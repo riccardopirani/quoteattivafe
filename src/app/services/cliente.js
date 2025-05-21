@@ -18,7 +18,7 @@ const ClienteService = {
     try {
       const response = await axios.post(
         `${BASE_URL}/cliente/caricariferimenticliente`,
-        { IdCliente: idCliente }
+        { IdCliente: idCliente },
       );
       return response.data;
     } catch (error) {
@@ -32,7 +32,7 @@ const ClienteService = {
     try {
       const response = await axios.post(
         `${BASE_URL}/cliente/caricafilialicliente`,
-        { IdCliente: idCliente }
+        { IdCliente: idCliente },
       );
       return response.data;
     } catch (error) {
@@ -46,7 +46,7 @@ const ClienteService = {
     try {
       const response = await axios.post(
         `${BASE_URL}/cliente/crea`,
-        datiCliente
+        datiCliente,
       );
       return response.data;
     } catch (error) {
@@ -60,7 +60,7 @@ const ClienteService = {
     try {
       const response = await axios.post(
         `${BASE_URL}/cliente/aggiorna`,
-        datiCliente
+        datiCliente,
       );
       return response.data;
     } catch (error) {

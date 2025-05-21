@@ -1,87 +1,141 @@
 import React, { Component } from "react";
-import { Link } from "react-router-dom";
+import { withRouter } from "react-router-dom";
 import { Form } from "react-bootstrap";
+import { login } from "../services/user"; // Assicurati di avere il percorso corretto per il tuo file di servizi
 
-export class Login extends Component {
+class Login extends Component {
+  state = {
+    username: "",
+    password: "",
+    error: "",
+    loading: false,
+  };
+
+  handleChange = (e) => {
+    this.setState({ [e.target.name]: e.target.value, error: "" });
+  };
+
+  handleSubmit = async (e) => {
+    e.preventDefault();
+    const { username, password } = this.state;
+
+    try {
+      this.setState({ loading: true });
+      const userId = await login(username, password);
+      localStorage.setItem("isLogin", true);
+      localStorage.setItem("userId", userId);
+      this.props.history.push("/dashboard");
+    } catch (err) {
+      this.setState({ error: err.message, loading: false });
+    }
+  };
+
   render() {
+    const { username, password, error, loading } = this.state;
+
     return (
-      <div>
-        <div className="d-flex align-items-center auth px-0">
-          <div className="row w-100 mx-0">
-            <div className="col-lg-4 mx-auto">
-              <div className="auth-form-light text-left py-5 px-4 px-sm-5">
-                <div className="brand-logo">
-                  <img
-                    src={require("../../assets/images/logo.svg")}
-                    alt="logo"
-                  />
-                </div>
-                <h4>Hello! let's get started</h4>
-                <h6 className="font-weight-light">Sign in to continue.</h6>
-                <Form className="pt-3">
-                  <Form.Group className="d-flex search-field">
-                    <Form.Control
-                      type="email"
-                      placeholder="Username"
-                      size="lg"
-                      className="h-auto"
-                    />
-                  </Form.Group>
-                  <Form.Group className="d-flex search-field">
-                    <Form.Control
-                      type="password"
-                      placeholder="Password"
-                      size="lg"
-                      className="h-auto"
-                    />
-                  </Form.Group>
-                  <div className="mt-3">
-                    <Link
-                      className="btn btn-block btn-primary btn-lg font-weight-medium auth-form-btn"
-                      to="/dashboard"
-                    >
-                      SIGN IN
-                    </Link>
-                  </div>
-                  <div className="my-2 d-flex justify-content-between align-items-center">
-                    <div className="form-check">
-                      <label className="form-check-label text-muted">
-                        <input type="checkbox" className="form-check-input" />
-                        <i className="input-helper"></i>
-                        Keep me signed in
-                      </label>
-                    </div>
-                    <a
-                      href="!#"
-                      onClick={(event) => event.preventDefault()}
-                      className="auth-link text-black"
-                    >
-                      Forgot password?
-                    </a>
-                  </div>
-                  <div className="mb-2">
-                    <button
-                      type="button"
-                      className="btn btn-block btn-facebook auth-form-btn"
-                    >
-                      <i className="mdi mdi-facebook mr-2"></i>Connect using
-                      facebook
-                    </button>
-                  </div>
-                  <div className="text-center mt-4 font-weight-light">
-                    Don't have an account?{" "}
-                    <Link to="/user-pages/register" className="text-primary">
-                      Create
-                    </Link>
-                  </div>
-                </Form>
-              </div>
-            </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          backgroundColor: "#f4f6f5",
+          padding: "20px",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "420px",
+            backgroundColor: "#ffffff",
+            borderRadius: "20px",
+            padding: "30px",
+            boxShadow: "0 8px 20px rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          <div style={{ textAlign: "center", marginBottom: "20px" }}>
+            <img
+              src="https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg"
+              alt="Attiva Costruzioni"
+              style={{
+                height: "60px",
+                objectFit: "contain",
+                marginBottom: "10px",
+              }}
+            />
+            <h4 style={{ margin: 0, color: "#2e7d32", fontWeight: "600" }}>
+              Benvenuto!
+            </h4>
+            <p style={{ color: "#777", fontSize: "14px", marginTop: "4px" }}>
+              Accedi per continuare
+            </p>
           </div>
+
+          <Form onSubmit={this.handleSubmit}>
+            <Form.Group style={{ marginBottom: "16px" }}>
+              <Form.Control
+                type="text"
+                name="username"
+                value={username}
+                onChange={this.handleChange}
+                placeholder="Username"
+                style={{
+                  borderRadius: "30px",
+                  padding: "12px 20px",
+                  fontSize: "15px",
+                  border: "1px solid #ccc",
+                }}
+              />
+            </Form.Group>
+
+            <Form.Group style={{ marginBottom: "16px" }}>
+              <Form.Control
+                type="password"
+                name="password"
+                value={password}
+                onChange={this.handleChange}
+                placeholder="Password"
+                style={{
+                  borderRadius: "30px",
+                  padding: "12px 20px",
+                  fontSize: "15px",
+                  border: "1px solid #ccc",
+                }}
+              />
+            </Form.Group>
+
+            {error && (
+              <div
+                style={{ color: "red", fontSize: "13px", marginBottom: "10px" }}
+              >
+                {error}
+              </div>
+            )}
+
+            <div style={{ marginBottom: "16px" }}>
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  backgroundColor: "#2e7d32",
+                  color: "#fff",
+                  padding: "12px",
+                  borderRadius: "30px",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                  border: "none",
+                }}
+              >
+                {loading ? "Attendere..." : "Accedi"}
+              </button>
+            </div>
+          </Form>
         </div>
       </div>
     );
   }
 }
 
-export default Login;
+export default withRouter(Login);

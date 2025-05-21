@@ -1,23 +1,65 @@
 import React, { Component } from "react";
 import { Link, withRouter } from "react-router-dom";
-import { Collapse } from "react-bootstrap";
-import { Dropdown } from "react-bootstrap";
+import { Collapse, Spinner } from "react-bootstrap";
 import { Trans } from "react-i18next";
+import { BASE_URL } from "../services/api";
+import "./Sidebar.css";
 
 class Sidebar extends Component {
-  state = {};
+  state = {
+    user: null,
+    menuStates: {},
+    loading: true,
+  };
 
   toggleMenuState(menuState) {
-    if (this.state[menuState]) {
-      this.setState({ [menuState]: false });
-    } else if (Object.keys(this.state).length === 0) {
-      this.setState({ [menuState]: true });
+    this.setState((prevState) => ({
+      menuStates: {
+        ...Object.keys(prevState.menuStates).reduce((acc, key) => {
+          acc[key] = false;
+          return acc;
+        }, {}),
+        [menuState]: !prevState.menuStates[menuState],
+      },
+    }));
+  }
+
+  async componentDidMount() {
+    this.onRouteChanged();
+    const userId = localStorage.getItem("userId");
+    if (userId) {
+      try {
+        const res = await fetch(`${BASE_URL}/RisorseUmane/CaricaRisorse`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ IdUtente: parseInt(userId) }),
+        });
+        const data = await res.json();
+        this.setState({
+          user: data.find((u) => u.IdUtente === parseInt(userId)),
+          loading: false,
+        });
+      } catch (err) {
+        console.error("Errore fetch utente:", err);
+        this.setState({ loading: false });
+      }
     } else {
-      Object.keys(this.state).forEach((i) => {
-        this.setState({ [i]: false });
-      });
-      this.setState({ [menuState]: true });
+      this.setState({ loading: false });
     }
+
+    const body = document.querySelector("body");
+    document.querySelectorAll(".sidebar .nav-item").forEach((el) => {
+      el.addEventListener("mouseover", function () {
+        if (body && body.classList.contains("sidebar-icon-only")) {
+          el.classList.add("hover-open");
+        }
+      });
+      el.addEventListener("mouseout", function () {
+        if (body && body.classList.contains("sidebar-icon-only")) {
+          el.classList.remove("hover-open");
+        }
+      });
+    });
   }
 
   componentDidUpdate(prevProps) {
@@ -27,71 +69,139 @@ class Sidebar extends Component {
   }
 
   onRouteChanged() {
-    document.querySelector("#sidebar").classList.remove("active");
-    Object.keys(this.state).forEach((i) => {
-      this.setState({ [i]: false });
-    });
+    const sidebar = document.querySelector("#sidebar");
+    if (sidebar) {
+      sidebar.classList.remove("active");
+    }
+    this.setState({ menuStates: {} });
+  }
 
-    const dropdownPaths = [
-      { path: "/apps", state: "appsMenuOpen" },
-      { path: "/basic-ui", state: "basicUiMenuOpen" },
-      { path: "/form-elements", state: "formElementsMenuOpen" },
-      { path: "/tables", state: "tablesMenuOpen" },
-      { path: "/icons", state: "iconsMenuOpen" },
-      { path: "/charts", state: "chartsMenuOpen" },
-      { path: "/user-pages", state: "userPagesMenuOpen" },
-      { path: "/error-pages", state: "errorPagesMenuOpen" },
+  isPathActive(path) {
+    return this.props.location.pathname.startsWith(path);
+  }
+
+  handleLogout = () => {
+    localStorage.removeItem("isLogin");
+    localStorage.removeItem("userId");
+    this.props.history.push("/login");
+  };
+
+  render() {
+    const { user, menuStates, loading } = this.state;
+
+    if (loading) {
+      return (
+        <div className="sidebar-loading text-center mt-5">
+          <Spinner animation="border" variant="success" />
+        </div>
+      );
+    }
+
+    const permessi = user || {};
+    const imageUrl = user
+      ? `${BASE_URL}/utente_${user.IdUtente}.jpg`
+      : "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg";
+
+    const permessiPersonalizzati = [
+      {
+        label: "Accesso Commerciale",
+        key: "AccessoMagazzino",
+        route: "/gare/upcoming",
+        subMenu: [
+          { label: "Riepilogo", to: "/gare/upcoming" },
+          { label: "In studio", to: "/basic-ui/buttons?menu=studio" },
+          { label: "Consegnate", to: "/basic-ui/buttons?menu=consegnate" },
+          { label: "Aggiudicate", to: "/basic-ui/buttons?menu=aggiudicate" },
+          { label: "Perse", to: "/basic-ui/buttons?menu=perse" },
+        ],
+        menuKey: "commercialeMenuOpen",
+        icon: "mdi mdi-crosshairs-gps",
+      },
+      {
+        label: "Accesso Tecnico",
+        key: "AccessoCantieri",
+        route: "/form-elements",
+        subMenu: [
+          { label: "Dashboard", to: "/tecnico/dashboard" },
+          { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
+        ],
+        menuKey: "tecnicoMenuOpen",
+        icon: "mdi mdi-format-list-bulleted",
+      },
+      {
+        label: "Accesso Sicurezza",
+        key: "AccessoPreventivi",
+        route: "/tables",
+        subMenu: [],
+        menuKey: "sicurezzaMenuOpen",
+        icon: "mdi mdi-table-large",
+      },
+      {
+        label: "Accesso Gestione",
+        key: "AccessoArticoli",
+        route: "/icons",
+        subMenu: [{ label: "Gestione", to: "/icons/mdi" }],
+        menuKey: "gestioneMenuOpen",
+        icon: "mdi mdi-account-box-outline",
+      },
+      {
+        label: "Accesso Amministrazione",
+        key: "AccessoUtenti",
+        route: "/charts",
+        subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
+        menuKey: "amministrazioneMenuOpen",
+        icon: "mdi mdi-chart-line",
+      },
     ];
 
-    dropdownPaths.forEach((obj) => {
-      if (this.isPathActive(obj.path)) {
-        this.setState({ [obj.state]: true });
-      }
-    });
-  }
-  render() {
+    const nomeUtente = user && user.Nome === "00000" ? "" : user?.Nome;
+    const cognomeUtente = user && user.Cognome === "00000" ? "" : user?.Cognome;
+
     return (
       <nav className="sidebar sidebar-offcanvas" id="sidebar">
         <div className="text-center sidebar-brand-wrapper d-flex align-items-center">
-          <a className="sidebar-brand brand-logo" href="index.html">
+          <a className="sidebar-brand brand-logo" href="/">
             <img
-              src={
-                "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg"
-              }
+              src="https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg"
               alt="logo"
             />
           </a>
         </div>
         <ul className="nav">
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              marginTop: "40px",
-            }}
-          >
-            {/* Icona utente */}
+          <div className="sidebar-user-info">
             <div
+              className="sidebar-user-img"
               style={{
-                border: "2px solid green",
-                borderRadius: "30%",
-                padding: "10px",
-                marginBottom: "10px",
+                border: "3px solid #00aa5e",
+                borderRadius: "50%",
+                padding: "5px",
               }}
             >
               <img
-                src="https://img.freepik.com/vettori-gratuito/circolo-blu-con-utente-bianco_78370-4707.jpg?semt=ais_hybrid&w=740"
-                width={50}
-                height={50}
+                src={imageUrl}
+                onError={(e) =>
+                  (e.target.src = "https://via.placeholder.com/50")
+                }
+                alt="utente"
+                style={{ borderRadius: "50%", width: 50, height: 50 }}
               />
             </div>
-
-            {/* Testo "Utente:" */}
-            <p style={{ fontSize: "24px", margin: 0 }}>Utente:</p>
-
-            {/* Nome utente */}
-            <p style={{ color: "green", marginTop: "8px" }}>Paolo Alberto</p>
+            <p
+              className="sidebar-user-label"
+              style={{ fontSize: 18, marginTop: 10 }}
+            >
+              Utente:
+            </p>
+            <p
+              className="sidebar-user-name"
+              style={{
+                color: "green",
+                fontWeight: "bold",
+                textAlign: "center",
+              }}
+            >
+              {`${nomeUtente || ""} ${cognomeUtente || ""}`.trim()}
+            </p>
           </div>
 
           <li
@@ -101,278 +211,72 @@ class Sidebar extends Component {
           >
             <Link className="nav-link" to="/dashboard">
               <i className="mdi mdi-television menu-icon"></i>
-              <span className="menu-title" style={{ color: "grey" }}>
+              <span className="menu-title text-green">
                 <Trans>Dashboard</Trans>
               </span>
             </Link>
           </li>
-          <li
-            className={
-              this.isPathActive("/gare/upcoming")
-                ? "nav-item active"
-                : "nav-item"
-            }
-          >
-            <div
-              className={
-                this.state.basicUiMenuOpen
-                  ? "nav-link menu-expanded"
-                  : "nav-link"
-              }
-              onClick={() => this.toggleMenuState("basicUiMenuOpen")}
-              data-toggle="collapse"
-            >
-              <i className="mdi mdi-crosshairs-gps menu-icon"></i>
-              <span className="menu-title" style={{ color: "grey" }}>
-                <Trans>Commerciale</Trans>
-              </span>
-            </div>
-            <Collapse in={this.state.basicUiMenuOpen}>
-              <ul className="nav flex-column sub-menu">
-                <li className="nav-item">
-                  <Link className="nav-link" to="/gare/upcoming">
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Riepilogo</Trans>
-                    </span>
-                  </Link>
+
+          {permessiPersonalizzati.map(
+            ({ label, key, route, subMenu, menuKey, icon }) =>
+              permessi[key] ? (
+                <li
+                  key={key}
+                  className={
+                    this.isPathActive(route) ? "nav-item active" : "nav-item"
+                  }
+                >
+                  {subMenu.length > 0 ? (
+                    <div
+                      className={
+                        menuStates[menuKey]
+                          ? "nav-link menu-expanded green-hover"
+                          : "nav-link green-hover"
+                      }
+                      onClick={() => this.toggleMenuState(menuKey)}
+                      data-toggle="collapse"
+                    >
+                      <i className={`${icon} menu-icon`}></i>
+                      <span className="menu-title text-green">{label}</span>
+                      <i className="menu-arrow"></i>
+                    </div>
+                  ) : (
+                    <Link className="nav-link green-hover" to={route}>
+                      <i className={`${icon} menu-icon`}></i>
+                      <span className="menu-title text-green">{label}</span>
+                    </Link>
+                  )}
+                  {subMenu.length > 0 && (
+                    <Collapse in={menuStates[menuKey]}>
+                      <ul className="nav flex-column sub-menu">
+                        {subMenu.map((item, index) => (
+                          <li className="nav-item" key={index}>
+                            <Link className="nav-link green-hover" to={item.to}>
+                              <span className="menu-title text-green">
+                                {item.label}
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </Collapse>
+                  )}
                 </li>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/basic-ui/buttons?menu=studio">
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>In studio</Trans>
-                    </span>
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link
-                    className="nav-link"
-                    to="/basic-ui/buttons?menu=consegnate"
-                  >
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Consegnate</Trans>
-                    </span>
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link
-                    className="nav-link"
-                    to="/basic-ui/buttons?menu=aggiudicate"
-                  >
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Aggiudicate</Trans>
-                    </span>
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/basic-ui/buttons?menu=perse">
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Perse</Trans>
-                    </span>
-                  </Link>
-                </li>
-              </ul>
-            </Collapse>
+              ) : null
+          )}
+
+          <li className="nav-item mt-4">
+            <button className="btn  btn-sm w-100" onClick={this.handleLogout}>
+              <img
+                src={require("../../assets/images/logout.jpg")}
+                alt="profile"
+                width="70%"
+              />
+            </button>
           </li>
-          <li
-            className={
-              this.isPathActive("/form-elements")
-                ? "nav-item active"
-                : "nav-item"
-            }
-          >
-            <div
-              className={
-                this.state.formElementsMenuOpen
-                  ? "nav-link menu-expanded"
-                  : "nav-link"
-              }
-              onClick={() => this.toggleMenuState("formElementsMenuOpen")}
-              data-toggle="collapse"
-            >
-              <i className="mdi mdi-format-list-bulleted menu-icon"></i>
-              <span className="menu-title" style={{ color: "grey" }}>
-                <Trans>Tecnico</Trans>
-              </span>
-              <i className="menu-arrow"></i>
-            </div>
-            <Collapse in={this.state.formElementsMenuOpen}>
-              <ul className="nav flex-column sub-menu">
-                <li className="nav-item">
-                  {" "}
-                  <Link
-                    className={
-                      this.isPathActive("/tecnico/dashboard")
-                        ? "nav-link active"
-                        : "nav-link"
-                    }
-                    to="/tecnico/dashboard"
-                  >
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Dashboard</Trans>
-                    </span>
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  {" "}
-                  <Link
-                    className={
-                      this.isPathActive("/gestione/commesse")
-                        ? "nav-link active"
-                        : "nav-link"
-                    }
-                    to="/gestione/commesse"
-                  >
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Controllo Gestione Commessa</Trans>
-                    </span>
-                  </Link>
-                </li>
-              </ul>
-            </Collapse>
-          </li>
-          {/* <li
-            className={
-              this.isPathActive("/tables") ? "nav-item active" : "nav-item"
-            }
-          >
-            <div
-              className={
-                this.state.tablesMenuOpen
-                  ? "nav-link menu-expanded"
-                  : "nav-link"
-              }
-              onClick={() => this.toggleMenuState("tablesMenuOpen")}
-              data-toggle="collapse"
-            >
-              <i className="mdi mdi-table-large menu-icon"></i>
-              <span className="menu-title">
-                <span className="menu-title" style={{ color: "grey" }}>
-                  <Trans>Sicurezza</Trans>
-                </span>
-              </span>
-              <i className="menu-arrow"></i>
-            </div>
-            <Collapse in={this.state.tablesMenuOpen}>
-              <ul className="nav flex-column sub-menu">
-                <li className="nav-item">
-                  {" "}
-                  <Link
-                    className={
-                      this.isPathActive("/tables/basic-table")
-                        ? "nav-link active"
-                        : "nav-link"
-                    }
-                    to="/tables/basic-table"
-                  >
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Amministrazione</Trans>
-                    </span>
-                  </Link>
-                </li>
-              </ul>
-            </Collapse>
-          </li>
-          <li
-            className={
-              this.isPathActive("/icons") ? "nav-item active" : "nav-item"
-            }
-          >
-            <div
-              className={
-                this.state.iconsMenuOpen ? "nav-link menu-expanded" : "nav-link"
-              }
-              onClick={() => this.toggleMenuState("iconsMenuOpen")}
-              data-toggle="collapse"
-            >
-              <i className="mdi mdi-account-box-outline menu-icon"></i>
-              <span className="menu-title" style={{ color: "grey" }}>
-                <Trans>Gestione</Trans>
-              </span>
-              <i className="menu-arrow"></i>
-            </div>
-            <Collapse in={this.state.iconsMenuOpen}>
-              <ul className="nav flex-column sub-menu">
-                <li className="nav-item">
-                  {" "}
-                  <Link
-                    className={
-                      this.isPathActive("/icons/mdi")
-                        ? "nav-link active"
-                        : "nav-link"
-                    }
-                    to="/icons/mdi"
-                  >
-                    <span className="menu-title" style={{ color: "grey" }}>
-                      <Trans>Gestione</Trans>
-                    </span>
-                  </Link>
-                </li>
-              </ul>
-            </Collapse>
-          </li>
-          <li
-            className={
-              this.isPathActive("/charts") ? "nav-item active" : "nav-item"
-            }
-          >
-            <div
-              className={
-                this.state.chartsMenuOpen
-                  ? "nav-link menu-expanded"
-                  : "nav-link"
-              }
-              onClick={() => this.toggleMenuState("chartsMenuOpen")}
-              data-toggle="collapse"
-            >
-              <i className="mdi mdi-chart-line menu-icon"></i>
-              <span className="menu-title" style={{ color: "grey" }}>
-                <Trans>Amministrazione</Trans>
-              </span>
-              <i className="menu-arrow"></i>
-            </div>
-            <Collapse in={this.state.chartsMenuOpen}>
-              <ul className="nav flex-column sub-menu">
-                <li className="nav-item">
-                  {" "}
-                  <Link
-                    className={
-                      this.isPathActive("/charts/chart-js")
-                        ? "nav-link active"
-                        : "nav-link"
-                    }
-                    to="/charts/chart-js"
-                  >
-                    Chart Js
-                  </Link>
-                </li>
-              </ul>
-            </Collapse>
-          </li>*/}
         </ul>
       </nav>
     );
-  }
-
-  isPathActive(path) {
-    return this.props.location.pathname.startsWith(path);
-  }
-
-  componentDidMount() {
-    this.onRouteChanged();
-    // add className 'hover-open' to sidebar navitem while hover in sidebar-icon-only menu
-    const body = document.querySelector("body");
-    document.querySelectorAll(".sidebar .nav-item").forEach((el) => {
-      el.addEventListener("mouseover", function () {
-        if (body.classList.contains("sidebar-icon-only")) {
-          el.classList.add("hover-open");
-        }
-      });
-      el.addEventListener("mouseout", function () {
-        if (body.classList.contains("sidebar-icon-only")) {
-          el.classList.remove("hover-open");
-        }
-      });
-    });
   }
 }
 
