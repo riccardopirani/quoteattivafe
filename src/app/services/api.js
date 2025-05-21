@@ -1,6 +1,6 @@
 // src/services/garaService.js
 import axios from "axios";
-export const BASE_URL = "http://127.0.0.1:8989"; // Cambia la porta o dominio se necessario
+export const BASE_URL = "http://cloud.centoimpianti.com:4501"; // Cambia la porta o dominio se necessario
 
 const GaraService = {
   // CREA una nuova gara
