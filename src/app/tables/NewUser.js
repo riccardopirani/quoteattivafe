@@ -21,8 +21,8 @@ const UserImage = ({ user }) => {
     return btoa(
       new Uint8Array(buffer.data).reduce(
         (data, byte) => data + String.fromCharCode(byte),
-        ""
-      )
+        "",
+      ),
     );
   };
 
@@ -32,7 +32,7 @@ const UserImage = ({ user }) => {
     if (base64) setSrc(`data:image/${mimeType};base64,${base64}`);
     else
       setSrc(
-        "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg"
+        "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg",
       );
   };
 
@@ -236,8 +236,8 @@ const UserManagementDrawer = () => {
 
   const filteredUsers = users.filter((user) =>
     ["Username", "Nome", "Cognome", "Email"].some((key) =>
-      (user[key] || "").toLowerCase().includes(filter.toLowerCase())
-    )
+      (user[key] || "").toLowerCase().includes(filter.toLowerCase()),
+    ),
   );
 
   const permessiPersonalizzati = [
@@ -293,8 +293,8 @@ const UserManagementDrawer = () => {
                         field === "Password"
                           ? "password"
                           : field === "Email"
-                          ? "email"
-                          : "text"
+                            ? "email"
+                            : "text"
                       }
                       value={form[field] || ""}
                       onChange={handleChange}

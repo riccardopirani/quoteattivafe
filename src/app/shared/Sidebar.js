@@ -5,13 +5,67 @@ import { Trans } from "react-i18next";
 import { BASE_URL } from "../services/api";
 import "./Sidebar.css";
 
+const permessiPersonalizzati = [
+  {
+    label: "Accesso Commerciale",
+    key: "AccessoMagazzino",
+    route: "/gare/upcoming",
+    subMenu: [
+      { label: "Riepilogo", to: "/gare/upcoming" },
+      { label: "In studio", to: "/basic-ui/buttons?menu=studio" },
+      { label: "Consegnate", to: "/basic-ui/buttons?menu=consegnate" },
+      { label: "Aggiudicate", to: "/basic-ui/buttons?menu=aggiudicate" },
+      { label: "Perse", to: "/basic-ui/buttons?menu=perse" },
+    ],
+    menuKey: "commercialeMenuOpen",
+    icon: "mdi mdi-crosshairs-gps",
+  },
+  {
+    label: "Accesso Tecnico",
+    key: "AccessoCantieri",
+    route: "/form-elements",
+    subMenu: [
+      { label: "Dashboard", to: "/tecnico/dashboard" },
+      { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
+    ],
+    menuKey: "tecnicoMenuOpen",
+    icon: "mdi mdi-format-list-bulleted",
+  },
+  {
+    label: "Accesso Sicurezza",
+    key: "AccessoPreventivi",
+    route: "/gestione/commesse",
+    subMenu: [],
+    menuKey: "sicurezzaMenuOpen",
+    icon: "mdi mdi-table-large",
+  },
+  {
+    label: "Accesso Gestione",
+    key: "AccessoArticoli",
+    route: "/icons",
+    subMenu: [{ label: "Gestione", to: "/gestione/commesse" }],
+    menuKey: "gestioneMenuOpen",
+    icon: "mdi mdi-account-box-outline",
+  },
+  {
+    label: "Accesso Amministrazione",
+    key: "AccessoUtenti",
+    route: "/charts",
+    subMenu: [{ label: "Utenti", to: "/gestione/commesse" }],
+    menuKey: "amministrazioneMenuOpen",
+    icon: "mdi mdi-chart-line",
+  },
+];
+
 class Sidebar extends Component {
   state = {
     user: null,
     menuStates: {},
     loading: true,
+    sidebarOpen: false, // Track whether the sidebar is open or closed
   };
 
+  // Toggle the state of the menu
   toggleMenuState(menuState) {
     this.setState((prevState) => ({
       menuStates: {
@@ -23,6 +77,13 @@ class Sidebar extends Component {
       },
     }));
   }
+
+  // Toggle the sidebar visibility on mobile
+  toggleSidebar = () => {
+    this.setState((prevState) => ({
+      sidebarOpen: !prevState.sidebarOpen,
+    }));
+  };
 
   async componentDidMount() {
     this.onRouteChanged();
@@ -87,7 +148,7 @@ class Sidebar extends Component {
   };
 
   render() {
-    const { user, menuStates, loading } = this.state;
+    const { user, menuStates, loading, sidebarOpen } = this.state;
 
     if (loading) {
       return (
@@ -102,63 +163,19 @@ class Sidebar extends Component {
       ? `${BASE_URL}/utente_${user.IdUtente}.jpg`
       : "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg";
 
-    const permessiPersonalizzati = [
-      {
-        label: "Accesso Commerciale",
-        key: "AccessoMagazzino",
-        route: "/gare/upcoming",
-        subMenu: [
-          { label: "Riepilogo", to: "/gare/upcoming" },
-          { label: "In studio", to: "/basic-ui/buttons?menu=studio" },
-          { label: "Consegnate", to: "/basic-ui/buttons?menu=consegnate" },
-          { label: "Aggiudicate", to: "/basic-ui/buttons?menu=aggiudicate" },
-          { label: "Perse", to: "/basic-ui/buttons?menu=perse" },
-        ],
-        menuKey: "commercialeMenuOpen",
-        icon: "mdi mdi-crosshairs-gps",
-      },
-      {
-        label: "Accesso Tecnico",
-        key: "AccessoCantieri",
-        route: "/form-elements",
-        subMenu: [
-          { label: "Dashboard", to: "/tecnico/dashboard" },
-          { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
-        ],
-        menuKey: "tecnicoMenuOpen",
-        icon: "mdi mdi-format-list-bulleted",
-      },
-      {
-        label: "Accesso Sicurezza",
-        key: "AccessoPreventivi",
-        route: "/tables",
-        subMenu: [],
-        menuKey: "sicurezzaMenuOpen",
-        icon: "mdi mdi-table-large",
-      },
-      {
-        label: "Accesso Gestione",
-        key: "AccessoArticoli",
-        route: "/icons",
-        subMenu: [{ label: "Gestione", to: "/icons/mdi" }],
-        menuKey: "gestioneMenuOpen",
-        icon: "mdi mdi-account-box-outline",
-      },
-      {
-        label: "Accesso Amministrazione",
-        key: "AccessoUtenti",
-        route: "/charts",
-        subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
-        menuKey: "amministrazioneMenuOpen",
-        icon: "mdi mdi-chart-line",
-      },
-    ];
-
-    const nomeUtente = user && user.Nome === "00000" ? "" : user?.Nome;
-    const cognomeUtente = user && user.Cognome === "00000" ? "" : user?.Cognome;
-
     return (
-      <nav className="sidebar sidebar-offcanvas" id="sidebar">
+      <nav
+        className={`sidebar sidebar-offcanvas ${sidebarOpen ? "active" : ""}`}
+        id="sidebar"
+      >
+        {/* Add a button for mobile toggle */}
+        <button
+          className="sidebar-toggler d-lg-none"
+          onClick={this.toggleSidebar}
+        >
+          <i className="mdi mdi-menu"></i>
+        </button>
+
         <div className="text-center sidebar-brand-wrapper d-flex align-items-center">
           <a className="sidebar-brand brand-logo" href="/">
             <img
@@ -167,7 +184,9 @@ class Sidebar extends Component {
             />
           </a>
         </div>
+
         <ul className="nav">
+          {/* User info */}
           <div className="sidebar-user-info">
             <div
               className="sidebar-user-img"
@@ -200,23 +219,11 @@ class Sidebar extends Component {
                 textAlign: "center",
               }}
             >
-              {`${nomeUtente || ""} ${cognomeUtente || ""}`.trim()}
+              {`${user?.Nome || ""} ${user?.Cognome || ""}`.trim()}
             </p>
           </div>
 
-          <li
-            className={
-              this.isPathActive("/dashboard") ? "nav-item active" : "nav-item"
-            }
-          >
-            <Link className="nav-link" to="/dashboard">
-              <i className="mdi mdi-television menu-icon"></i>
-              <span className="menu-title text-green">
-                <Trans>Dashboard</Trans>
-              </span>
-            </Link>
-          </li>
-
+          {/* Sidebar Menu */}
           {permessiPersonalizzati.map(
             ({ label, key, route, subMenu, menuKey, icon }) =>
               permessi[key] ? (
@@ -233,8 +240,14 @@ class Sidebar extends Component {
                           ? "nav-link menu-expanded green-hover"
                           : "nav-link green-hover"
                       }
-                      onClick={() => this.toggleMenuState(menuKey)}
-                      data-toggle="collapse"
+                      onClick={() => {
+                        this.toggleMenuState(menuKey);
+                        const cleanLabel = label.replace(/^Accesso\s+/i, ""); // Rimuove "Accesso " all'inizio
+                        localStorage.setItem("selectedMenuLabel", cleanLabel);
+                        window.dispatchEvent(
+                          new Event("selectedMenuLabelChanged"),
+                        );
+                      }}
                     >
                       <i className={`${icon} menu-icon`}></i>
                       <span className="menu-title text-green">{label}</span>
@@ -262,11 +275,11 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null
+              ) : null,
           )}
 
           <li className="nav-item mt-4">
-            <button className="btn  btn-sm w-100" onClick={this.handleLogout}>
+            <button className="btn btn-sm w-100" onClick={this.handleLogout}>
               <img
                 src={require("../../assets/images/logout.jpg")}
                 alt="profile"

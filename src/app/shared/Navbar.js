@@ -1,14 +1,29 @@
 import React, { Component } from "react";
-import { Dropdown } from "react-bootstrap";
-import { Trans } from "react-i18next";
 
 class Navbar extends Component {
-  toggleOffcanvas() {
-    document.querySelector(".sidebar-offcanvas").classList.toggle("active");
+  constructor(props) {
+    super(props);
+    this.state = {
+      selectedLabel: localStorage.getItem("selectedMenuLabel") || "Commerciale",
+    };
   }
-  toggleRightSidebar() {
-    document.querySelector(".right-sidebar").classList.toggle("open");
+  componentDidMount() {
+    window.addEventListener("selectedMenuLabelChanged", this.handleLabelChange);
   }
+
+  componentWillUnmount() {
+    window.removeEventListener(
+      "selectedMenuLabelChanged",
+      this.handleLabelChange,
+    );
+  }
+
+  handleLabelChange = () => {
+    this.setState({
+      selectedLabel: localStorage.getItem("selectedMenuLabel") || "Commerciale",
+    });
+  };
+
   render() {
     return (
       <nav
@@ -19,16 +34,6 @@ class Navbar extends Component {
           className="navbar-menu-wrapper d-flex align-items-center justify-content-between"
           style={{ backgroundColor: "#12b34c" }}
         >
-          <a
-            className="navbar-brand brand-logo-mini align-self-center d-lg-none"
-            href="!#"
-            onClick={(evt) => evt.preventDefault()}
-          >
-            <img
-              src={require("../../assets/images/logo-mini.svg")}
-              alt="logo"
-            />
-          </a>
           <button
             className="navbar-toggler navbar-toggler align-self-center"
             type="button"
@@ -36,6 +41,7 @@ class Navbar extends Component {
           >
             <i className="mdi mdi-menu"></i>
           </button>
+
           <p
             style={{
               color: "white",
@@ -44,13 +50,13 @@ class Navbar extends Component {
               marginTop: 10,
             }}
           >
-            {" "}
-            Commerciale
+            {this.state.selectedLabel}
           </p>
+
           <button
             className="navbar-toggler navbar-toggler-right d-lg-none align-self-center"
             type="button"
-            onClick={this.toggleOffcanvas}
+            onClick={this.props.toggleOffcanvas}
           >
             <span className="mdi mdi-menu"></span>
           </button>
