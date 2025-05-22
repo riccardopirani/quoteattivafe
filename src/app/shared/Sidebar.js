@@ -1,7 +1,6 @@
-import React, { Component } from "react";
+import { Component } from "react";
 import { Link, withRouter } from "react-router-dom";
 import { Collapse, Spinner } from "react-bootstrap";
-import { Trans } from "react-i18next";
 import { BASE_URL } from "../services/api";
 import "./Sidebar.css";
 
