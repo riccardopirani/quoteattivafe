@@ -1,6 +1,7 @@
-import { Component } from "react";
+import React, { Component } from "react";
 import { Link, withRouter } from "react-router-dom";
 import { Collapse, Spinner } from "react-bootstrap";
+import { Trans } from "react-i18next";
 import { BASE_URL } from "../services/api";
 import "./Sidebar.css";
 
@@ -33,16 +34,22 @@ const permessiPersonalizzati = [
   {
     label: "Accesso Sicurezza",
     key: "AccessoPreventivi",
-    route: "/gestione/commesse",
-    subMenu: [],
+    route: "/form-elements",
+    subMenu: [
+      { label: "Dashboard", to: "/tecnico/dashboard" },
+      { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
+    ],
     menuKey: "sicurezzaMenuOpen",
     icon: "mdi mdi-table-large",
   },
   {
     label: "Accesso Gestione",
     key: "AccessoArticoli",
-    route: "/icons",
-    subMenu: [{ label: "Gestione", to: "/gestione/commesse" }],
+    route: "/form-elements",
+    subMenu: [
+      { label: "Dashboard", to: "/tecnico/dashboard" },
+      { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
+    ],
     menuKey: "gestioneMenuOpen",
     icon: "mdi mdi-account-box-outline",
   },
@@ -50,7 +57,7 @@ const permessiPersonalizzati = [
     label: "Accesso Amministrazione",
     key: "AccessoUtenti",
     route: "/charts",
-    subMenu: [{ label: "Utenti", to: "/gestione/commesse" }],
+    subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
     menuKey: "amministrazioneMenuOpen",
     icon: "mdi mdi-chart-line",
   },
