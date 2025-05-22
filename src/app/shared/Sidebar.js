@@ -7,7 +7,7 @@ import "./Sidebar.css";
 
 const permessiPersonalizzati = [
   {
-    label: "Accesso Commerciale",
+    label: "Commerciale",
     key: "AccessoMagazzino",
     route: "/gare/upcoming",
     subMenu: [
@@ -21,7 +21,7 @@ const permessiPersonalizzati = [
     icon: "mdi mdi-crosshairs-gps",
   },
   {
-    label: "Accesso Tecnico",
+    label: " Tecnico",
     key: "AccessoCantieri",
     route: "/form-elements",
     subMenu: [
@@ -32,7 +32,7 @@ const permessiPersonalizzati = [
     icon: "mdi mdi-format-list-bulleted",
   },
   {
-    label: "Accesso Sicurezza",
+    label: "Sicurezza",
     key: "AccessoPreventivi",
     route: "/form-elements",
     subMenu: [
@@ -43,7 +43,7 @@ const permessiPersonalizzati = [
     icon: "mdi mdi-table-large",
   },
   {
-    label: "Accesso Gestione",
+    label: "Gestione",
     key: "AccessoArticoli",
     route: "/form-elements",
     subMenu: [
@@ -54,7 +54,7 @@ const permessiPersonalizzati = [
     icon: "mdi mdi-account-box-outline",
   },
   {
-    label: "Accesso Amministrazione",
+    label: "Amministrazione",
     key: "AccessoUtenti",
     route: "/charts",
     subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
@@ -251,7 +251,7 @@ class Sidebar extends Component {
                         const cleanLabel = label.replace(/^Accesso\s+/i, ""); // Rimuove "Accesso " all'inizio
                         localStorage.setItem("selectedMenuLabel", cleanLabel);
                         window.dispatchEvent(
-                          new Event("selectedMenuLabelChanged"),
+                          new Event("selectedMenuLabelChanged")
                         );
                       }}
                     >
@@ -281,7 +281,7 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null,
+              ) : null
           )}
 
           <li className="nav-item mt-4">
