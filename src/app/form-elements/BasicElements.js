@@ -1,5 +1,22 @@
-import React, { useRef, useEffect, useState } from "react";
-import Dashboard from "../dashboard/Dashboard";
+import React, { useState } from "react";
+import { format } from "date-fns";
+import { Drawer, DrawerContent, DrawerHeader, DrawerBody, Button } from "antd";
+import { Select, Input } from "antd";
+
+const { Option } = Select;
+
+const tabStyle = {
+  padding: "10px 20px",
+  cursor: "pointer",
+  borderBottom: "3px solid transparent",
+  fontWeight: "bold",
+};
+
+const activeTabStyle = {
+  ...tabStyle,
+  borderBottom: "3px solid #2e7d32",
+  color: "#2e7d32",
+};
 
 const cellStyle = {
   textAlign: "center",
@@ -12,21 +29,10 @@ const headerStyle = {
   fontWeight: "bold",
 };
 
-function DashboardPanoramica() {
-  const bottomRef = useRef(null);
-  const [scrolledToBottom, setScrolledToBottom] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!bottomRef.current) return;
-      const rect = bottomRef.current.getBoundingClientRect();
-      const isVisible = rect.top < window.innerHeight && rect.bottom >= 0;
-      setScrolledToBottom(isVisible);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+function DashboardTabsPanoramica() {
+  const [activeTab, setActiveTab] = useState("Panoramica");
+  const [commessaOption, setCommessaOption] = useState("");
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const summaryCards = [
     { label: "Aperte", value: 4, color: "#2e7d32" },
@@ -46,17 +52,48 @@ function DashboardPanoramica() {
     { label: "Commessa peggiore", value: "Cod 363", highlight: true },
   ];
 
-  return (
-    <div style={{ padding: 20, fontFamily: "Arial, sans-serif" }}>
-      <h2>Panoramica</h2>
+  const handleCommessaSelection = (value) => {
+    setCommessaOption(value);
+    if (value === "nuova") {
+      setIsDrawerOpen(false);
+      window.location.href = "/gestione/commesse";
+    }
+  };
 
+  const renderDrawer = () => (
+    <Drawer
+      title="Crea Gara"
+      placement="right"
+      closable
+      onClose={() => setIsDrawerOpen(false)}
+      open={isDrawerOpen}
+    >
+      <Select
+        style={{ width: "100%" }}
+        placeholder="Seleziona un'opzione"
+        onChange={handleCommessaSelection}
+      >
+        <Option value="aggancia">Aggancia a commessa esistente</Option>
+        <Option value="nuova">Nuova commessa</Option>
+      </Select>
+
+      {commessaOption === "aggancia" && (
+        <div style={{ marginTop: 20 }}>
+          <Input placeholder="Filtro per Codice" style={{ marginBottom: 10 }} />
+          <Input placeholder="Filtro per Ragione Sociale" />
+        </div>
+      )}
+
+      <div style={{ marginTop: 20, textAlign: "right" }}>
+        <Button onClick={() => setIsDrawerOpen(false)}>Chiudi</Button>
+      </div>
+    </Drawer>
+  );
+
+  const renderPanoramica = () => (
+    <>
       <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 20,
-          marginBottom: 30,
-        }}
+        style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 30 }}
       >
         {summaryCards.map((card, index) => (
           <div
@@ -79,14 +116,13 @@ function DashboardPanoramica() {
           </div>
         ))}
       </div>
+    </>
+  );
 
+  const renderDashboard = () => (
+    <>
       <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 20,
-          marginBottom: 40,
-        }}
+        style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 30 }}
       >
         {dashboardCards.map((card, i) => (
           <div
@@ -112,185 +148,41 @@ function DashboardPanoramica() {
           </div>
         ))}
       </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        <div>
-          <h4>Aggiornamento controllo gestione</h4>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={headerStyle}>
-                <th style={cellStyle}>Cod.</th>
-                <th style={cellStyle}>Commessa</th>
-                <th style={cellStyle}>Resp. Ufficio</th>
-                <th style={cellStyle}>Costi ultimi 60 gg.</th>
-                <th style={cellStyle}>Aggiornata da</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={cellStyle}>269</td>
-                <td style={cellStyle}>Grillenzoni - Via Torre Portello</td>
-                <td style={cellStyle}>Gabriele</td>
-                <td style={cellStyle}>0,00 €</td>
-                <td
-                  style={{
-                    ...cellStyle,
-                    backgroundColor: "#f44336",
-                    color: "#fff",
-                  }}
-                >
-                  {"> 60 gg"}
-                </td>
-              </tr>
-              <tr>
-                <td style={cellStyle}>270</td>
-                <td style={cellStyle}>
-                  Palazzo Veneziani - Via Frassoni 17 Finale
-                </td>
-                <td style={cellStyle}>Gabriele</td>
-                <td style={cellStyle}>370,11 €</td>
-                <td
-                  style={{
-                    ...cellStyle,
-                    backgroundColor: "#ff9800",
-                    color: "#fff",
-                  }}
-                >
-                  {"> 30 gg"}
-                </td>
-              </tr>
-              <tr>
-                <td style={cellStyle}>271</td>
-                <td style={cellStyle}>Petocchi</td>
-                <td style={cellStyle}>Filippo</td>
-                <td style={cellStyle}>0,00 €</td>
-                <td
-                  style={{
-                    ...cellStyle,
-                    backgroundColor: "#4CAF50",
-                    color: "#fff",
-                  }}
-                >
-                  {"< 30 gg"}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <h4>Esposizione cantieri</h4>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={headerStyle}>
-                <th style={cellStyle}>Cod.</th>
-                <th style={cellStyle}>Commessa</th>
-                <th style={cellStyle}>Resp. Ufficio</th>
-                <th style={cellStyle}>Costi sostenuti</th>
-                <th style={cellStyle}>Esposizione</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={cellStyle}>269</td>
-                <td style={cellStyle}>Grillenzoni - Via Torre Portello</td>
-                <td style={cellStyle}>Gabriele</td>
-                <td style={cellStyle}>0,00 €</td>
-                <td
-                  style={{
-                    ...cellStyle,
-                    backgroundColor: "#f44336",
-                    color: "#fff",
-                  }}
-                >
-                  - € 50.000
-                </td>
-              </tr>
-              <tr>
-                <td style={cellStyle}>270</td>
-                <td style={cellStyle}>
-                  Palazzo Veneziani - Via Frassoni 17 Finale
-                </td>
-                <td style={cellStyle}>Gabriele</td>
-                <td style={cellStyle}>370,11 €</td>
-                <td
-                  style={{
-                    ...cellStyle,
-                    backgroundColor: "#ff9800",
-                    color: "#fff",
-                  }}
-                >
-                  € 0
-                </td>
-              </tr>
-              <tr>
-                <td style={cellStyle}>271</td>
-                <td style={cellStyle}>Petocchi</td>
-                <td style={cellStyle}>Filippo</td>
-                <td style={cellStyle}>0,00 €</td>
-                <td
-                  style={{
-                    ...cellStyle,
-                    backgroundColor: "#4CAF50",
-                    color: "#fff",
-                  }}
-                >
-                  - € 50.000
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <h3 style={{ backgroundColor: "#dbe8dc", padding: "10px" }}>Dashboard</h3>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <Button type="primary" onClick={() => setIsDrawerOpen(true)}>
+          CREA GARA
+        </Button>
       </div>
+      {renderDrawer()}
+    </>
+  );
 
-      <div ref={bottomRef} style={{ marginTop: 40 }}>
-        <h3 style={{ backgroundColor: "#dbe8dc", padding: "10px" }}>
-          Dashboard
-        </h3>
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            marginBottom: 20,
-          }}
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          borderBottom: "1px solid #ccc",
+          marginBottom: 20,
+        }}
+      >
+        <div
+          style={activeTab === "Panoramica" ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab("Panoramica")}
         >
-          <thead>
-            <tr style={headerStyle}>
-              <th style={cellStyle}>Cod.</th>
-              <th style={cellStyle}>Indirizzo</th>
-              <th style={cellStyle}>Resp. Ufficio</th>
-              <th style={cellStyle}>Stato</th>
-              <th style={cellStyle}>Delta costi Fatture</th>
-              <th style={cellStyle}>Costi 30 gg.</th>
-              <th style={cellStyle}>Avanz. %</th>
-              <th style={cellStyle}>Lavori a finire</th>
-              <th style={cellStyle}>Sil da salizzare</th>
-              <th style={cellStyle}>Sal da fatturare</th>
-              <th style={cellStyle}>Margine %</th>
-              <th style={cellStyle}>Data aggiornamento</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...Array(5)].map((_, i) => (
-              <tr key={i}>
-                {[...Array(12)].map((_, j) => (
-                  <td key={j} style={cellStyle}></td>
-                ))}
-              </tr>
-            ))}
-            <tr style={{ backgroundColor: "#edf3ed", fontWeight: "bold" }}>
-              <td style={cellStyle} colSpan={12}>
-                TOTALI
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button className="btn btn-light">IMPORTA GARA</button>
-          <button className="btn btn-light">CREA GARA</button>
+          Panoramica
+        </div>
+        <div
+          style={activeTab === "Dashboard" ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab("Dashboard")}
+        >
+          Dashboard
         </div>
       </div>
+      {activeTab === "Panoramica" ? renderPanoramica() : renderDashboard()}
     </div>
   );
 }
 
-export default DashboardPanoramica;
+export default DashboardTabsPanoramica;

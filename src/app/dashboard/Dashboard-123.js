@@ -1,5 +1,4 @@
 import React, { Component } from "react";
-// import { Line, Doughnut, Bar, Radar } from 'react-chartjs-2';
 import { Line, Bar, Radar } from "react-chartjs-2";
 
 import { ProgressBar, Dropdown } from "react-bootstrap";
@@ -16,9 +15,6 @@ const mapData = {
   FR: 0,
   US: 20,
 };
-
-// import DatePicker from 'react-datepicker';
-// import { Dropdown } from 'react-bootstrap';
 
 export class Dashboard extends Component {
   constructor(props) {
