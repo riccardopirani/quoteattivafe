@@ -54,6 +54,7 @@ const permessiPersonalizzati = [
     label: "Amministrazione",
     key: "AccessoUtenti",
     route: "/charts",
+    subMenu: [],
     menuKey: "amministrazioneMenuOpen",
     icon: "mdi mdi-chart-line",
   },
