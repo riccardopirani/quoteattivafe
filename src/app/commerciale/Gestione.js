@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LineChart,
   Line,
@@ -9,7 +9,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 const tableStyle = {
   borderCollapse: "collapse",
   width: "100%",
@@ -35,7 +36,7 @@ const chartData = [
   { month: "Nov-25", costi: 260000, ricavi: 270000 },
   { month: "Dec-25", costi: 280000, ricavi: 320000 },
 ];
-const tabs = [
+let tabs = [
   "Dati commessa",
   "Gestione contratto",
   "Costi / Ricavi",
@@ -255,224 +256,284 @@ const CostiRicavi = () => (
   </div>
 );
 
-const DatiCommessa = () => (
-  <>
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: "0.4rem",
-        marginBottom: "1rem",
-      }}
-    >
-      <input
-        placeholder="Codice"
-        style={{ padding: "0.4rem", border: "1px solid #ccc" }}
-      />
-      <input
-        placeholder="Cliente"
-        style={{ padding: "0.4rem", border: "1px solid #ccc" }}
-      />
-      <input
-        placeholder="Indirizzo"
-        style={{ padding: "0.4rem", border: "1px solid #ccc" }}
-      />
-    </div>
+const DatiCommessa = ({ onComplete }) => {
+  const [dataInizio, setDataInizio] = useState(new Date());
+  const [dataFine, setDataFine] = useState(new Date());
+  const [isComplete, setIsComplete] = useState(false);
 
-    <div
-      style={{
-        textAlign: "center",
-        fontWeight: "bold",
-        fontSize: "1rem",
-        marginBottom: "1rem",
-      }}
-    >
-      Cod. 365 <span style={{ color: "brown" }}>Bunge</span> S.p.a. Via Baiona
-      237 «Silo»
-    </div>
+  const [datiGenerali, setDatiGenerali] = useState({
+    codice: "",
+    indirizzo: "",
+    tipoLavori: "",
+    tipoAppalto: "",
+    respUfficio: "",
+    respCantiere: "",
+  });
 
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "1rem",
-      }}
-    >
-      <div>
-        <div style={{ fontWeight: "bold", fontSize: "0.85rem" }}>
-          Data inizio cantiere
-        </div>
-        <div style={{ fontSize: "0.9rem" }}>10 maggio 2025</div>
-      </div>
-      <div>
-        <div style={{ fontWeight: "bold", fontSize: "0.85rem" }}>
-          Data inizio cantiere
-        </div>
-        <div style={{ fontSize: "0.9rem" }}>10 maggio 2025</div>
-      </div>
-      <button
+  const handleChange = (field) => (e) => {
+    if (!e || !e.target) return; // protezione contro eventi nulli o sintetici riutilizzati
+    const value = e.target.value ?? "";
+    setDatiGenerali((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  useEffect(() => {
+    const tuttiCompilati = Object.values(datiGenerali).every(
+      (val) => val.trim() !== ""
+    );
+    if (tuttiCompilati && !isComplete) {
+      setIsComplete(true);
+      if (typeof onComplete === "function") onComplete();
+    }
+  }, [datiGenerali, isComplete, onComplete]);
+
+  return (
+    <>
+      {/* HEADER INPUT controllati */}
+      <div
         style={{
-          backgroundColor: "#018E42",
-          color: "white",
-          padding: "0.5rem 1rem",
-          fontWeight: "bold",
-          fontSize: "0.85rem",
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "0.4rem",
+          marginBottom: "1rem",
         }}
       >
-        APERTO
-      </button>
-    </div>
+        <input
+          placeholder="Codice"
+          style={{ padding: "0.4rem", border: "1px solid #ccc" }}
+        />
+        <input
+          placeholder="Cliente"
+          style={{ padding: "0.4rem", border: "1px solid #ccc" }}
+        />
+        <input
+          placeholder="Indirizzo"
+          style={{ padding: "0.4rem", border: "1px solid #ccc" }}
+        />
+      </div>
 
-    <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-      <div style={{ flex: 2 }}>
+      {/* INFORMAZIONE */}
+      <div
+        style={{
+          textAlign: "center",
+          fontWeight: "bold",
+          fontSize: "1rem",
+          marginBottom: "1rem",
+        }}
+      >
+        Cod. 365 <span style={{ color: "brown" }}>Bunge</span> S.p.a. Via Baiona
+        237 «Silo»
+      </div>
+
+      {/* DATEPICKER */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1rem",
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: "bold", fontSize: "0.85rem" }}>
+            Data inizio cantiere
+          </div>
+          <DatePicker
+            selected={dataInizio}
+            onChange={(date) => setDataInizio(date)}
+            dateFormat="dd MMMM yyyy"
+            placeholderText="Seleziona la data di inizio"
+            className="date-picker"
+          />
+        </div>
+
+        <div>
+          <div style={{ fontWeight: "bold", fontSize: "0.85rem" }}>
+            Data fine cantiere
+          </div>
+          <DatePicker
+            selected={dataFine}
+            onChange={(date) => setDataFine(date)}
+            dateFormat="dd MMMM yyyy"
+            placeholderText="Seleziona la data di fine"
+            className="date-picker"
+          />
+        </div>
+
+        <button
+          style={{
+            backgroundColor: "#018E42",
+            color: "white",
+            padding: "0.5rem 1rem",
+            fontWeight: "bold",
+            fontSize: "0.85rem",
+          }}
+        >
+          APERTO
+        </button>
+      </div>
+
+      {/* TABELLE */}
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+        <div style={{ flex: 2 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+            }}
+          >
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th
+                    colSpan="2"
+                    style={{
+                      ...cellStyle,
+                      textAlign: "center",
+                      backgroundColor: "#ddf0e3",
+                    }}
+                  >
+                    DATI GENERALI
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: "Codice", key: "codice" },
+                  { label: "Indirizzo cantiere", key: "indirizzo" },
+                  { label: "Tipo lavori", key: "tipoLavori" },
+                  { label: "Tipo appalto", key: "tipoAppalto" },
+                  { label: "Resp. Ufficio", key: "respUfficio" },
+                  { label: "Resp. Cantiere", key: "respCantiere" },
+                ].map(({ label, key }) => (
+                  <tr key={key}>
+                    <td style={cellStyle}>{label}</td>
+                    <td style={cellStyle}>
+                      <input
+                        type="text"
+                        placeholder={`Inserisci ${label.toLowerCase()}`}
+                        value={datiGenerali[key] ?? ""}
+                        onChange={handleChange(key)}
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          outline: "none",
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Documenti (non obbligatori per completamento) */}
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th
+                    colSpan="2"
+                    style={{
+                      ...cellStyle,
+                      textAlign: "center",
+                      backgroundColor: "#ddf0e3",
+                    }}
+                  >
+                    DOCUMENTI
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  "Link cartella contratto",
+                  "Link centro di costo",
+                  "Link Gant",
+                  "Link cartella condivisione",
+                  "Link cartella sicurezza",
+                  "Link cartella foto",
+                ].map((item) => (
+                  <tr key={item}>
+                    <td style={cellStyle}>{item}</td>
+                    <td style={cellStyle}>
+                      <input
+                        type="text"
+                        placeholder={`Inserisci ${item.toLowerCase()}`}
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          outline: "none",
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ANAGRAFICA */}
+          <table style={{ ...tableStyle, marginTop: "1rem" }}>
+            <thead>
+              <tr>
+                <th
+                  colSpan="6"
+                  style={{
+                    ...cellStyle,
+                    textAlign: "center",
+                    backgroundColor: "#ddf0e3",
+                  }}
+                >
+                  ANAGRAFICA
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {["Cliente", "Progettista"].map((ruolo) => (
+                <tr key={ruolo}>
+                  <td style={cellStyle}>{ruolo}</td>
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <td key={idx} style={cellStyle}>
+                      <input
+                        type="text"
+                        placeholder="..."
+                        style={{ width: "100%", border: "none" }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* MAPPA + IMMAGINE */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
             gap: "1rem",
           }}
         >
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th
-                  colSpan="2"
-                  style={{
-                    ...cellStyle,
-                    textAlign: "center",
-                    backgroundColor: "#ddf0e3",
-                  }}
-                >
-                  DATI GENERALI
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                "Codice",
-                "Indirizzo cantiere",
-                "Tipo lavori",
-                "Tipo appalto",
-                "Resp. Ufficio",
-                "Resp. Cantiere",
-              ].map((item) => (
-                <tr key={item}>
-                  <td style={cellStyle}>{item}</td>
-                  <td style={cellStyle}></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th
-                  colSpan="2"
-                  style={{
-                    ...cellStyle,
-                    textAlign: "center",
-                    backgroundColor: "#ddf0e3",
-                  }}
-                >
-                  DOCUMENTI
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                "Link cartella contratto",
-                "Link centro di costo",
-                "Link Gant",
-                "Link cartella condivisione",
-                "Link cartella sicurezza",
-                "Link cartella foto",
-              ].map((item) => (
-                <tr key={item}>
-                  <td style={cellStyle}>{item}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <iframe
+            title="Mappa Ferrara"
+            width="100%"
+            height="200"
+            src="https://www.openstreetmap.org/export/embed.html?bbox=11.609%2C44.829%2C11.629%2C44.841&layer=mapnik&marker=44.835%2C11.619"
+            style={{ border: "1px solid black" }}
+          ></iframe>
+          <img
+            src="https://travelitalia.pl/wp-content/uploads/2021/09/ferrara-italy-29-july-2020-evocative-view-of-the-road-leadin_shutterstock_1786546775-scaled.jpg.webp"
+            alt="Street"
+            style={{ width: "100%", height: "50%", borderRadius: "8px" }}
+          />
         </div>
-
-        <table style={{ ...tableStyle, marginTop: "1rem" }}>
-          <thead>
-            <tr>
-              <th
-                colSpan="6"
-                style={{
-                  ...cellStyle,
-                  textAlign: "center",
-                  backgroundColor: "#ddf0e3",
-                }}
-              >
-                ANAGRAFICA
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={cellStyle}>Cliente</td>
-              <td style={cellStyle}>Nome</td>
-              <td style={cellStyle}>Telefono</td>
-              <td style={cellStyle}>Mail</td>
-              <td style={cellStyle}>D.I.</td>
-              <td style={cellStyle}>
-                Nome
-                <br />
-                Telefono
-                <br />
-                Mail
-              </td>
-            </tr>
-            <tr>
-              <td style={cellStyle}>Progettista</td>
-              <td style={cellStyle}>Nome</td>
-              <td style={cellStyle}>Telefono</td>
-              <td style={cellStyle}>Mail</td>
-              <td style={cellStyle}>C.s.e.</td>
-              <td style={cellStyle}>
-                Nome
-                <br />
-                Telefono
-                <br />
-                Mail
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
-
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem",
-        }}
-      >
-        <iframe
-          title="Mappa Ferrara"
-          width="100%"
-          height="200"
-          frameBorder="0"
-          scrolling="no"
-          marginHeight="0"
-          marginWidth="0"
-          src="https://www.openstreetmap.org/export/embed.html?bbox=11.609%2C44.829%2C11.629%2C44.841&layer=mapnik&marker=44.835%2C11.619"
-          style={{ border: "1px solid black" }}
-        ></iframe>
-        <img
-          src="https://travelitalia.pl/wp-content/uploads/2021/09/ferrara-italy-29-july-2020-evocative-view-of-the-road-leadin_shutterstock_1786546775-scaled.jpg.webp"
-          alt="Street"
-          style={{ width: "100%", height: "50%", borderRadius: "8px" }}
-        />
-      </div>
-    </div>
-  </>
-);
+    </>
+  );
+};
 
 const GestioneContratto = () => (
   <div
@@ -653,16 +714,42 @@ const GestioneContratto = () => (
 );
 
 const CommessaTecnico = () => {
+  const tabsOriginali = [
+    "Dati commessa",
+    "Gestione contratto",
+    "Costi / Ricavi",
+    "Approvvigionamenti",
+    "C.D.P.",
+    "Cruscotto di commessa",
+  ];
+
+  const [isModalitaNuova, setIsModalitaNuova] = useState(false);
+  const [tabsVisibili, setTabsVisibili] = useState(tabsOriginali);
   const [selectedTab, setSelectedTab] = useState("Dati commessa");
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("modalita") === "nuova") {
+      setIsModalitaNuova(true);
+      setTabsVisibili(["Dati commessa"]);
+    }
+  }, []);
+
+  const handleComplete = () => {
+    if (!isModalitaNuova) return;
+
+    // Rimuovi "modalita=nuova" dalla query string
+    const url = new URL(window.location.href);
+    url.searchParams.delete("modalita");
+    window.history.replaceState({}, "", url.pathname);
+
+    // Ripristina tabs completi
+    setTabsVisibili(tabsOriginali);
+    setIsModalitaNuova(false);
+  };
+
   return (
-    <div
-      style={{
-        backgroundColor: "white",
-        minHeight: "100vh",
-        fontFamily: "sans-serif",
-      }}
-    >
+    <div style={{ backgroundColor: "white", minHeight: "100vh" }}>
       <div style={{ padding: "1.5rem" }}>
         <h2
           style={{
@@ -683,7 +770,7 @@ const CommessaTecnico = () => {
             marginBottom: "1rem",
           }}
         >
-          {tabs.map((label) => (
+          {tabsVisibili.map((label) => (
             <div
               key={label}
               onClick={() => setSelectedTab(label)}
@@ -703,7 +790,9 @@ const CommessaTecnico = () => {
           ))}
         </div>
 
-        {selectedTab === "Dati commessa" && <DatiCommessa />}
+        {selectedTab === "Dati commessa" && (
+          <DatiCommessa onComplete={handleComplete} />
+        )}
         {selectedTab === "Gestione contratto" && <GestioneContratto />}
         {selectedTab === "Costi / Ricavi" && <CostiRicavi />}
         {selectedTab === "Approvvigionamenti" && <Approvvigionamenti />}
@@ -713,6 +802,7 @@ const CommessaTecnico = () => {
     </div>
   );
 };
+
 const CruscottoCommessa = () => (
   <div style={{ padding: "1rem", backgroundColor: "white" }}>
     <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>

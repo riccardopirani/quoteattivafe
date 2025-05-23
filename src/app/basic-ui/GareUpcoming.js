@@ -144,12 +144,12 @@ function GareUpcoming() {
                 </td>
                 <td style={cellStyle}>
                   {formatCurrency(
-                    sumColumn(upcomingDelivery, "TotaleMeccanici")
+                    sumColumn(upcomingDelivery, "TotaleMeccanici"),
                   )}
                 </td>
                 <td style={cellStyle}>
                   {formatCurrency(
-                    sumColumn(upcomingDelivery, "TotaleElettrici")
+                    sumColumn(upcomingDelivery, "TotaleElettrici"),
                   )}
                 </td>
                 <td style={cellStyle}>
@@ -217,12 +217,12 @@ function GareUpcoming() {
                 </td>
                 <td style={cellStyle}>
                   {formatCurrency(
-                    sumColumn(recentlyDelivered, "TotaleMeccanici")
+                    sumColumn(recentlyDelivered, "TotaleMeccanici"),
                   )}
                 </td>
                 <td style={cellStyle}>
                   {formatCurrency(
-                    sumColumn(recentlyDelivered, "TotaleElettrici")
+                    sumColumn(recentlyDelivered, "TotaleElettrici"),
                   )}
                 </td>
                 <td style={cellStyle}>

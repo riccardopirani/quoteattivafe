@@ -56,7 +56,7 @@ function DashboardTabsPanoramica() {
     setCommessaOption(value);
     if (value === "nuova") {
       setIsDrawerOpen(false);
-      window.location.href = "/gestione/commesse";
+      window.location.href = "/gestione/commesse?modalita=nuova";
     }
   };
 
