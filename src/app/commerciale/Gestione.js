@@ -12,6 +12,7 @@ import {
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
+import ApprovvigionamentoService from "../services/approvigionamenti";
 
 const tableStyle = {
   borderCollapse: "collapse",
@@ -1104,71 +1105,105 @@ const CDP = () => (
   </div>
 );
 
-const Approvvigionamenti = () => (
-  <div style={{ padding: "1rem", backgroundColor: "white" }}>
-    <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>
-      Cod. 365 Bunge S.p.a. Via Baiona 237 «Silo»
-      <span
-        style={{
-          float: "right",
-          backgroundColor: "#fbc02d",
-          color: "black",
-          padding: "0.3rem 1rem",
-          fontWeight: "bold",
-        }}
+const Approvvigionamenti = ({ commessa }) => {
+  const [righe, setRighe] = useState([]);
+
+  useEffect(() => {
+    if (commessa?.IdCantiere) {
+      ApprovvigionamentoService.leggi(commessa.IdCantiere)
+        .then((data) => setRighe(data))
+        .catch((err) =>
+          console.error("Errore nel caricamento approvvigionamenti:", err)
+        );
+    }
+  }, [commessa?.IdCantiere]);
+
+  return (
+    <div style={{ padding: "1rem", backgroundColor: "white" }}>
+      <div
+        style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
       >
-        BLOCCATO
-      </span>
-    </div>
-    <table style={{ ...tableStyle }}>
-      <thead>
-        <tr>
-          <th
-            colSpan="7"
-            style={{
-              ...cellStyle,
-              backgroundColor: "#d9ead3",
-              textAlign: "center",
-              fontWeight: "bold",
-            }}
-          >
-            GESTIONE APPROVVIGIONAMENTI
-          </th>
-        </tr>
-        <tr>
-          {[
-            "N°",
-            "DESCRIZIONE",
-            "FORNITURA",
-            "POSA",
-            "DATA DEFINIZIONE",
-            "LINK CARTELLA",
-            "RESPONSABILE",
-          ].map((label, idx) => (
+        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+        {commessa?.Indirizzo || ""}
+        <span
+          style={{
+            float: "right",
+            backgroundColor: "#fbc02d",
+            color: "black",
+            padding: "0.3rem 1rem",
+            fontWeight: "bold",
+          }}
+        >
+          BLOCCATO
+        </span>
+      </div>
+
+      <table style={tableStyle}>
+        <thead>
+          <tr>
             <th
-              key={idx}
+              colSpan="7"
               style={{
                 ...cellStyle,
-                backgroundColor: "#ecf4ec",
+                backgroundColor: "#d9ead3",
                 textAlign: "center",
                 fontWeight: "bold",
               }}
             >
-              {label}
+              GESTIONE APPROVVIGIONAMENTI
             </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <tr key={i}>
-            {Array.from({ length: 7 }).map((_, j) => (
-              <td key={j} style={{ ...cellStyle, height: "2.2rem" }}></td>
+          </tr>
+          <tr>
+            {[
+              "N°",
+              "DESCRIZIONE",
+              "FORNITURA",
+              "POSA",
+              "DATA DEFINIZIONE",
+              "LINK CARTELLA",
+              "RESPONSABILE",
+            ].map((label, idx) => (
+              <th
+                key={idx}
+                style={{
+                  ...cellStyle,
+                  backgroundColor: "#ecf4ec",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                }}
+              >
+                {label}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+        </thead>
+        <tbody>
+          {righe.length === 0 ? (
+            <tr>
+              <td
+                colSpan="7"
+                style={{ ...cellStyle, textAlign: "center", color: "#999" }}
+              >
+                Nessun dato disponibile.
+              </td>
+            </tr>
+          ) : (
+            righe.map((r, i) => (
+              <tr key={i}>
+                <td style={cellStyle}>{r.Numero}</td>
+                <td style={cellStyle}>{r.Descrizione}</td>
+                <td style={cellStyle}>{r.Fornitura}</td>
+                <td style={cellStyle}>{r.Posa}</td>
+                <td style={cellStyle}>{r.DataDefinizione?.slice(0, 10)}</td>
+                <td style={cellStyle}>{r.LinkCartella}</td>
+                <td style={cellStyle}>{r.Responsabile}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 export default CommessaTecnico;
