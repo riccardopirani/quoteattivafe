@@ -18,6 +18,8 @@ import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
 import CDPService from "../services/cdp"; // Assicurati che il file esista con metodi: crea, leggi, aggiorna, elimina
+import { FaFilePdf, FaFileExcel, FaTimes } from "react-icons/fa";
+import dayjs from "dayjs";
 
 const tableStyle = {
   borderCollapse: "collapse",
@@ -46,6 +48,7 @@ const chartData = [
 ];
 
 const CostiRicavi = ({ commessa }) => {
+  const [openArchivio, setOpenArchivio] = useState(false);
   const [sezioni, setSezioni] = useState([
     {
       nodo: "A",
@@ -148,7 +151,7 @@ const CostiRicavi = ({ commessa }) => {
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
-      "CostiRicavi.xlsx",
+      "CostiRicavi.xlsx"
     );
 
     // 🔹 2. Screenshot della sezione visibile
@@ -345,6 +348,7 @@ const CostiRicavi = ({ commessa }) => {
               marginRight: "1rem",
               marginLeft: "200px",
             }}
+            onClick={() => setOpenArchivio(true)}
           >
             Archivio costi/ricavi »
           </button>
@@ -388,6 +392,12 @@ const CostiRicavi = ({ commessa }) => {
           </div>
         </div>
       </div>
+      {/* Drawer laterale */}
+      <DrawerArchivio
+        open={openArchivio}
+        onClose={() => setOpenArchivio(false)}
+        documenti={documenti}
+      />
     </div>
   );
 };
@@ -398,6 +408,93 @@ const cella = {
   border: "1px solid #ccc",
   verticalAlign: "middle",
 };
+
+const DrawerArchivio = ({ open, onClose, documenti }) => {
+  const [filtroData, setFiltroData] = useState("");
+
+  const filtrati = documenti.filter((doc) =>
+    filtroData ? doc.data.includes(filtroData) : true
+  );
+
+  return (
+    <div
+      className={`fixed top-0 right-0 h-full w-full md:w-[400px] bg-white shadow-xl z-50 transform transition-transform duration-300 ${
+        open ? "translate-x-0" : "translate-x-full"
+      }`}
+    >
+      <div className="flex justify-between items-center p-4 border-b bg-gray-50">
+        <h2 className="text-lg font-semibold">Archivio Costi/Ricavi</h2>
+        <button onClick={onClose}>
+          <FaTimes />
+        </button>
+      </div>
+
+      <div className="p-4">
+        <label className="block text-sm font-medium mb-2">
+          Filtro per data
+        </label>
+        <input
+          type="date"
+          className="border px-3 py-2 rounded w-full mb-4"
+          value={filtroData}
+          onChange={(e) => setFiltroData(e.target.value)}
+        />
+
+        <div className="space-y-4 overflow-y-auto max-h-[75vh]">
+          {filtrati.map((doc, i) => (
+            <div
+              key={i}
+              className="border rounded-lg p-3 bg-gray-100 hover:bg-gray-200 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  {doc.tipo === "pdf" ? (
+                    <FaFilePdf className="text-red-600 text-2xl" />
+                  ) : (
+                    <FaFileExcel className="text-green-600 text-2xl" />
+                  )}
+                  <div>
+                    <div className="font-medium">{doc.nome}</div>
+                    <div className="text-xs text-gray-500">
+                      {dayjs(doc.data).format("DD MMM YYYY")}
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={doc.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 text-sm font-semibold"
+                >
+                  Visualizza »
+                </a>
+              </div>
+            </div>
+          ))}
+          {filtrati.length === 0 && (
+            <div className="text-center text-gray-400 text-sm mt-4">
+              Nessun documento trovato.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+const documenti = [
+  {
+    nome: "CostiRicavi_Maggio2025.xlsx",
+    tipo: "excel",
+    data: "2025-05-10",
+    link: "/download/maggio2025.xlsx",
+  },
+  {
+    nome: "CostiRicavi_Aprile2025.pdf",
+    tipo: "pdf",
+    data: "2025-04-15",
+    link: "/download/aprile2025.pdf",
+  },
+];
 
 const DatiCommessa = ({ onComplete, commessa }) => {
   const [triggered, setTriggered] = useState(false);
@@ -459,7 +556,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      },
+      }
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -480,8 +577,8 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          indirizzo,
-        )}&format=json&limit=1`,
+          indirizzo
+        )}&format=json&limit=1`
       );
       const data = await res.json();
       if (data.length > 0) {
@@ -501,7 +598,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
             lon - 0.005
           },${lat - 0.005},${lon + 0.005},${
             lat + 0.005
-          }&layer=mapnik&marker=${lat},${lon}`,
+          }&layer=mapnik&marker=${lat},${lon}`
         );
       } else {
         setZonaImageUrl(null);
@@ -982,7 +1079,7 @@ const CommessaTecnico = () => {
           (c.IdCantiere && c.IdCantiere.toString().includes(searchTerm)) ||
           (c.RagioneSociale &&
             c.RagioneSociale.toLowerCase().includes(
-              searchTerm.toLowerCase(),
+              searchTerm.toLowerCase()
             )) ||
           (c.Indirizzo &&
             c.Indirizzo.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -1534,7 +1631,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -1854,15 +1951,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
