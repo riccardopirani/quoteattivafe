@@ -4,6 +4,39 @@ import { Select, Input } from "antd";
 import CantiereService from "../services/cantiere";
 const { Option } = Select;
 
+const cellHeaderStyle = {
+  padding: "10px 8px",
+  backgroundColor: "#dbe8dc",
+  fontWeight: "bold",
+  fontSize: "14px",
+  textAlign: "left",
+};
+
+const calcolaGiorniUltimoAgg = (data) => {
+  if (!data) return { text: "n.d.", color: "#999" };
+  const [dd, mm, yyyy] = data.split("/");
+  const dataAgg = new Date(`${yyyy}-${mm}-${dd}`);
+  const giorni = Math.floor((new Date() - dataAgg) / (1000 * 60 * 60 * 24));
+  if (giorni > 60) return { text: "> 60 gg", color: "red" };
+  if (giorni > 30) return { text: "> 30 gg", color: "#ff9800" };
+  return { text: "< 30 gg", color: "#2e7d32" };
+};
+
+const parseData = (str) => {
+  if (!str) return new Date(0);
+  const [dd, mm, yyyy] = str.split("/");
+  return new Date(`${yyyy}-${mm}-${dd}`);
+};
+const headerTitleStyle = {
+  backgroundColor: "#dbe8dc",
+  textAlign: "center",
+  padding: "12px 8px",
+  fontSize: "16px",
+  fontWeight: "bold",
+  color: "#333",
+  borderBottom: "1px solid #ccc",
+};
+
 const tabStyle = {
   padding: "10px 20px",
   cursor: "pointer",
@@ -28,6 +61,203 @@ const headerStyle = {
   fontWeight: "bold",
 };
 
+const TabelleCantieri = () => {
+  const [tabellaGestione, setTabellaGestione] = useState([]);
+  const [tabellaEsposizione, setTabellaEsposizione] = useState([]);
+  const [visibleRowsGestione, setVisibleRowsGestione] = useState(10);
+  const [visibleRowsEsposizione, setVisibleRowsEsposizione] = useState(10);
+
+  useEffect(() => {
+    const fetchCommesse = async () => {
+      try {
+        const dati = await CantiereService.ricercaCantieri({});
+
+        const gestione = dati.map((c) => {
+          const parsedDate = parseData(c.DataCreazioneCantiere);
+          return {
+            cod: c.IdCantiere,
+            commessa: c.Indirizzo || "-",
+            respUfficio: c.RespUfficio || "-",
+            costi60gg:
+              parseFloat((c.CostiUltimi60gg || "0").replace(/[^\d.-]/g, "")) ||
+              0,
+            aggiornataDa: calcolaGiorniUltimoAgg(c.DataCreazioneCantiere),
+            dataObj: parsedDate,
+          };
+        });
+
+        gestione.sort((a, b) => b.dataObj - a.dataObj);
+
+        const esposizione = dati.map((c) => ({
+          cod: c.IdCantiere,
+          commessa: c.Indirizzo || "-",
+          respUfficio: c.RespUfficio || "-",
+          costiSostenuti:
+            parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
+          esposizione:
+            parseFloat(
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
+            ) || 0,
+        }));
+
+        setTabellaGestione(gestione);
+        setTabellaEsposizione(esposizione);
+      } catch (err) {
+        console.error("Errore nel recupero delle commesse:", err);
+      }
+    };
+
+    fetchCommesse();
+  }, []);
+
+  // Infinite scroll listener
+  useEffect(() => {
+    const handleScroll = () => {
+      const nearBottom =
+        window.innerHeight + window.scrollY >= document.body.offsetHeight - 100;
+
+      if (nearBottom) {
+        setVisibleRowsGestione((prev) => prev + 10);
+        setVisibleRowsEsposizione((prev) => prev + 10);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        gap: "40px",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginTop: "30px",
+        flexWrap: "nowrap",
+      }}
+    >
+      {/* Tabella sinistra */}
+      <div style={{ width: "50%" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            backgroundColor: "#eaf4ea",
+            borderRadius: 10,
+            overflow: "hidden",
+          }}
+        >
+          <thead>
+            <tr>
+              <th colSpan="5" style={headerTitleStyle}>
+                Aggiornamento controllo gestione
+              </th>
+            </tr>
+            <tr>
+              {[
+                "Cod.",
+                "Commessa",
+                "Resp. Ufficio",
+                "Costi ultimi 60 gg.",
+                "Aggiornata da",
+              ].map((label, idx) => (
+                <th key={idx} style={cellHeaderStyle}>
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody style={{ backgroundColor: "white" }}>
+            {tabellaGestione.slice(0, visibleRowsGestione).map((r, idx) => (
+              <tr key={idx}>
+                <td style={cellStyle}>{r.cod}</td>
+                <td style={cellStyle}>{r.commessa}</td>
+                <td style={cellStyle}>{r.respUfficio}</td>
+                <td style={cellStyle}>€ {r.costi60gg.toFixed(2)}</td>
+                <td
+                  style={{
+                    ...cellStyle,
+                    color: r.aggiornataDa.color,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {r.aggiornataDa.text}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Tabella destra */}
+      <div style={{ width: "50%" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            backgroundColor: "#eaf4ea",
+            borderRadius: 10,
+            overflow: "hidden",
+          }}
+        >
+          <thead>
+            <tr>
+              <th colSpan="5" style={headerTitleStyle}>
+                Esposizione cantieri
+              </th>
+            </tr>
+            <tr>
+              {[
+                "Cod.",
+                "Commessa",
+                "Resp. Ufficio",
+                "Costi sostenuti",
+                "Esposizione",
+              ].map((label, idx) => (
+                <th key={idx} style={cellHeaderStyle}>
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody style={{ backgroundColor: "white" }}>
+            {tabellaEsposizione
+              .slice(0, visibleRowsEsposizione)
+              .map((r, idx) => (
+                <tr key={idx}>
+                  <td style={cellStyle}>{r.cod}</td>
+                  <td style={cellStyle}>{r.commessa}</td>
+                  <td style={cellStyle}>{r.respUfficio}</td>
+                  <td style={cellStyle}>€ {r.costiSostenuti.toFixed(2)}</td>
+                  <td
+                    style={{
+                      ...cellStyle,
+                      fontWeight: "bold",
+                      color:
+                        r.esposizione > 0
+                          ? "red"
+                          : r.esposizione === 0
+                          ? "#ff9800"
+                          : "#2e7d32",
+                    }}
+                  >
+                    €{" "}
+                    {r.esposizione.toLocaleString("it-IT", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 function DashboardTabsPanoramica() {
   const [commesse, setCommesse] = useState([]);
   const [filteredCommesse, setFilteredCommesse] = useState([]);
@@ -41,6 +271,71 @@ function DashboardTabsPanoramica() {
   const [commessaOption, setCommessaOption] = useState("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [summaryCards, setSummaryCards] = useState([]);
+  const [tabellaGestione, setTabellaGestione] = useState([]);
+  const [tabellaEsposizione, setTabellaEsposizione] = useState([]);
+
+  useEffect(() => {
+    const fetchCommesse = async () => {
+      try {
+        const dati = await CantiereService.ricercaCantieri({});
+
+        // Funzione parsing data
+        const parseData = (str) => {
+          if (!str) return new Date(0);
+          const [dd, mm, yyyy] = str.split("/");
+          return new Date(`${yyyy}-${mm}-${dd}`);
+        };
+
+        // Dati tabella 1
+        const gestione = dati.map((c) => {
+          const parsedDate = parseData(c.DataCreazioneCantiere);
+          return {
+            cod: c.IdCantiere,
+            commessa: c.Indirizzo || "-",
+            respUfficio: c.RespUfficio || "-",
+            costi60gg:
+              parseFloat((c.CostiUltimi60gg || "0").replace(/[^\d.-]/g, "")) ||
+              0,
+            aggiornataDa: calcolaGiorniUltimoAgg(c.DataCreazioneCantiere),
+            dataObj: parsedDate,
+          };
+        });
+
+        // Ordina per data discendente (più recente in alto)
+        gestione.sort((a, b) => b.dataObj - a.dataObj);
+
+        // Dati tabella 2
+        const esposizione = dati.map((c) => ({
+          cod: c.IdCantiere,
+          commessa: c.Indirizzo || "-",
+          respUfficio: c.RespUfficio || "-",
+          costiSostenuti:
+            parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
+          esposizione:
+            parseFloat(
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
+            ) || 0,
+        }));
+
+        setTabellaGestione(gestione);
+        setTabellaEsposizione(esposizione);
+      } catch (err) {
+        console.error("Errore nel recupero delle commesse:", err);
+      }
+    };
+
+    fetchCommesse();
+  }, []);
+
+  const calcolaGiorniUltimoAgg = (data) => {
+    if (!data) return "n.d.";
+    const [dd, mm, yyyy] = data.split("/");
+    const dataAgg = new Date(`${yyyy}-${mm}-${dd}`);
+    const giorni = Math.floor((new Date() - dataAgg) / (1000 * 60 * 60 * 24));
+    if (giorni > 60) return { text: "> 60 gg", color: "red" };
+    if (giorni > 30) return { text: "> 30 gg", color: "#ff9800" };
+    return { text: "< 30 gg", color: "#2e7d32" };
+  };
 
   useEffect(() => {
     const filtra = commesse.filter((c) => {
@@ -132,12 +427,12 @@ function DashboardTabsPanoramica() {
   // 🔢 CALCOLI PRIMA DI dashboardCards
   const totaleSal = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.SalDaFatturare),
-    0,
+    0
   );
 
   const totaleSil = filteredCommesse.reduce(
     (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
-    0,
+    0
   );
 
   const commesseDaAggiornare = filteredCommesse.filter((c) => {
@@ -166,12 +461,12 @@ function DashboardTabsPanoramica() {
   });
   const totaleCosti30gg = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.Costi30gg),
-    0,
+    0
   );
 
   const totaleLavoriAFinire = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.LavoriAFinire),
-    0,
+    0
   );
 
   const marginiValidi = filteredCommesse
@@ -264,33 +559,44 @@ function DashboardTabsPanoramica() {
       commessaPeggiore = c;
     }
   });
-
   const renderPanoramica = () => (
     <>
       <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 30 }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 30,
+          marginBottom: 30,
+        }}
       >
         {summaryCards.map((card, index) => (
           <div
             key={index}
             style={{
-              flex: "1 1 30%",
-              backgroundColor: "#f1f5f3",
-              padding: 20,
-              borderRadius: 10,
+              backgroundColor: "#f3f6f4",
+              padding: "30px 20px",
+              borderRadius: 20,
+              boxShadow: "0 2px 5px rgba(0, 0, 0, 0.1)",
               textAlign: "center",
-              minWidth: 150,
+              minHeight: 100,
             }}
           >
-            <div style={{ fontWeight: "bold" }}>{card.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{card.label}</div>
             <div
-              style={{ fontSize: 24, color: card.color, fontWeight: "bold" }}
+              style={{
+                fontSize: 30,
+                fontWeight: 700,
+                marginTop: 10,
+                color: card.color,
+              }}
             >
               {card.value}
             </div>
           </div>
         ))}
       </div>
+
+      <TabelleCantieri />
     </>
   );
 

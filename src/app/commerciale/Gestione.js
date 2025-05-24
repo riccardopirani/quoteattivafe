@@ -13,7 +13,10 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
 import ApprovvigionamentoService from "../services/approvigionamenti";
-
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import html2canvas from "html2canvas";
+import { useRef } from "react";
 const tableStyle = {
   borderCollapse: "collapse",
   width: "100%",
@@ -48,218 +51,351 @@ let tabs = [
   "Cruscotto di commessa",
 ];
 
-const CostiRicavi = () => (
-  <div style={{ padding: "1rem", backgroundColor: "white" }}>
-    <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>
-      Cod. 365 Bunge S.p.a. Via Baiona 237 «Silo»
-      <span
-        style={{
-          float: "right",
-          backgroundColor: "#d32f2f",
-          color: "white",
-          padding: "0.3rem 1rem",
-          fontWeight: "bold",
-        }}
-      >
-        CHIUSO
-      </span>
-    </div>
-    <table style={{ ...tableStyle, marginBottom: "1rem" }}>
-      <thead>
-        <tr>
-          {[
-            "NODO",
-            "SOTTONODO",
-            "COSTI",
-            "Aggiornata al:",
-            "Giacenze",
-            "Costi per raffronto",
-            "BCWP",
-            "Contabilità",
-            "Da contabilizzare",
-            "Ricavi raffronto",
-            "MDC",
-            "MDC%",
-            "Note",
-          ].map((label, idx) => (
-            <th
-              key={idx}
-              style={{
-                ...cellStyle,
-                backgroundColor: idx >= 3 ? "#eaf4ea" : "#e2f0d9",
-                fontWeight: "bold",
-                textAlign: "center",
-              }}
-            >
-              {label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {[
-          {
-            nodo: "A",
-            coloreNodo: "#cde1bc",
-            coloreRiga: "#f3fdf5",
-            titolo: "OPERE EDILI",
-            sotto: [
-              "A00 Demolizione muri",
-              "A01 Realizzazione tetto",
-              "A02 Posa infissi",
-            ],
-          },
-          {
-            nodo: "E",
-            coloreNodo: "#f7e7af",
-            coloreRiga: "#fef9e6",
-            titolo: "IMPIANTI ELETTRICI",
-            sotto: [
-              "E00 Posa corrugato",
-              "E01 Posa interruttori",
-              "E02 Posa cavi",
-            ],
-          },
-          {
-            nodo: "M",
-            coloreNodo: "#a4b8cb",
-            coloreRiga: "#e4ebf3",
-            titolo: "IMPIANTI MECCANICI",
-            sotto: [
-              "M00 Posa sanitari",
-              "M01 Posa tubazioni",
-              "M02 Posa scarichi",
-            ],
-          },
-          {
-            nodo: "I",
-            coloreNodo: "#eac3e2",
-            coloreRiga: "#fce9f8",
-            titolo: "COSTI INDIRETTI",
-            sotto: [
-              "I00 Affitto alloggio",
-              "I01 Occupazione suolo pubblico",
-              "I02 Costi partecipazione gara",
-            ],
-          },
-          {
-            nodo: "R",
-            coloreNodo: "#b3b3b3",
-            coloreRiga: "#f3f3f3",
-            titolo: "RICAVI",
-            sotto: [
-              "R00 Sal 1 Contratto",
-              "R01 Sal 2 Contratto",
-              "R02 Sal 1 Preventivo tetto",
-            ],
-          },
-        ].map(({ nodo, coloreNodo, coloreRiga, titolo, sotto }, idx) => (
-          <React.Fragment key={idx}>
-            <tr>
-              <td
-                style={{
-                  ...cellStyle,
-                  backgroundColor: coloreNodo,
-                  fontWeight: "bold",
-                  textAlign: "center",
-                }}
-              >
-                {nodo}
-              </td>
-              <td
-                colSpan={12}
-                style={{
-                  ...cellStyle,
-                  backgroundColor: coloreNodo,
-                  fontWeight: "bold",
-                }}
-              >
-                {titolo}
-              </td>
-            </tr>
-            {sotto.map((sottoNodo, i) => (
-              <tr key={i}>
-                <td style={{ ...cellStyle, backgroundColor: coloreRiga }}></td>
-                <td style={{ ...cellStyle, backgroundColor: coloreRiga }}>
-                  {sottoNodo}
-                </td>
-                {Array(11)
-                  .fill(null)
-                  .map((_, k) => (
-                    <td
-                      key={k}
-                      style={{ ...cellStyle, backgroundColor: coloreRiga }}
-                    ></td>
-                  ))}
-              </tr>
-            ))}
-          </React.Fragment>
-        ))}
-      </tbody>
-    </table>
+const CostiRicavi = ({ commessa }) => {
+  const [sezioni, setSezioni] = useState([
+    {
+      nodo: "A",
+      coloreNodo: "#cde1bc",
+      coloreRiga: "#f3fdf5",
+      titolo: "OPERE EDILI",
+      sotto: [
+        "A00 Demolizione muri",
+        "A01 Realizzazione tetto",
+        "A02 Posa infissi",
+      ],
+    },
+    {
+      nodo: "E",
+      coloreNodo: "#f7e7af",
+      coloreRiga: "#fef9e6",
+      titolo: "IMPIANTI ELETTRICI",
+      sotto: ["E00 Posa corrugato", "E01 Posa interruttori", "E02 Posa cavi"],
+    },
+    {
+      nodo: "M",
+      coloreNodo: "#a4b8cb",
+      coloreRiga: "#e4ebf3",
+      titolo: "IMPIANTI MECCANICI",
+      sotto: ["M00 Posa sanitari", "M01 Posa tubazioni", "M02 Posa scarichi"],
+    },
+    {
+      nodo: "I",
+      coloreNodo: "#eac3e2",
+      coloreRiga: "#fce9f8",
+      titolo: "COSTI INDIRETTI",
+      sotto: [
+        "I00 Affitto alloggio",
+        "I01 Occupazione suolo pubblico",
+        "I02 Costi partecipazione gara",
+      ],
+    },
+    {
+      nodo: "R",
+      coloreNodo: "#d0d0d0",
+      coloreRiga: "#f3f3f3",
+      titolo: "RICAVI",
+      sotto: [
+        "R00 Sal 1 Contratto",
+        "R01 Sal 2 Contratto",
+        "R03 Sal 1 Preventivo tetto",
+      ],
+    },
+  ]);
 
+  const aggiungiRiga = (index) => {
+    const nuovo = [...sezioni];
+    nuovo[index].sotto.push("");
+    setSezioni(nuovo);
+  };
+
+  const handleExportExcel = async () => {
+    const headers = [
+      "NODO",
+      "SOTTONODO",
+      "COSTI",
+      "Aggiornata al",
+      "Giacenze",
+      "Costi per raffronto",
+      "BCWP",
+      "Contabilità",
+      "Da contabilizzare",
+      "Ricavi raffronto",
+      "MDC",
+      "MDC%",
+      "Note",
+    ];
+
+    const rows = [];
+    sezioni.forEach((sezione) => {
+      rows.push([sezione.nodo, sezione.titolo]);
+      sezione.sotto.forEach((sotto) => {
+        rows.push([null, sotto, "", "", "", "", "", "", "", "", "", "", ""]);
+      });
+    });
+    rows.push([]);
+    rows.push([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Margine di commessa",
+      "€ 20.000",
+    ]);
+    rows.push(["", "", "", "", "", "", "", "", "", "Margine %", "20 %"]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "CostiRicavi");
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    saveAs(
+      new Blob([wbout], { type: "application/octet-stream" }),
+      "CostiRicavi.xlsx"
+    );
+
+    // 🔹 2. Screenshot della sezione visibile
+    if (contentRef.current) {
+      const canvas = await html2canvas(contentRef.current, {
+        scale: 2,
+        useCORS: true,
+      });
+      canvas.toBlob((blob) => {
+        if (blob) {
+          saveAs(blob, "CostiRicavi_Screenshot.png");
+        }
+      });
+    }
+  };
+  const contentRef = useRef();
+  return (
     <div
+      ref={contentRef}
       style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginTop: "1rem",
+        padding: "1rem",
+        backgroundColor: "white",
+        fontFamily: "sans-serif",
       }}
     >
-      <div>
-        <button
+      <div
+        style={{
+          fontWeight: "bold",
+          marginBottom: "1rem",
+          fontSize: "1rem",
+          alignItems: "center",
+        }}
+      >
+        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+        {commessa?.Indirizzo || ""}
+        <span
           style={{
-            padding: "0.5rem 1rem",
-            marginRight: "1rem",
-            border: "1px solid black",
-            background: "white",
+            float: "right",
+            backgroundColor: "#d32f2f",
+            color: "white",
+            padding: "0.3rem 1.2rem",
             fontWeight: "bold",
+            fontSize: "0.9rem",
+            borderRadius: 2,
           }}
         >
-          Archivio costi/ricavi »
-        </button>
-        <button
-          style={{
-            padding: "0.5rem 1rem",
-            border: "1px solid black",
-            background: "#b3dbff",
-            fontWeight: "bold",
-          }}
-        >
-          Genera costi/ricavi »
-        </button>
+          CHIUSO
+        </span>
       </div>
-      <div style={{ textAlign: "right", fontSize: "0.85rem" }}>
-        <div
-          style={{
-            marginBottom: "0.3rem",
-            backgroundColor: "#e6f2e6",
-            padding: "0.3rem 0.5rem",
-          }}
-        >
-          <strong>Data aggiornamento</strong>:{" "}
-          <span style={{ float: "right" }}>10 giu. 2025</span>
+
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: "0.85rem",
+        }}
+      >
+        <thead>
+          <tr>
+            {[
+              "NODO",
+              "SOTTONODO",
+              "COSTI",
+              "", // Spazio bianco
+              "Aggiornata al:",
+              "Giacenze",
+              "Costi per raffronto",
+              "BCWP",
+              "Contabilità",
+              "Da contabilizzare",
+              "Ricavi raffronto",
+              "MDC",
+              "MDC%",
+              "Note",
+            ].map((label, i) => (
+              <th
+                key={i}
+                style={{
+                  ...cella,
+                  backgroundColor:
+                    i >= 4 ? "#eaf4ea" : i === 3 ? "white" : "#e2f0d9",
+                  border: i === 3 ? "none" : "1px solid #ccc",
+                  minWidth: i === 3 ? "10px" : undefined,
+                  textAlign: "center",
+                  fontWeight: "bold",
+                }}
+              >
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sezioni.map((sezione, idx) => (
+            <React.Fragment key={idx}>
+              <tr>
+                <td
+                  style={{
+                    ...cella,
+                    backgroundColor: sezione.coloreNodo,
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {sezione.nodo}
+                </td>
+                <td
+                  colSpan={13}
+                  style={{
+                    ...cella,
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {sezione.titolo}
+                  <button
+                    onClick={() => aggiungiRiga(idx)}
+                    style={{
+                      float: "right",
+                      padding: "0.2rem 0.6rem",
+                      fontSize: "0.75rem",
+                      border: "1px solid #bbb",
+                      borderRadius: 4,
+                      backgroundColor: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    + Aggiungi riga
+                  </button>
+                </td>
+              </tr>
+              {sezione.sotto.map((sottoNodo, i) => (
+                <tr key={i}>
+                  <td
+                    style={{ ...cella, backgroundColor: sezione.coloreRiga }}
+                  ></td>
+                  <td style={{ ...cella, backgroundColor: sezione.coloreRiga }}>
+                    {sottoNodo}
+                  </td>
+                  <td
+                    style={{ ...cella, backgroundColor: sezione.coloreRiga }}
+                  ></td>
+                  <td
+                    style={{
+                      ...cella,
+                      backgroundColor: "white",
+                      border: "none",
+                    }}
+                  ></td>{" "}
+                  {/* Spazio */}
+                  {Array(10)
+                    .fill(null)
+                    .map((_, k) => (
+                      <td
+                        key={k}
+                        style={{
+                          ...cella,
+                          backgroundColor: sezione.coloreRiga,
+                        }}
+                      ></td>
+                    ))}
+                </tr>
+              ))}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: "1.5rem",
+          alignItems: "flex-start",
+        }}
+      >
+        <div>
+          <button
+            style={{
+              padding: "0.5rem 1rem",
+              border: "1px solid black",
+              background: "white",
+              fontWeight: "bold",
+              marginRight: "1rem",
+              marginLeft: "200px",
+            }}
+          >
+            Archivio costi/ricavi »
+          </button>
+          <button
+            onClick={handleExportExcel}
+            style={{
+              padding: "0.5rem 1rem",
+              border: "1px solid black",
+              background: "#b3dbff",
+              fontWeight: "bold",
+              marginLeft: "100px",
+            }}
+          >
+            Genera costi/ricavi
+          </button>
         </div>
-        <div
-          style={{
-            marginBottom: "0.3rem",
-            backgroundColor: "#e6f2e6",
-            padding: "0.3rem 0.5rem",
-          }}
-        >
-          <strong>Margine di commessa</strong>:{" "}
-          <span style={{ float: "right" }}>€ 20.000</span>
-        </div>
-        <div style={{ backgroundColor: "#e6f2e6", padding: "0.3rem 0.5rem" }}>
-          <strong>Margine %</strong>:{" "}
-          <span style={{ float: "right" }}>20 %</span>
+        <div style={{ textAlign: "right", fontSize: "0.85rem" }}>
+          <div
+            style={{
+              backgroundColor: "#e6f2e6",
+              padding: "0.4rem 0.6rem",
+              marginBottom: 4,
+            }}
+          >
+            <strong>Data aggiornamento</strong>:{" "}
+            <span style={{ float: "right" }}>10 giu. 2025</span>
+          </div>
+          <div
+            style={{
+              backgroundColor: "#e6f2e6",
+              padding: "0.4rem 0.6rem",
+              marginBottom: 4,
+            }}
+          >
+            <strong>Margine di commessa</strong>:{" "}
+            <span style={{ float: "right" }}>€ 20.000</span>
+          </div>
+          <div style={{ backgroundColor: "#e6f2e6", padding: "0.4rem 0.6rem" }}>
+            <strong>Margine %</strong>:{" "}
+            <span style={{ float: "right" }}>20 %</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-// ✅ DatiCommessa aggiornato con tutti i campi richiesti
+// Stile base per ogni cella
+const cella = {
+  padding: "0.4rem",
+  border: "1px solid #ccc",
+  verticalAlign: "middle",
+};
+
 const DatiCommessa = ({ onComplete, commessa }) => {
   const [triggered, setTriggered] = useState(false);
   const [dataInizio, setDataInizio] = useState(new Date());
