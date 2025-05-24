@@ -248,7 +248,7 @@ class Sidebar extends Component {
                         const cleanLabel = label.replace(/^Accesso\s+/i, ""); // Rimuove "Accesso " all'inizio
                         localStorage.setItem("selectedMenuLabel", cleanLabel);
                         window.dispatchEvent(
-                          new Event("selectedMenuLabelChanged")
+                          new Event("selectedMenuLabelChanged"),
                         );
                       }}
                     >
@@ -278,7 +278,7 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null
+              ) : null,
           )}
 
           <li className="nav-item mt-4">

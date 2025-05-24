@@ -3,9 +3,119 @@ import { useLocation } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import GaraService from "../services/api";
 import ClienteService from "../services/cliente";
+import Swal from "sweetalert2";
 
 const COLORS = ["#4CAF50", "#FFEB3B", "#2196F3"];
 
+const getObbligatori = (tipo) => {
+  switch (tipo) {
+    case "In Studio":
+      return [
+        "codice",
+        "cliente",
+        "telefono",
+        "tipoLavori",
+        "tipoAppalto",
+        "indirizzo",
+        "scadenzaConsegna",
+        "responsabileCliente",
+        "responsabileGara",
+        "importoOffAgg",
+      ];
+    case "Consegnata":
+      return [
+        "codice",
+        "cliente",
+        "telefono",
+        "mail",
+        "tipoLavori",
+        "tipoAppalto",
+        "indirizzo",
+        "scadenzaConsegna",
+        "dataConsegna",
+        "responsabileCliente",
+        "responsabileGara",
+        "importoOffAgg",
+        "opereEdili",
+        "impiantiMeccanici",
+        "impiantiElettrici",
+      ];
+    case "Aggiudicata":
+      return drawerFields.map((f) => f.name); // tutti i campi del form
+    case "Persa":
+      return [
+        "codice",
+        "cliente",
+        "indirizzo",
+        "telefono",
+        "mail",
+        "tipoLavori",
+        "tipoAppalto",
+        "scadenzaConsegna",
+        "responsabileCliente",
+        "responsabileGara",
+        "importoOffAgg",
+      ];
+    default:
+      return [];
+  }
+};
+
+const drawerFieldToGaraKey = {
+  codice: "CodiceGara",
+  cliente: "Cliente",
+  indirizzo: "UbicazioneLavori",
+  telefono: "Telefono",
+  mail: "Mail",
+  pivaCf: "PivaCf",
+  progettista: "Progettista",
+  progettistaTelefono: "ProgettistaTelefono",
+  progettistaMail: "ProgettistaMail",
+  dl: "DL",
+  dlTelefono: "DLTel",
+  dlMail: "DLEmail",
+  cse: "CSE",
+  cseTelefono: "CSETel",
+  cseMail: "CSEEmail",
+  tipoAppalto: "TipoAppalto",
+  scadenzaConsegna: "ScadenzaConsegna",
+  dataConsegna: "DataConsegna",
+  dataInizioCantiere: "DataInizioCantiere",
+  responsabileCliente: "ResponsabileCliente",
+  responsabileGara: "ResponsabileGara",
+  importoOffAgg: "Importo",
+  opereEdili: "TotaleEdili",
+  impiantiMeccanici: "TotaleMeccanici",
+  impiantiElettrici: "TotaleElettrici",
+};
+
+const drawerFields = [
+  { name: "codice", label: "Codice" },
+  { name: "cliente", label: "Cliente" },
+  { name: "telefono", label: "Telefono" },
+  { name: "mail", label: "Mail" },
+  { name: "pivaCf", label: "P.iva/C.F." },
+  { name: "progettista", label: "Progettista" },
+  { name: "progettistaTelefono", label: "Telefono Progettista" },
+  { name: "progettistaMail", label: "Mail Progettista" },
+  { name: "dl", label: "D.L." },
+  { name: "dlTelefono", label: "Telefono D.L." },
+  { name: "dlMail", label: "Mail D.L." },
+  { name: "cse", label: "C.S.E." },
+  { name: "cseTelefono", label: "Telefono C.S.E." },
+  { name: "cseMail", label: "Mail C.S.E." },
+  { name: "tipoAppalto", label: "Tipo appalto" },
+  { name: "indirizzo", label: "Indirizzo cantiere" },
+  { name: "scadenzaConsegna", label: "Scadenza consegna", type: "date" },
+  { name: "dataConsegna", label: "Data consegna", type: "date" },
+  { name: "dataInizioCantiere", label: "Data inizio cantiere", type: "date" },
+  { name: "responsabileCliente", label: "Resp. cliente" },
+  { name: "responsabileGara", label: "Resp. gara" },
+  { name: "importoOffAgg", label: "Importo off./agg." },
+  { name: "opereEdili", label: "Opere edili" },
+  { name: "impiantiMeccanici", label: "Impianti meccanici" },
+  { name: "impiantiElettrici", label: "Impianti elettrici" },
+];
 const centeredCellStyle = {
   textAlign: "center",
   verticalAlign: "middle",
@@ -63,19 +173,36 @@ function Buttons() {
   const [drawerClienteOpen, setDrawerClienteOpen] = useState(false);
   const [gare, setGare] = useState([]);
   const [clienti, setClienti] = useState([]);
+  // Stato iniziale del form aggiornato
+  // Stato iniziale del form aggiornato
   const [form, setForm] = useState({
+    codice: "",
     cliente: "",
-    titoloGara: "",
+    telefono: "",
+    mail: "",
+    pivaCf: "",
+    progettista: "",
+    progettistaTelefono: "",
+    progettistaMail: "",
+    dl: "",
+    dlTelefono: "",
+    dlMail: "",
+    cse: "",
+    cseTelefono: "",
+    cseMail: "",
+    tipoLavori: "",
+    indirizzo: "",
+
     tipoAppalto: "",
     scadenzaConsegna: "",
     dataConsegna: "",
+    dataInizioCantiere: "",
     responsabileCliente: "",
     responsabileGara: "",
-    indirizzo: "",
-    edili: 0,
-    tipoLavoro: tipoLavoriMap[selectedMenu],
-    idraulici: 0,
-    elettrici: 0,
+    importoOffAgg: "",
+    opereEdili: "",
+    impiantiMeccanici: "",
+    impiantiElettrici: "",
   });
 
   const [selectedGara, setSelectedGara] = useState(null);
@@ -165,91 +292,166 @@ function Buttons() {
 
   const toggleDrawer = (gara = null) => {
     setSelectedGara(gara);
-    setForm(
-      gara
-        ? {
-            cliente: gara.Cliente,
-            titoloGara: gara.TitoloGara,
-            tipoAppalto: gara.TipoAppalto,
-            scadenzaConsegna: toInputDateString(gara.ScadenzaConsegna),
-            dataConsegna: toInputDateString(gara.DataConsegna),
-            responsabileCliente: gara.ResponsabileCliente,
-            responsabileGara: gara.ResponsabileGara,
-            indirizzo: gara.UbicazioneLavori,
-            edili: gara.TotaleEdili,
-            idraulici: gara.TotaleMeccanici,
-            elettrici: gara.TotaleElettrici,
-            tipoLavoro: gara.TipoLavori,
+    if (!gara) {
+      setForm({
+        ...drawerFields.reduce((acc, { name }) => {
+          acc[name] = "";
+          return acc;
+        }, {}),
+        tipoLavori: tipoLavoriMap[selectedMenu],
+      });
+    } else {
+      const updatedForm = drawerFields.reduce(
+        (acc, { name, type = "text" }) => {
+          const garaKey = drawerFieldToGaraKey[name] || name;
+          let value = gara[garaKey];
+
+          if (value === null || value === undefined) {
+            value = "";
+          } else if (type === "date") {
+            value = toInputDateString(value); // normalizza formato date
           }
-        : {
-            cliente: "",
-            titoloGara: "",
-            tipoAppalto: "",
-            scadenzaConsegna: "",
-            dataConsegna: "",
-            responsabileCliente: "",
-            responsabileGara: "",
-            indirizzo: "",
-            edili: 0,
-            idraulici: 0,
-            elettrici: 0,
-            tipoLavoro: tipoLavoriMap[selectedMenu],
-          },
-    );
+
+          acc[name] = value;
+          return acc;
+        },
+        {},
+      );
+
+      updatedForm.tipoLavori = gara.TipoLavori || tipoLavoriMap[selectedMenu];
+
+      setForm(updatedForm);
+    }
     setDrawerOpen(true);
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    if (name === "indirizzo") fetchLocationSuggestions(value);
+  };
+
+  const obbligatoriStudio = [
+    "codice",
+    "cliente",
+    "telefono",
+    "tipoLavori",
+    "tipoAppalto",
+    "indirizzo", // <-- questo!
+    "scadenzaConsegna",
+    "responsabileCliente",
+    "responsabileGara",
+    "importoOffAgg",
+  ];
+
+  const obbligatoriConsegnata = [
+    "codice",
+    "cliente",
+    "telefono",
+    "mail",
+    "tipoLavori",
+    "tipoAppalto",
+    "indirizzo", // <-- questo!
+    "scadenzaConsegna",
+    "dataConsegna",
+    "responsabileCliente",
+    "responsabileGara",
+    "importoOffAgg",
+    "opereEdili",
+    "impiantiMeccanici",
+    "impiantiElettrici",
+  ];
+
+  const getLabelStyle = (name) => {
+    const obbligatori = getObbligatori(form.tipoLavori || "");
+    return {
+      fontWeight: "500",
+      marginBottom: 4,
+      color: obbligatori.includes(name) ? "red" : "#333",
+    };
   };
 
   const handleSubmit = async () => {
-    const clienteObj = clienti.find((c) => {
-      const ragione = c?.RagioneSociale?.toLowerCase().trim();
-      const input = form?.cliente?.toLowerCase().trim();
-      return ragione && input && ragione === input;
-    });
+    const obbligatori = getObbligatori(form.tipoLavori);
+    const mancanti = obbligatori.filter(
+      (campo) =>
+        typeof form[campo] === "undefined" || String(form[campo]).trim() === "",
+    );
 
-    const idCliente = clienteObj?.IdCliente;
-    if (!idCliente) {
-      alert("Cliente non valido");
+    if (mancanti.length > 0) {
+      Swal.fire({
+        title: "Campi obbligatori mancanti",
+        icon: "warning",
+        html: `<ul style="text-align:left;">${mancanti
+          .map((c) => `<li><b>${c}</b></li>`)
+          .join("")}</ul>`,
+        confirmButtonText: "Ok",
+        confirmButtonColor: "#3085d6",
+        backdrop: true,
+        allowOutsideClick: false,
+      });
       return;
     }
 
-    const totale =
-      Number(form.edili) + Number(form.idraulici) + Number(form.elettrici);
-
     const baseGara = {
-      CodiceGara: selectedGara ? selectedGara.CodiceGara : `GARA-${Date.now()}`,
-      IdCliente: idCliente,
-      TitoloGara: form.titoloGara,
-      TipoLavori: form.tipoLavoro,
-      UbicazioneLavori: form.indirizzo,
-      ImportoStimato: totale,
-      DataInserimento: selectedGara
-        ? selectedGara.DataInserimento
-        : new Date().toISOString().split("T")[0],
-      ResponsabileCliente: form.responsabileCliente,
+      CodiceGara: form.codice,
+      Cliente: form.cliente,
+      UbicazioneLavori: form.indirizzo, // usato per mappe e tabella
+      IndirizzoCantiere: form.indirizzo, // duplicato per compatibilità
+      Telefono: form.telefono,
+      Mail: form.mail,
+      PivaCf: form.pivaCf,
+      Progettista: form.progettista,
+      ProgettistaTelefono: form.progettistaTelefono,
+      ProgettistaMail: form.progettistaMail,
+      DL: form.dl,
+      DLTel: form.dlTelefono,
+      DLEmail: form.dlMail,
+      CSE: form.cse,
+      CSETel: form.cseTelefono,
+      CSEEmail: form.cseMail,
+      TipoLavori: form.tipoLavori,
       TipoAppalto: form.tipoAppalto,
+      IndirizzoCantiere: form.indirizzoCantiere,
       ScadenzaConsegna: form.scadenzaConsegna,
       DataConsegna: form.dataConsegna,
+      DataInizioCantiere: form.dataInizioCantiere,
+      ResponsabileCliente: form.responsabileCliente,
       ResponsabileGara: form.responsabileGara,
-      Importo: totale,
-      TotaleEdili: Number(form.edili),
-      TotaleMeccanici: Number(form.idraulici),
-      TotaleElettrici: Number(form.elettrici),
+      Importo: parseFloat(form.importoOffAgg || "0"),
+      TotaleEdili: parseFloat(form.opereEdili || "0"),
+      TotaleMeccanici: parseFloat(form.impiantiMeccanici || "0"),
+      TotaleElettrici: parseFloat(form.impiantiElettrici || "0"),
+      DataInserimento: new Date().toISOString().split("T")[0],
     };
 
-    if (selectedGara) {
-      await GaraService.aggiornaGara(baseGara);
-    } else {
-      await GaraService.creaGara(baseGara);
-    }
+    try {
+      if (selectedGara) {
+        await GaraService.aggiornaGara({
+          ...baseGara,
+          IdGara: selectedGara.IdGara,
+        });
+      } else {
+        await GaraService.creaGara(baseGara);
+      }
 
-    await loadGare();
-    setDrawerOpen(false);
+      await loadGare();
+
+      setSelectedGara(null);
+      setForm({
+        ...drawerFields.reduce((acc, { name }) => {
+          acc[name] = "";
+          return acc;
+        }, {}),
+        tipoLavori: tipoLavoriMap[selectedMenu],
+      });
+      setDrawerOpen(false);
+    } catch (error) {
+      console.error("Errore durante il salvataggio della gara:", error);
+      alert(
+        "Errore durante il salvataggio della gara:\n" +
+          (error?.message || "Errore sconosciuto"),
+      );
+    }
   };
 
   const loadGare = async () => {
@@ -344,7 +546,7 @@ function Buttons() {
           <tbody>
             {filteredGare.map((g, index) => (
               <tr key={index}>
-                <td style={centeredCellStyle}>{g.IdGara}</td>
+                <td style={centeredCellStyle}>{g.CodiceGara}</td>
                 <td style={centeredCellStyle}>{g.Cliente}</td>
                 <td style={centeredCellStyle}>{g.UbicazioneLavori}</td>
                 <td style={centeredCellStyle}>{formatDate(g.DataConsegna)}</td>
@@ -352,7 +554,13 @@ function Buttons() {
                 <td style={centeredCellStyle}>€{g.TotaleEdili}</td>
                 <td style={centeredCellStyle}>€{g.TotaleMeccanici}</td>
                 <td style={centeredCellStyle}>€{g.TotaleElettrici}</td>
-                <td style={centeredCellStyle}>€{g.Importo}</td>
+                <td style={centeredCellStyle}>
+                  €
+                  {(g.TotaleEdili || 0) +
+                    (g.TotaleMeccanici || 0) +
+                    (g.TotaleElettrici || 0)}
+                </td>
+
                 <td style={centeredCellStyle}>
                   <button
                     onClick={() => getMapUrl(g.UbicazioneLavori)}
@@ -447,7 +655,6 @@ function Buttons() {
           </tbody>
         </table>
       </div>
-
       {/* Mappa e grafico */}
       <div
         style={{
@@ -521,31 +728,42 @@ function Buttons() {
           flexDirection: "column",
         }}
       >
-        {/* Header fisso */}
         <div
           style={{
             flexShrink: 0,
             padding: "16px 24px 8px",
             borderBottom: "1px solid #ddd",
             backgroundColor: "#f9f9f9",
-            zIndex: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          <button
-            onClick={toggleDrawer}
+          <h3 style={{ margin: 0 }}>Aggiungi / modifica gara</h3>
+          <select
+            name="tipoLavori"
+            value={form.tipoLavori || ""}
+            onChange={(e) => {
+              const newTipo = e.target.value;
+              setForm((prev) => ({
+                ...prev,
+                tipoLavori: newTipo,
+              }));
+            }}
             style={{
-              float: "right",
-              fontSize: 18,
-              border: "none",
-              background: "none",
-              cursor: "pointer",
+              padding: "6px 10px",
+              borderRadius: "6px",
+              fontSize: "14px",
+              border: "1px solid #ccc",
+              backgroundColor: "#fff",
             }}
           >
-            ✕
-          </button>
-          <h3 style={{ margin: 0, textAlign: "center" }}>
-            Nuova Gara - {menuTitles[selectedMenu]}
-          </h3>
+            <option value="">Seleziona stato</option>
+            <option value="In Studio">In Studio</option>
+            <option value="Consegnata">Consegnata</option>
+            <option value="Aggiudicata">Aggiudicata</option>
+            <option value="Persa">Persa</option>
+          </select>
         </div>
 
         <div
@@ -558,221 +776,32 @@ function Buttons() {
             gap: 16,
           }}
         >
-          {/* Tipo Lavoro */}
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <label style={labelStyle}>Tipologia Gara</label>
-            <select
-              name="tipoLavoro"
-              value={form.tipoLavoro}
-              onChange={handleChange}
-              style={{ ...inputStyle, backgroundColor: "#fff" }}
+          {drawerFields.map(({ name, label, type = "text" }) => (
+            <div
+              key={name}
+              style={{ display: "flex", flexDirection: "column" }}
             >
-              <option value="">Seleziona tipologia</option>
-              <option value="In Studio">In Studio</option>
-              <option value="Consegnata">Consegnata</option>
-              <option value="Aggiudicata">Aggiudicata</option>
-              <option value="Persa">Persa</option>
-            </select>
-          </div>
-          {/* Campo */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              position: "relative",
-            }}
-          >
-            <label style={labelStyle}>Cliente</label>
-            <input
-              name="cliente"
-              placeholder="Inizia a digitare il cliente..."
-              value={form.cliente}
-              onChange={(e) => {
-                handleChange(e); // aggiorna form.cliente
-                const query = e.target.value.toLowerCase();
-                const filtered = clienti
-                  .filter((c) => c.RagioneSociale.toLowerCase().includes(query))
-                  .slice(0, 5); // massimo 5 suggerimenti
-                setFilteredClienti(filtered);
-                setShowClientiDropdown(true);
-              }}
-              onBlur={() => {
-                setTimeout(() => setShowClientiDropdown(false), 200); // chiudi dropdown dopo selezione
-              }}
-              style={inputStyle}
-            />
-
-            {showClientiDropdown && filteredClienti.length > 0 && (
-              <ul
+              <label style={getLabelStyle(name)}>{label}</label>
+              <input
+                type={type}
+                name={name}
+                value={form[name] || ""}
+                onChange={handleChange}
+                disabled={name === "codice" && selectedGara !== null}
                 style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  backgroundColor: "#fff",
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 4,
                   border: "1px solid #ccc",
-                  borderTop: "none",
-                  zIndex: 10,
-                  maxHeight: "150px",
-                  overflowY: "auto",
-                  margin: 0,
-                  padding: 0,
-                  listStyle: "none",
+                  backgroundColor:
+                    name === "codice" && selectedGara !== null
+                      ? "#eee"
+                      : "#fff",
                 }}
-              >
-                {filteredClienti.map((c, i) => (
-                  <li
-                    key={i}
-                    onClick={() => {
-                      setForm((prev) => ({
-                        ...prev,
-                        cliente: c.RagioneSociale,
-                      }));
-                      setShowClientiDropdown(false);
-                    }}
-                    style={{
-                      padding: "8px 12px",
-                      cursor: "pointer",
-                      borderBottom: "1px solid #eee",
-                      backgroundColor:
-                        form.cliente === c.RagioneSociale ? "#f0f0f0" : "#fff",
-                    }}
-                  >
-                    {c.RagioneSociale}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Suggerimento per aggiunta cliente */}
-          <span style={{ marginTop: 4, fontSize: "13px", color: "#666" }}>
-            Cliente non presente?{" "}
-            <button
-              onClick={() => setDrawerClienteOpen(true)}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#007BFF",
-                cursor: "pointer",
-                padding: 0,
-                fontSize: "13px",
-                textDecoration: "underline",
-              }}
-            >
-              Crea nuovo cliente
-            </button>
-          </span>
-
-          {/* Titolo Gara */}
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <label style={labelStyle}>Titolo Gara</label>
-            <input
-              name="titoloGara"
-              placeholder="Inserisci titolo"
-              value={form.titoloGara}
-              onChange={handleChange}
-              style={inputStyle}
-            />
-          </div>
-
-          {/* Tipo Appalto */}
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <label style={labelStyle}>Tipo Appalto</label>
-            <select
-              name="tipoAppalto"
-              value={form.tipoAppalto}
-              onChange={handleChange}
-              style={{ ...inputStyle, backgroundColor: "#fff" }}
-            >
-              <option value="">Seleziona tipo appalto</option>
-              <option value="Edili">Edili</option>
-              <option value="Idraulici">Idraulici</option>
-              <option value="Elettrici">Elettrici</option>
-            </select>
-          </div>
-
-          {/* Date */}
-          {[
-            { label: "Scadenza Consegna", name: "scadenzaConsegna" },
-            { label: "Data Consegna", name: "dataConsegna" },
-          ].map(({ label, name }) => (
-            <div
-              key={name}
-              style={{ display: "flex", flexDirection: "column" }}
-            >
-              <label style={labelStyle}>{label}</label>
-              <input
-                type="date"
-                name={name}
-                value={form[name]}
-                onChange={handleChange}
-                style={inputStyle}
               />
             </div>
           ))}
 
-          {/* Responsabili */}
-          {[
-            { label: "Responsabile Cliente", name: "responsabileCliente" },
-            { label: "Responsabile Gara", name: "responsabileGara" },
-          ].map(({ label, name }) => (
-            <div
-              key={name}
-              style={{ display: "flex", flexDirection: "column" }}
-            >
-              <label style={labelStyle}>{label}</label>
-              <input
-                name={name}
-                placeholder={`Inserisci ${label.toLowerCase()}`}
-                value={form[name]}
-                onChange={handleChange}
-                style={inputStyle}
-              />
-            </div>
-          ))}
-
-          {/* Comune/Città */}
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <label style={labelStyle}>Comune / Città / Paese</label>
-            <input
-              list="suggested-locations"
-              name="indirizzo"
-              placeholder="Inserisci località"
-              value={form.indirizzo}
-              onChange={handleChange}
-              style={inputStyle}
-            />
-            <datalist id="suggested-locations">
-              {suggestions.map((s, i) => (
-                <option key={i} value={s} />
-              ))}
-            </datalist>
-          </div>
-
-          {/* Importi */}
-          {[
-            { label: "Totale Edili", name: "edili" },
-            { label: "Totale Idraulici", name: "idraulici" },
-            { label: "Totale Elettrici", name: "elettrici" },
-          ].map(({ label, name }) => (
-            <div
-              key={name}
-              style={{ display: "flex", flexDirection: "column" }}
-            >
-              <label style={labelStyle}>{label}</label>
-              <input
-                type="number"
-                name={name}
-                placeholder={`Inserisci ${label.toLowerCase()}`}
-                value={form[name]}
-                onChange={handleChange}
-                style={inputStyle}
-              />
-            </div>
-          ))}
-
-          {/* Salva */}
           <button
             onClick={handleSubmit}
             style={{
@@ -851,7 +880,6 @@ function Buttons() {
               "FAX",
               "Email",
               "Telefono",
-              "Indirizzo",
               "Provincia",
               "Citta",
               "Cap",

@@ -11,6 +11,8 @@ import {
 } from "recharts";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import CantiereService from "../services/cantiere";
+
 const tableStyle = {
   borderCollapse: "collapse",
   width: "100%",
@@ -256,65 +258,122 @@ const CostiRicavi = () => (
   </div>
 );
 
-const DatiCommessa = ({ onComplete }) => {
+// ✅ DatiCommessa aggiornato con tutti i campi richiesti
+const DatiCommessa = ({ onComplete, commessa }) => {
+  const [triggered, setTriggered] = useState(false);
   const [dataInizio, setDataInizio] = useState(new Date());
   const [dataFine, setDataFine] = useState(new Date());
-  const [isComplete, setIsComplete] = useState(false);
+  const [mappaUrl, setMappaUrl] = useState(null);
+  const [zonaImageUrl, setZonaImageUrl] = useState(null);
 
   const [datiGenerali, setDatiGenerali] = useState({
     codice: "",
+    cliente: "",
     indirizzo: "",
     tipoLavori: "",
     tipoAppalto: "",
     respUfficio: "",
     respCantiere: "",
+    contratto: "",
+    centroCosto: "",
+    gant: "",
+    condivisione: "",
+    sicurezza: "",
+    foto: "",
+    anagraficaCliente: ["", "", "", "", ""],
+    anagraficaProgettista: ["", "", "", "", ""],
   });
 
+  useEffect(() => {
+    if (commessa) {
+      setDatiGenerali((prev) => ({
+        ...prev,
+        codice: commessa.IdCantiere?.toString() || "",
+        cliente: commessa.RagioneSociale || "",
+        indirizzo: commessa.Indirizzo || "",
+        tipoLavori: commessa.TipoLavori || "",
+        tipoAppalto: commessa.TipoAppalto || "",
+        respUfficio: commessa.RespUfficio || "",
+        respCantiere: commessa.RespCantiere || "",
+      }));
+    }
+  }, [commessa]);
+
   const handleChange = (field) => (e) => {
-    if (!e || !e.target) return; // protezione contro eventi nulli o sintetici riutilizzati
     const value = e.target.value ?? "";
-    setDatiGenerali((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setDatiGenerali((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleArrayChange = (field, index) => (e) => {
+    const newArr = [...datiGenerali[field]];
+    newArr[index] = e.target.value;
+    setDatiGenerali((prev) => ({ ...prev, [field]: newArr }));
+  };
+
+  const aggiornaMappaDaIndirizzo = async (indirizzo) => {
+    if (!indirizzo) return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          indirizzo
+        )}&format=json&limit=1`,
+        {
+          headers: {
+            "User-Agent": "centoimpianti.com - commessa",
+            "Accept-Language": "it",
+          },
+        }
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        const { lat, lon } = data[0];
+        const delta = 0.01;
+        const bbox = `${lon - delta},${lat - delta},${lon + delta},${
+          lat + delta
+        }`;
+        const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
+        setMappaUrl(url);
+      } else {
+        setMappaUrl(null);
+      }
+    } catch (error) {
+      console.error("Errore caricamento mappa:", error);
+      setMappaUrl(null);
+    }
+  };
+
+  const aggiornaImmagineZona = async (query) => {
+    if (!query) return setZonaImageUrl(null);
+    const base = query.split(",")[1]?.trim() || query;
+    const url = `https://source.unsplash.com/600x400/?${encodeURIComponent(
+      base
+    )}`;
+    setZonaImageUrl(url);
   };
 
   useEffect(() => {
-    const tuttiCompilati = Object.values(datiGenerali).every(
-      (val) => val.trim() !== ""
-    );
-    if (tuttiCompilati && !isComplete) {
-      setIsComplete(true);
-      if (typeof onComplete === "function") onComplete();
+    const indirizzo = datiGenerali.indirizzo.trim();
+    if (indirizzo !== "") {
+      aggiornaMappaDaIndirizzo(indirizzo);
+      aggiornaImmagineZona(indirizzo);
+    } else {
+      setMappaUrl(null);
+      setZonaImageUrl(null);
     }
-  }, [datiGenerali, isComplete, onComplete]);
+  }, [datiGenerali.indirizzo]);
+
+  useEffect(() => {
+    const { codice, indirizzo } = datiGenerali;
+    if (codice && indirizzo && !triggered) {
+      setTriggered(true);
+      if (typeof onComplete === "function") {
+        onComplete({ codice, indirizzo });
+      }
+    }
+  }, [datiGenerali, triggered, onComplete]);
 
   return (
     <>
-      {/* HEADER INPUT controllati */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "0.4rem",
-          marginBottom: "1rem",
-        }}
-      >
-        <input
-          placeholder="Codice"
-          style={{ padding: "0.4rem", border: "1px solid #ccc" }}
-        />
-        <input
-          placeholder="Cliente"
-          style={{ padding: "0.4rem", border: "1px solid #ccc" }}
-        />
-        <input
-          placeholder="Indirizzo"
-          style={{ padding: "0.4rem", border: "1px solid #ccc" }}
-        />
-      </div>
-
-      {/* INFORMAZIONE */}
       <div
         style={{
           textAlign: "center",
@@ -323,11 +382,11 @@ const DatiCommessa = ({ onComplete }) => {
           marginBottom: "1rem",
         }}
       >
-        Cod. 365 <span style={{ color: "brown" }}>Bunge</span> S.p.a. Via Baiona
-        237 «Silo»
+        Cod. {datiGenerali.codice || "—"}{" "}
+        <span style={{ color: "brown" }}>{datiGenerali.cliente || ""}</span>{" "}
+        {datiGenerali.indirizzo}
       </div>
 
-      {/* DATEPICKER */}
       <div
         style={{
           display: "flex",
@@ -342,26 +401,20 @@ const DatiCommessa = ({ onComplete }) => {
           </div>
           <DatePicker
             selected={dataInizio}
-            onChange={(date) => setDataInizio(date)}
+            onChange={setDataInizio}
             dateFormat="dd MMMM yyyy"
-            placeholderText="Seleziona la data di inizio"
-            className="date-picker"
           />
         </div>
-
         <div>
           <div style={{ fontWeight: "bold", fontSize: "0.85rem" }}>
             Data fine cantiere
           </div>
           <DatePicker
             selected={dataFine}
-            onChange={(date) => setDataFine(date)}
+            onChange={setDataFine}
             dateFormat="dd MMMM yyyy"
-            placeholderText="Seleziona la data di fine"
-            className="date-picker"
           />
         </div>
-
         <button
           style={{
             backgroundColor: "#018E42",
@@ -375,105 +428,89 @@ const DatiCommessa = ({ onComplete }) => {
         </button>
       </div>
 
-      {/* TABELLE */}
       <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
         <div style={{ flex: 2 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1rem",
-            }}
-          >
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th
-                    colSpan="2"
-                    style={{
-                      ...cellStyle,
-                      textAlign: "center",
-                      backgroundColor: "#ddf0e3",
-                    }}
-                  >
-                    DATI GENERALI
-                  </th>
+          <table style={{ width: "100%", marginBottom: "1rem" }}>
+            <thead>
+              <tr>
+                <th
+                  colSpan="2"
+                  style={{
+                    ...cellStyle,
+                    backgroundColor: "#ddf0e3",
+                    textAlign: "center",
+                  }}
+                >
+                  DATI GENERALI
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                "codice",
+                "cliente",
+                "indirizzo",
+                "tipoLavori",
+                "tipoAppalto",
+                "respUfficio",
+                "respCantiere",
+              ].map((key) => (
+                <tr key={key}>
+                  <td style={cellStyle}>{key}</td>
+                  <td style={cellStyle}>
+                    <input
+                      type="text"
+                      value={datiGenerali[key] ?? ""}
+                      onChange={handleChange(key)}
+                      placeholder={`Inserisci ${key}`}
+                      style={{ width: "100%", border: "none" }}
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {[
-                  { label: "Codice", key: "codice" },
-                  { label: "Indirizzo cantiere", key: "indirizzo" },
-                  { label: "Tipo lavori", key: "tipoLavori" },
-                  { label: "Tipo appalto", key: "tipoAppalto" },
-                  { label: "Resp. Ufficio", key: "respUfficio" },
-                  { label: "Resp. Cantiere", key: "respCantiere" },
-                ].map(({ label, key }) => (
-                  <tr key={key}>
-                    <td style={cellStyle}>{label}</td>
-                    <td style={cellStyle}>
-                      <input
-                        type="text"
-                        placeholder={`Inserisci ${label.toLowerCase()}`}
-                        value={datiGenerali[key] ?? ""}
-                        onChange={handleChange(key)}
-                        style={{
-                          width: "100%",
-                          border: "none",
-                          outline: "none",
-                        }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ))}
+            </tbody>
+          </table>
 
-            {/* Documenti (non obbligatori per completamento) */}
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th
-                    colSpan="2"
-                    style={{
-                      ...cellStyle,
-                      textAlign: "center",
-                      backgroundColor: "#ddf0e3",
-                    }}
-                  >
-                    DOCUMENTI
-                  </th>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th
+                  colSpan="2"
+                  style={{
+                    ...cellStyle,
+                    textAlign: "center",
+                    backgroundColor: "#ddf0e3",
+                  }}
+                >
+                  DOCUMENTI
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                "contratto",
+                "centroCosto",
+                "gant",
+                "condivisione",
+                "sicurezza",
+                "foto",
+              ].map((key) => (
+                <tr key={key}>
+                  <td style={cellStyle}>{key}</td>
+                  <td style={cellStyle}>
+                    <input
+                      type="text"
+                      value={datiGenerali[key] ?? ""}
+                      onChange={handleChange(key)}
+                      placeholder={`Link ${key}`}
+                      style={{ width: "100%", border: "none" }}
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {[
-                  "Link cartella contratto",
-                  "Link centro di costo",
-                  "Link Gant",
-                  "Link cartella condivisione",
-                  "Link cartella sicurezza",
-                  "Link cartella foto",
-                ].map((item) => (
-                  <tr key={item}>
-                    <td style={cellStyle}>{item}</td>
-                    <td style={cellStyle}>
-                      <input
-                        type="text"
-                        placeholder={`Inserisci ${item.toLowerCase()}`}
-                        style={{
-                          width: "100%",
-                          border: "none",
-                          outline: "none",
-                        }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
 
-          {/* ANAGRAFICA */}
           <table style={{ ...tableStyle, marginTop: "1rem" }}>
             <thead>
               <tr>
@@ -490,14 +527,17 @@ const DatiCommessa = ({ onComplete }) => {
               </tr>
             </thead>
             <tbody>
-              {["Cliente", "Progettista"].map((ruolo) => (
-                <tr key={ruolo}>
-                  <td style={cellStyle}>{ruolo}</td>
-                  {Array.from({ length: 5 }).map((_, idx) => (
-                    <td key={idx} style={cellStyle}>
+              {["anagraficaCliente", "anagraficaProgettista"].map((field) => (
+                <tr key={field}>
+                  <td style={cellStyle}>
+                    {field === "anagraficaCliente" ? "Cliente" : "Progettista"}
+                  </td>
+                  {datiGenerali[field].map((val, i) => (
+                    <td key={i} style={cellStyle}>
                       <input
                         type="text"
-                        placeholder="..."
+                        value={val}
+                        onChange={handleArrayChange(field, i)}
                         style={{ width: "100%", border: "none" }}
                       />
                     </td>
@@ -508,7 +548,6 @@ const DatiCommessa = ({ onComplete }) => {
           </table>
         </div>
 
-        {/* MAPPA + IMMAGINE */}
         <div
           style={{
             flex: 1,
@@ -517,24 +556,36 @@ const DatiCommessa = ({ onComplete }) => {
             gap: "1rem",
           }}
         >
-          <iframe
-            title="Mappa Ferrara"
-            width="100%"
-            height="200"
-            src="https://www.openstreetmap.org/export/embed.html?bbox=11.609%2C44.829%2C11.629%2C44.841&layer=mapnik&marker=44.835%2C11.619"
-            style={{ border: "1px solid black" }}
-          ></iframe>
-          <img
-            src="https://travelitalia.pl/wp-content/uploads/2021/09/ferrara-italy-29-july-2020-evocative-view-of-the-road-leadin_shutterstock_1786546775-scaled.jpg.webp"
-            alt="Street"
-            style={{ width: "100%", height: "50%", borderRadius: "8px" }}
-          />
+          {mappaUrl && (
+            <iframe
+              title="Mappa"
+              src={mappaUrl}
+              width="100%"
+              height="200"
+              style={{ border: "1px solid #ccc" }}
+            />
+          )}
+          {zonaImageUrl ? (
+            <img
+              src={zonaImageUrl}
+              alt="Zona"
+              style={{
+                width: "100%",
+                height: "200px",
+                objectFit: "cover",
+                borderRadius: 8,
+              }}
+            />
+          ) : (
+            <div style={{ textAlign: "center", color: "#999" }}>
+              Nessuna immagine trovata
+            </div>
+          )}
         </div>
       </div>
     </>
   );
 };
-
 const GestioneContratto = () => (
   <div
     style={{
@@ -723,9 +774,27 @@ const CommessaTecnico = () => {
     "Cruscotto di commessa",
   ];
 
+  const [allCommesse, setAllCommesse] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredOptions, setFilteredOptions] = useState([]);
+  const [selectedCommessa, setSelectedCommessa] = useState(null);
   const [isModalitaNuova, setIsModalitaNuova] = useState(false);
   const [tabsVisibili, setTabsVisibili] = useState(tabsOriginali);
   const [selectedTab, setSelectedTab] = useState("Dati commessa");
+
+  const [datiCommessa, setDatiCommessa] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const dati = await CantiereService.ricercaCantieri({});
+        setAllCommesse(dati);
+      } catch (err) {
+        console.error("Errore nel caricamento commesse:", err);
+      }
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -735,17 +804,41 @@ const CommessaTecnico = () => {
     }
   }, []);
 
-  const handleComplete = () => {
+  useEffect(() => {
+    if (searchTerm.length > 1) {
+      const filtered = allCommesse.filter((c) => {
+        return (
+          (c.IdCantiere && c.IdCantiere.toString().includes(searchTerm)) ||
+          (c.RagioneSociale &&
+            c.RagioneSociale.toLowerCase().includes(
+              searchTerm.toLowerCase()
+            )) ||
+          (c.Indirizzo &&
+            c.Indirizzo.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+      });
+      setFilteredOptions(filtered.slice(0, 10));
+    } else {
+      setFilteredOptions([]);
+    }
+  }, [searchTerm, allCommesse]);
+
+  const handleComplete = (data) => {
     if (!isModalitaNuova) return;
 
-    // Rimuovi "modalita=nuova" dalla query string
     const url = new URL(window.location.href);
     url.searchParams.delete("modalita");
     window.history.replaceState({}, "", url.pathname);
 
-    // Ripristina tabs completi
+    setDatiCommessa(data);
     setTabsVisibili(tabsOriginali);
     setIsModalitaNuova(false);
+
+    fetch("/api/commesse/nuova", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then((res) => console.log("Commessa inviata:", res.status));
   };
 
   return (
@@ -761,43 +854,107 @@ const CommessaTecnico = () => {
         >
           Controllo gestione commessa
         </h2>
-
-        <div
-          style={{
-            display: "table",
-            width: "100%",
-            tableLayout: "fixed",
-            marginBottom: "1rem",
-          }}
-        >
-          {tabsVisibili.map((label) => (
+        <div style={{ marginBottom: "1rem" }}>
+          <input
+            type="text"
+            placeholder="Filtra per codice, cliente o indirizzo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "0.5rem",
+              border: "1px solid #ccc",
+            }}
+          />
+          {filteredOptions.length > 0 && (
             <div
-              key={label}
-              onClick={() => setSelectedTab(label)}
               style={{
-                cursor: "pointer",
-                display: "table-cell",
-                textAlign: "center",
-                border: "1px solid gray",
-                backgroundColor: selectedTab === label ? "#e3f2e8" : "white",
-                fontSize: "0.9rem",
-                padding: "0.4rem 0",
-                fontWeight: selectedTab === label ? "bold" : "normal",
+                border: "1px solid #ccc",
+                backgroundColor: "#fff",
+                maxHeight: "200px",
+                overflowY: "auto",
               }}
             >
-              {label}
+              {filteredOptions.map((commessa) => (
+                <div
+                  key={commessa.IdCantiere}
+                  onClick={() => {
+                    setSelectedCommessa(commessa);
+                    setSearchTerm("");
+                    setFilteredOptions([]);
+                  }}
+                  style={{
+                    padding: "0.5rem",
+                    cursor: "pointer",
+                    borderBottom: "1px solid #eee",
+                  }}
+                >
+                  <strong>{commessa.IdCantiere}</strong> -{" "}
+                  {commessa.RagioneSociale} ({commessa.Indirizzo})
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
 
-        {selectedTab === "Dati commessa" && (
-          <DatiCommessa onComplete={handleComplete} />
+        {isModalitaNuova || selectedCommessa ? (
+          <>
+            <div
+              style={{
+                display: "table",
+                width: "100%",
+                tableLayout: "fixed",
+                marginBottom: "1rem",
+              }}
+            >
+              {tabsVisibili.map((label) => (
+                <div
+                  key={label}
+                  onClick={() => setSelectedTab(label)}
+                  style={{
+                    cursor: "pointer",
+                    display: "table-cell",
+                    textAlign: "center",
+                    border: "1px solid gray",
+                    backgroundColor:
+                      selectedTab === label ? "#e3f2e8" : "white",
+                    fontSize: "0.9rem",
+                    padding: "0.4rem 0",
+                    fontWeight: selectedTab === label ? "bold" : "normal",
+                  }}
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+
+            {selectedTab === "Dati commessa" && (
+              <DatiCommessa
+                commessa={selectedCommessa}
+                onComplete={handleComplete}
+              />
+            )}
+            {selectedTab === "Gestione contratto" && (
+              <GestioneContratto commessa={selectedCommessa} />
+            )}
+            {selectedTab === "Costi / Ricavi" && (
+              <CostiRicavi commessa={selectedCommessa} />
+            )}
+            {selectedTab === "Approvvigionamenti" && (
+              <Approvvigionamenti commessa={selectedCommessa} />
+            )}
+            {selectedTab === "C.D.P." && <CDP commessa={selectedCommessa} />}
+            {selectedTab === "Cruscotto di commessa" && (
+              <CruscottoCommessa commessa={selectedCommessa} />
+            )}
+          </>
+        ) : (
+          <div
+            style={{ textAlign: "center", color: "#888", marginTop: "2rem" }}
+          >
+            Seleziona una commessa per iniziare
+          </div>
         )}
-        {selectedTab === "Gestione contratto" && <GestioneContratto />}
-        {selectedTab === "Costi / Ricavi" && <CostiRicavi />}
-        {selectedTab === "Approvvigionamenti" && <Approvvigionamenti />}
-        {selectedTab === "C.D.P." && <CDP />}
-        {selectedTab === "Cruscotto di commessa" && <CruscottoCommessa />}
       </div>
     </div>
   );

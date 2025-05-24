@@ -1,8 +1,7 @@
-import React, { useState } from "react";
-import { format } from "date-fns";
-import { Drawer, DrawerContent, DrawerHeader, DrawerBody, Button } from "antd";
+import React, { useState, useEffect } from "react";
+import { Drawer, Button } from "antd";
 import { Select, Input } from "antd";
-
+import CantiereService from "../services/cantiere";
 const { Option } = Select;
 
 const tabStyle = {
@@ -30,26 +29,190 @@ const headerStyle = {
 };
 
 function DashboardTabsPanoramica() {
+  const [commesse, setCommesse] = useState([]);
+  const [filteredCommesse, setFilteredCommesse] = useState([]);
+  const [filters, setFilters] = useState({
+    codice: "",
+    indirizzo: "",
+    stato: "",
+    respUfficio: "",
+  });
   const [activeTab, setActiveTab] = useState("Panoramica");
   const [commessaOption, setCommessaOption] = useState("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [summaryCards, setSummaryCards] = useState([]);
 
-  const summaryCards = [
-    { label: "Aperte", value: 4, color: "#2e7d32" },
-    { label: "Bloccate", value: 2, color: "#ff9800" },
-    { label: "Chiuse", value: 3, color: "#d32f2f" },
-    { label: "Costi 30 gg.", value: "€ 500.000", color: "#2e7d32" },
-    { label: "Lavori a finire", value: "100.000", color: "#2e7d32" },
-    { label: "Margine % medio", value: "20%", color: "#2e7d32" },
-  ];
+  useEffect(() => {
+    const filtra = commesse.filter((c) => {
+      return (
+        (filters.codice === "" ||
+          c.IdCantiere.toString().includes(filters.codice)) &&
+        (filters.indirizzo === "" ||
+          (c.Indirizzo || "")
+            .toLowerCase()
+            .includes(filters.indirizzo.toLowerCase())) &&
+        (filters.stato === "" ||
+          (c.StatoCantiere || "")
+            .toLowerCase()
+            .includes(filters.stato.toLowerCase())) &&
+        (filters.respUfficio === "" ||
+          (c.RespUfficio || "")
+            .toLowerCase()
+            .includes(filters.respUfficio.toLowerCase()))
+      );
+    });
+    setFilteredCommesse(filtra);
+  }, [filters, commesse]);
 
+  useEffect(() => {
+    const fetchCommesse = async () => {
+      const dati = await CantiereService.ricercaCantieri({});
+      setCommesse(dati); // Salva per la tabella
+
+      try {
+        const dati = await CantiereService.ricercaCantieri({});
+        let aperte = 0,
+          bloccate = 0,
+          chiuse = 0;
+
+        dati.forEach((c) => {
+          console.log("Cantiere:", c);
+          const stato = (c.StatoCantiere || "").toLowerCase();
+
+          if (stato.includes("chiuso")) {
+            chiuse++;
+          } else if (
+            stato === "incorso" ||
+            stato.includes("lavoro terminato")
+          ) {
+            aperte++;
+          } else {
+            bloccate++;
+          }
+        });
+        setSummaryCards([
+          { label: "Aperte", value: aperte, color: "#2e7d32" },
+          { label: "Bloccate", value: bloccate, color: "#ff9800" },
+          { label: "Chiuse", value: chiuse, color: "red" },
+          {
+            label: "Costi 30 gg.",
+            value: `€ ${totaleCosti30gg.toLocaleString("it-IT", {
+              maximumFractionDigits: 0,
+            })}`,
+            color: "#2e7d32",
+          },
+          {
+            label: "Lavori a finire",
+            value: `€ ${totaleLavoriAFinire.toLocaleString("it-IT", {
+              maximumFractionDigits: 0,
+            })}`,
+            color: "#2e7d32",
+          },
+          {
+            label: "Margine % medio",
+            value: `${mediaMargine}%`,
+            color: "#2e7d32",
+          },
+        ]);
+      } catch (err) {
+        console.error("Errore nel recupero delle commesse:", err);
+      }
+    };
+
+    fetchCommesse();
+  }, []);
+
+  // FUNZIONE UTILITY
+  const getEuroValue = (str) =>
+    parseFloat((str || "0").replace(/[^\d.-]/g, "")) || 0;
+
+  const now = new Date();
+  const MILLISECONDS_IN_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+  // 🔢 CALCOLI PRIMA DI dashboardCards
+  const totaleSal = filteredCommesse.reduce(
+    (acc, c) => acc + getEuroValue(c.SalDaFatturare),
+    0,
+  );
+
+  const totaleSil = filteredCommesse.reduce(
+    (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
+    0,
+  );
+
+  const commesseDaAggiornare = filteredCommesse.filter((c) => {
+    const dataAgg = c.DataCreazioneCantiere;
+    if (!dataAgg) return false;
+    const [day, month, year] = dataAgg.split("/");
+    const dateObj = new Date(`${year}-${month}-${day}`);
+    return now - dateObj > MILLISECONDS_IN_30_DAYS;
+  }).length;
+
+  let commessaMigliore = null;
+  let commessaPeggiore = null;
+  let maxMargine = -Infinity;
+  let minMargine = Infinity;
+
+  filteredCommesse.forEach((c) => {
+    const margine = getEuroValue(c.MarginePercentuale);
+    if (margine > maxMargine) {
+      maxMargine = margine;
+      commessaMigliore = c;
+    }
+    if (margine < minMargine) {
+      minMargine = margine;
+      commessaPeggiore = c;
+    }
+  });
+  const totaleCosti30gg = filteredCommesse.reduce(
+    (acc, c) => acc + getEuroValue(c.Costi30gg),
+    0,
+  );
+
+  const totaleLavoriAFinire = filteredCommesse.reduce(
+    (acc, c) => acc + getEuroValue(c.LavoriAFinire),
+    0,
+  );
+
+  const marginiValidi = filteredCommesse
+    .map((c) => getEuroValue(c.MarginePercentuale))
+    .filter((v) => !isNaN(v));
+
+  const mediaMargine =
+    marginiValidi.length > 0
+      ? (
+          marginiValidi.reduce((acc, val) => acc + val, 0) /
+          marginiValidi.length
+        ).toFixed(1)
+      : "0";
+  // ✅ ORA PUOI DEFINIRE dashboardCards
   const dashboardCards = [
-    { label: "Commesse gestite", value: 4 },
-    { label: "Sal da fatturare", value: "€ 10.000", highlight: true },
-    { label: "Sil da salizzare", value: 4 },
-    { label: "Commesse da aggiornare", value: 4 },
-    { label: "Commessa migliore", value: "Cod 361", highlight: true },
-    { label: "Commessa peggiore", value: "Cod 363", highlight: true },
+    { label: "Commesse gestite", value: filteredCommesse.length },
+    {
+      label: "Sal da fatturare",
+      value: `€ ${totaleSal.toLocaleString("it-IT", {
+        maximumFractionDigits: 0,
+      })}`,
+      highlight: true,
+    },
+    {
+      label: "Sil da salizzare",
+      value: totaleSil,
+    },
+    {
+      label: "Commesse da aggiornare",
+      value: commesseDaAggiornare,
+    },
+    {
+      label: "Commessa migliore",
+      value: commessaMigliore ? `Cod ${commessaMigliore.IdCantiere}` : "-",
+      highlight: true,
+    },
+    {
+      label: "Commessa peggiore",
+      value: commessaPeggiore ? `Cod ${commessaPeggiore.IdCantiere}` : "-",
+      highlight: true,
+    },
   ];
 
   const handleCommessaSelection = (value) => {
@@ -62,7 +225,7 @@ function DashboardTabsPanoramica() {
 
   const renderDrawer = () => (
     <Drawer
-      title="Crea Gara"
+      title="Crea Commessa"
       placement="right"
       closable
       onClose={() => setIsDrawerOpen(false)}
@@ -89,6 +252,18 @@ function DashboardTabsPanoramica() {
       </div>
     </Drawer>
   );
+
+  filteredCommesse.forEach((c) => {
+    const margine = getEuroValue(c.MarginePercentuale); // assume e.g., "20%" or "0%"
+    if (margine > maxMargine) {
+      maxMargine = margine;
+      commessaMigliore = c;
+    }
+    if (margine < minMargine) {
+      minMargine = margine;
+      commessaPeggiore = c;
+    }
+  });
 
   const renderPanoramica = () => (
     <>
@@ -148,12 +323,120 @@ function DashboardTabsPanoramica() {
           </div>
         ))}
       </div>
-      <h3 style={{ backgroundColor: "#dbe8dc", padding: "10px" }}>Dashboard</h3>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <Button type="primary" onClick={() => setIsDrawerOpen(true)}>
-          CREA GARA
-        </Button>
+      <div style={{ marginTop: 40 }}>
+        <h3 style={{ backgroundColor: "#dbe8dc", padding: "10px" }}>
+          Dashboard
+        </h3>
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <Input
+            placeholder="Filtra Codice"
+            value={filters.codice}
+            onChange={(e) => setFilters({ ...filters, codice: e.target.value })}
+            style={{ width: 120 }}
+          />
+          <Input
+            placeholder="Filtra Indirizzo"
+            value={filters.indirizzo}
+            onChange={(e) =>
+              setFilters({ ...filters, indirizzo: e.target.value })
+            }
+            style={{ width: 200 }}
+          />
+          <Input
+            placeholder="Filtra Resp. Ufficio"
+            value={filters.respUfficio}
+            onChange={(e) =>
+              setFilters({ ...filters, respUfficio: e.target.value })
+            }
+            style={{ width: 200 }}
+          />
+          <Input
+            placeholder="Filtra Stato"
+            value={filters.stato}
+            onChange={(e) => setFilters({ ...filters, stato: e.target.value })}
+            style={{ width: 160 }}
+          />
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Button
+            onClick={() => setIsDrawerOpen(true)}
+            style={{
+              backgroundColor: "#9e9e9e", // grigio chiaro
+              color: "#ffffff", // testo bianco
+              border: "none",
+              fontWeight: "bold",
+            }}
+          >
+            Crea Commessa
+          </Button>
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              backgroundColor: "#f9f9f9",
+              marginTop: 10,
+            }}
+          >
+            <thead>
+              <tr>
+                {[
+                  "Cod.",
+                  "Indirizzo",
+                  "Resp. Ufficio",
+                  "Stato",
+                  "Delta costi Fatture",
+                  "Costi 30 gg.",
+                  "Avanz. %",
+                  "Lavori a finire",
+                  "Sil da salizzare",
+                  "Sal da fatturare",
+                  "Margine %",
+                  "Data aggiornamento",
+                ].map((label, idx) => (
+                  <th key={idx} style={{ ...cellStyle, ...headerStyle }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCommesse.map((c, i) => (
+                <tr key={i}>
+                  <td style={cellStyle}>{c.IdCantiere}</td>
+                  <td style={cellStyle}>{c.Indirizzo}</td>
+                  <td style={cellStyle}>{c.RespUfficio || "-"}</td>
+                  <td style={cellStyle}>{c.StatoCantiere}</td>
+                  <td style={cellStyle}>€ 0</td>
+                  <td style={cellStyle}>€ 0</td>
+                  <td style={cellStyle}>0%</td>
+                  <td style={cellStyle}>€ 0</td>
+                  <td style={cellStyle}>0</td>
+                  <td style={cellStyle}>€ 0</td>
+                  <td style={cellStyle}>0%</td>
+                  <td style={cellStyle}>{c.DataCreazioneCantiere}</td>
+                </tr>
+              ))}
+              <tr style={{ backgroundColor: "#eaf4ea", fontWeight: "bold" }}>
+                <td style={cellStyle} colSpan={4}>
+                  TOTALI
+                </td>
+                <td style={cellStyle}>€ 0</td>
+                <td style={cellStyle}>€ 0</td>
+                <td style={cellStyle}></td>
+                <td style={cellStyle}>€ 0</td>
+                <td style={cellStyle}></td>
+                <td style={cellStyle}>€ 0</td>
+                <td style={cellStyle}>0%</td>
+                <td style={cellStyle}></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
       {renderDrawer()}
     </>
   );

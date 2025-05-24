@@ -33,7 +33,12 @@ class Dashboard extends Component {
   };
 
   estraiDati = (gare, tipoLavori) => {
-    const gareFiltrate = gare.filter((g) => g.TipoLavori === tipoLavori);
+    const gareFiltrate = gare.filter((g) => {
+      if (tipoLavori === "In Studio") {
+        return !g.TipoLavori || g.TipoLavori.toLowerCase().includes("studio");
+      }
+      return g.TipoLavori === tipoLavori;
+    });
     const totali = gareFiltrate.reduce(
       (acc, g) => {
         acc[0] += g.TotaleEdili || 0;
@@ -57,7 +62,20 @@ class Dashboard extends Component {
       cutout: "70%",
       rotation: Math.PI * 0.5,
       plugins: {
-        legend: { display: false },
+        legend: { display: false }, // <-- nasconde i label del grafico
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              const label = context.chart.data.labels[context.dataIndex] || "";
+              const dataset = context.dataset;
+              const total = dataset.data.reduce((acc, val) => acc + val, 0);
+              const currentValue = dataset.data[context.dataIndex];
+              const percentage = ((currentValue / total) * 100).toFixed(1);
+
+              return `${label}: ${percentage}%`;
+            },
+          },
+        },
       },
     };
 
@@ -95,6 +113,7 @@ class Dashboard extends Component {
             const totaleImporto = data.reduce((a, b) => a + b, 0);
 
             const chartData = {
+              labels: ["Edili", "Elettrici", "Meccanici"], // <--- aggiungi questo
               datasets: [
                 {
                   data,
@@ -169,22 +188,24 @@ class Dashboard extends Component {
                   </div>
                 </div>
 
-                <ul
-                  style={{
-                    listStyle: "none",
-                    padding: 0,
-                    fontSize: "0.9rem",
-                    marginTop: "12px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    paddingInline: "10px",
-                  }}
-                >
-                  <li style={{ color: "#19d895" }}>Edili</li>
-                  <li style={{ color: "#f7d235" }}>Elettrici</li>
-                  <li style={{ color: "#3e83f3" }}>Meccanici</li>
-                </ul>
+                {false && (
+                  <ul
+                    style={{
+                      listStyle: "none",
+                      padding: 0,
+                      fontSize: "0.9rem",
+                      marginTop: "12px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      width: "100%",
+                      paddingInline: "10px",
+                    }}
+                  >
+                    <li style={{ color: "#19d895" }}>Edili</li>
+                    <li style={{ color: "#f7d235" }}>Elettrici</li>
+                    <li style={{ color: "#3e83f3" }}>Meccanici</li>
+                  </ul>
+                )}
               </div>
             );
           })}
