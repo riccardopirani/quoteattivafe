@@ -451,44 +451,65 @@ const DatiCommessa = ({ onComplete, commessa }) => {
   };
 
   const aggiornaMappaDaIndirizzo = async (indirizzo) => {
-    if (!indirizzo) return;
+    const encoded = encodeURIComponent(indirizzo);
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
+      {
+        headers: {
+          "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
+          "Accept-Language": "it",
+        },
+      }
+    );
+    const data = await res.json();
+    if (data.length > 0) {
+      const { lat, lon } = data[0];
+      const delta = 0.002;
+      const left = parseFloat(lon) - delta;
+      const right = parseFloat(lon) + delta;
+      const top = parseFloat(lat) + delta;
+      const bottom = parseFloat(lat) - delta;
+      const url = `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik&marker=${lat},${lon}`;
+      setMappaUrl(url);
+    }
+  };
+
+  const aggiornaImmagineZona = async (indirizzo) => {
+    if (!indirizzo) return setZonaImageUrl(null);
+
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
           indirizzo
-        )}&format=json&limit=1`,
-        {
-          headers: {
-            "User-Agent": "centoimpianti.com - commessa",
-            "Accept-Language": "it",
-          },
-        }
+        )}&format=json&limit=1`
       );
       const data = await res.json();
       if (data.length > 0) {
         const { lat, lon } = data[0];
-        const delta = 0.01;
-        const bbox = `${lon - delta},${lat - delta},${lon + delta},${
-          lat + delta
-        }`;
-        const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
-        setMappaUrl(url);
-      } else {
-        setMappaUrl(null);
-      }
-    } catch (error) {
-      console.error("Errore caricamento mappa:", error);
-      setMappaUrl(null);
-    }
-  };
 
-  const aggiornaImmagineZona = async (query) => {
-    if (!query) return setZonaImageUrl(null);
-    const base = query.split(",")[1]?.trim() || query;
-    const url = `https://source.unsplash.com/600x400/?${encodeURIComponent(
-      base
-    )}`;
-    setZonaImageUrl(url);
+        // Fallback su una mappa satellite statica generica
+        const fallbackUrl = `https://maps.wikimedia.org/img/osm-intl,${lat},${lon},15,600x400.png`;
+
+        // Proviamo a costruire un'immagine da Wikimedia Maps (stile standard, nessun token)
+        const imageUrl = `https://maps.wikimedia.org/osm-intl/${lon},${lat},15/600x400.png`;
+
+        // Ma poiché il server di Wikimedia non genera immagini così direttamente,
+        // ci basiamo su OpenStreetMap tile via iframe o non usiamo più un'immagine vera, ma l'iframe mappa stesso.
+
+        setZonaImageUrl(
+          `https://www.openstreetmap.org/export/embed.html?bbox=${
+            lon - 0.005
+          },${lat - 0.005},${lon + 0.005},${
+            lat + 0.005
+          }&layer=mapnik&marker=${lat},${lon}`
+        );
+      } else {
+        setZonaImageUrl(null);
+      }
+    } catch (err) {
+      console.error("Errore caricamento immagine della zona:", err);
+      setZonaImageUrl(null);
+    }
   };
 
   useEffect(() => {
@@ -715,22 +736,6 @@ const DatiCommessa = ({ onComplete, commessa }) => {
               height="200"
               style={{ border: "1px solid #ccc" }}
             />
-          )}
-          {zonaImageUrl ? (
-            <img
-              src={zonaImageUrl}
-              alt="Zona"
-              style={{
-                width: "100%",
-                height: "200px",
-                objectFit: "cover",
-                borderRadius: 8,
-              }}
-            />
-          ) : (
-            <div style={{ textAlign: "center", color: "#999" }}>
-              Nessuna immagine trovata
-            </div>
           )}
         </div>
       </div>
