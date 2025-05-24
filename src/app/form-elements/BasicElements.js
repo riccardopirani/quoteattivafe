@@ -96,7 +96,7 @@ const TabelleCantieri = () => {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
             ) || 0,
         }));
 
@@ -239,8 +239,8 @@ const TabelleCantieri = () => {
                         r.esposizione > 0
                           ? "red"
                           : r.esposizione === 0
-                          ? "#ff9800"
-                          : "#2e7d32",
+                            ? "#ff9800"
+                            : "#2e7d32",
                     }}
                   >
                     €{" "}
@@ -313,7 +313,7 @@ function DashboardTabsPanoramica() {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
             ) || 0,
         }));
 
@@ -427,12 +427,12 @@ function DashboardTabsPanoramica() {
   // 🔢 CALCOLI PRIMA DI dashboardCards
   const totaleSal = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.SalDaFatturare),
-    0
+    0,
   );
 
   const totaleSil = filteredCommesse.reduce(
     (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
-    0
+    0,
   );
 
   const commesseDaAggiornare = filteredCommesse.filter((c) => {
@@ -461,12 +461,12 @@ function DashboardTabsPanoramica() {
   });
   const totaleCosti30gg = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.Costi30gg),
-    0
+    0,
   );
 
   const totaleLavoriAFinire = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.LavoriAFinire),
-    0
+    0,
   );
 
   const marginiValidi = filteredCommesse

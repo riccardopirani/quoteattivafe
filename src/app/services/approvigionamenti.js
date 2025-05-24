@@ -5,7 +5,7 @@ const ApprovvigionamentoService = {
     try {
       const response = await axios.post(
         `${BASE_URL}/approvvigionamento/crea`,
-        data
+        data,
       );
       return response.data;
     } catch (error) {
@@ -18,7 +18,7 @@ const ApprovvigionamentoService = {
     try {
       const response = await axios.post(
         `${BASE_URL}/approvvigionamento/aggiorna`,
-        data
+        data,
       );
       return response.data;
     } catch (error) {
@@ -33,7 +33,7 @@ const ApprovvigionamentoService = {
         `${BASE_URL}/approvvigionamento/elimina`,
         {
           IdApprovvigionamento: idApprovvigionamento,
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -48,7 +48,7 @@ const ApprovvigionamentoService = {
         `${BASE_URL}/approvvigionamento/leggi`,
         {
           IdCantiere: idCantiere,
-        }
+        },
       );
       return response.data;
     } catch (error) {
