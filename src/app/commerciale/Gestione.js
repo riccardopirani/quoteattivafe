@@ -148,7 +148,7 @@ const CostiRicavi = ({ commessa }) => {
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
-      "CostiRicavi.xlsx"
+      "CostiRicavi.xlsx",
     );
 
     // 🔹 2. Screenshot della sezione visibile
@@ -459,7 +459,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      }
+      },
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -480,8 +480,8 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          indirizzo
-        )}&format=json&limit=1`
+          indirizzo,
+        )}&format=json&limit=1`,
       );
       const data = await res.json();
       if (data.length > 0) {
@@ -501,7 +501,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
             lon - 0.005
           },${lat - 0.005},${lon + 0.005},${
             lat + 0.005
-          }&layer=mapnik&marker=${lat},${lon}`
+          }&layer=mapnik&marker=${lat},${lon}`,
         );
       } else {
         setZonaImageUrl(null);
@@ -602,86 +602,100 @@ const DatiCommessa = ({ onComplete, commessa }) => {
 
       <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
         <div style={{ flex: 2 }}>
-          <table style={{ width: "100%", marginBottom: "1rem" }}>
-            <thead>
-              <tr>
-                <th
-                  colSpan="2"
-                  style={{
-                    ...cellStyle,
-                    backgroundColor: "#ddf0e3",
-                    textAlign: "center",
-                  }}
-                >
-                  DATI GENERALI
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                "codice",
-                "cliente",
-                "indirizzo",
-                "tipoLavori",
-                "tipoAppalto",
-                "respUfficio",
-                "respCantiere",
-              ].map((key) => (
-                <tr key={key}>
-                  <td style={cellStyle}>{key}</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={datiGenerali[key] ?? ""}
-                      onChange={handleChange(key)}
-                      placeholder={`Inserisci ${key}`}
-                      style={{ width: "100%", border: "none" }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div
+            style={{
+              display: "flex",
+              gap: "2rem",
+              marginBottom: "1rem",
+            }}
+          >
+            {/* Colonna 1: DATI GENERALI */}
+            <div style={{ flex: 1 }}>
+              <table style={{ width: "100%", marginBottom: "1rem" }}>
+                <thead>
+                  <tr>
+                    <th
+                      colSpan="2"
+                      style={{
+                        ...cellStyle,
+                        backgroundColor: "#ddf0e3",
+                        textAlign: "center",
+                      }}
+                    >
+                      DATI GENERALI
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    "codice",
+                    "cliente",
+                    "indirizzo",
+                    "tipoLavori",
+                    "tipoAppalto",
+                    "respUfficio",
+                    "respCantiere",
+                  ].map((key) => (
+                    <tr key={key}>
+                      <td style={cellStyle}>{key}</td>
+                      <td style={cellStyle}>
+                        <input
+                          type="text"
+                          value={datiGenerali[key] ?? ""}
+                          onChange={handleChange(key)}
+                          placeholder={`Inserisci ${key}`}
+                          style={{ width: "100%", border: "none" }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th
-                  colSpan="2"
-                  style={{
-                    ...cellStyle,
-                    textAlign: "center",
-                    backgroundColor: "#ddf0e3",
-                  }}
-                >
-                  DOCUMENTI
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                "contratto",
-                "centroCosto",
-                "gant",
-                "condivisione",
-                "sicurezza",
-                "foto",
-              ].map((key) => (
-                <tr key={key}>
-                  <td style={cellStyle}>{key}</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={datiGenerali[key] ?? ""}
-                      onChange={handleChange(key)}
-                      placeholder={`Link ${key}`}
-                      style={{ width: "100%", border: "none" }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            {/* Colonna 2: DOCUMENTI */}
+            <div style={{ flex: 1 }}>
+              <table style={{ width: "100%", marginBottom: "1rem" }}>
+                <thead>
+                  <tr>
+                    <th
+                      colSpan="2"
+                      style={{
+                        ...cellStyle,
+                        textAlign: "center",
+                        backgroundColor: "#ddf0e3",
+                      }}
+                    >
+                      DOCUMENTI
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    "contratto",
+                    "centroCosto",
+                    "gant",
+                    "condivisione",
+                    "sicurezza",
+                    "foto",
+                  ].map((key) => (
+                    <tr key={key}>
+                      <td style={cellStyle}>{key}</td>
+                      <td style={cellStyle}>
+                        <input
+                          type="text"
+                          value={datiGenerali[key] ?? ""}
+                          onChange={handleChange(key)}
+                          placeholder={`Link ${key}`}
+                          style={{ width: "100%", border: "none" }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <table style={{ ...tableStyle, marginTop: "1rem" }}>
             <thead>
@@ -968,7 +982,7 @@ const CommessaTecnico = () => {
           (c.IdCantiere && c.IdCantiere.toString().includes(searchTerm)) ||
           (c.RagioneSociale &&
             c.RagioneSociale.toLowerCase().includes(
-              searchTerm.toLowerCase()
+              searchTerm.toLowerCase(),
             )) ||
           (c.Indirizzo &&
             c.Indirizzo.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -1520,7 +1534,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err)
+          console.error("Errore nel caricamento approvvigionamenti:", err),
         );
     }
   }, [commessa?.IdCantiere]);
@@ -1840,15 +1854,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?"
+                          "Sei sicuro di voler eliminare questo approvvigionamento?",
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero
+                            editingItem.Numero,
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere
+                            commessa?.IdCantiere,
                           );
                           setRighe(updated);
                           chiudiDrawer();
