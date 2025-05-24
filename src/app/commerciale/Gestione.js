@@ -392,12 +392,158 @@ const CostiRicavi = ({ commessa }) => {
           </div>
         </div>
       </div>
-      {/* Drawer laterale */}
-      <DrawerArchivio
-        open={openArchivio}
-        onClose={() => setOpenArchivio(false)}
-        documenti={documenti}
-      />
+      {openArchivio && (
+        <>
+          {/* Sfondo oscurato */}
+          <div
+            onClick={() => setOpenArchivio(false)}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(0, 0, 0, 0.3)",
+              zIndex: 999,
+            }}
+          ></div>
+
+          {/* Drawer */}
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              height: "100%",
+              width: "90%",
+              maxWidth: "400px",
+              backgroundColor: "#fff",
+              boxShadow: "-2px 0 8px rgba(0,0,0,0.15)",
+              zIndex: 1000,
+              display: "flex",
+              flexDirection: "column",
+              transition: "transform 0.3s ease-in-out",
+              animation: "slideInDrawer 0.3s ease-out forwards",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "1rem",
+                borderBottom: "1px solid #eee",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "#f9fafb",
+              }}
+            >
+              <h2 style={{ fontSize: "1.1rem", fontWeight: "bold" }}>
+                Archivio Costi/Ricavi
+              </h2>
+              <button
+                onClick={() => setOpenArchivio(false)}
+                style={{
+                  fontSize: "1.5rem",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Contenuto */}
+            <div style={{ padding: "1rem", overflowY: "auto", flex: 1 }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "0.5rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                Filtro per data
+              </label>
+              <input
+                type="date"
+                style={{
+                  padding: "0.5rem",
+                  border: "1px solid #ccc",
+                  borderRadius: 4,
+                  width: "100%",
+                  marginBottom: "1rem",
+                }}
+              />
+
+              {/* Lista documenti */}
+              {[
+                {
+                  nome: "CostiRicavi_Maggio2025.xlsx",
+                  tipo: "excel",
+                  data: "2025-05-10",
+                  link: "/files/maggio2025.xlsx",
+                },
+                {
+                  nome: "CostiRicavi_Aprile2025.pdf",
+                  tipo: "pdf",
+                  data: "2025-04-15",
+                  link: "/files/aprile2025.pdf",
+                },
+              ].map((doc, i) => (
+                <div
+                  key={i}
+                  style={{
+                    border: "1px solid #ddd",
+                    borderRadius: 6,
+                    padding: "0.75rem",
+                    marginBottom: "0.75rem",
+                    backgroundColor: "#f8f9fa",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 20,
+                        color: doc.tipo === "pdf" ? "#b91c1c" : "#15803d",
+                      }}
+                    >
+                      {doc.tipo === "pdf" ? "📄" : "📊"}
+                    </span>
+                    <div>
+                      <div style={{ fontWeight: "bold" }}>{doc.nome}</div>
+                      <div style={{ fontSize: "0.75rem", color: "#777" }}>
+                        {doc.data}
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href={doc.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "#2563eb",
+                      fontSize: "0.85rem",
+                      fontWeight: "bold",
+                      textDecoration: "none",
+                    }}
+                  >
+                    Visualizza »
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -409,78 +555,6 @@ const cella = {
   verticalAlign: "middle",
 };
 
-const DrawerArchivio = ({ open, onClose, documenti }) => {
-  const [filtroData, setFiltroData] = useState("");
-
-  const filtrati = documenti.filter((doc) =>
-    filtroData ? doc.data.includes(filtroData) : true
-  );
-
-  return (
-    <div
-      className={`fixed top-0 right-0 h-full w-full md:w-[400px] bg-white shadow-xl z-50 transform transition-transform duration-300 ${
-        open ? "translate-x-0" : "translate-x-full"
-      }`}
-    >
-      <div className="flex justify-between items-center p-4 border-b bg-gray-50">
-        <h2 className="text-lg font-semibold">Archivio Costi/Ricavi</h2>
-        <button onClick={onClose}>
-          <FaTimes />
-        </button>
-      </div>
-
-      <div className="p-4">
-        <label className="block text-sm font-medium mb-2">
-          Filtro per data
-        </label>
-        <input
-          type="date"
-          className="border px-3 py-2 rounded w-full mb-4"
-          value={filtroData}
-          onChange={(e) => setFiltroData(e.target.value)}
-        />
-
-        <div className="space-y-4 overflow-y-auto max-h-[75vh]">
-          {filtrati.map((doc, i) => (
-            <div
-              key={i}
-              className="border rounded-lg p-3 bg-gray-100 hover:bg-gray-200 transition"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {doc.tipo === "pdf" ? (
-                    <FaFilePdf className="text-red-600 text-2xl" />
-                  ) : (
-                    <FaFileExcel className="text-green-600 text-2xl" />
-                  )}
-                  <div>
-                    <div className="font-medium">{doc.nome}</div>
-                    <div className="text-xs text-gray-500">
-                      {dayjs(doc.data).format("DD MMM YYYY")}
-                    </div>
-                  </div>
-                </div>
-                <a
-                  href={doc.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 text-sm font-semibold"
-                >
-                  Visualizza »
-                </a>
-              </div>
-            </div>
-          ))}
-          {filtrati.length === 0 && (
-            <div className="text-center text-gray-400 text-sm mt-4">
-              Nessun documento trovato.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 const documenti = [
   {
     nome: "CostiRicavi_Maggio2025.xlsx",
@@ -1512,7 +1586,7 @@ const CDP = ({ commessa }) => {
             top: 0,
             right: 0,
             width: "100%",
-            maxWidth: 400,
+            maxWidth: "60%",
             height: "100%",
             backgroundColor: "#f7fdf8",
             boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
