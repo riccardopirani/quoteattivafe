@@ -17,6 +17,8 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
+import CDPService from "../services/cdp"; // Assicurati che il file esista con metodi: crea, leggi, aggiorna, elimina
+
 const tableStyle = {
   borderCollapse: "collapse",
   width: "100%",
@@ -41,14 +43,6 @@ const chartData = [
   { month: "Oct-25", costi: 220000, ricavi: 250000 },
   { month: "Nov-25", costi: 260000, ricavi: 270000 },
   { month: "Dec-25", costi: 280000, ricavi: 320000 },
-];
-let tabs = [
-  "Dati commessa",
-  "Gestione contratto",
-  "Costi / Ricavi",
-  "Approvvigionamenti",
-  "C.D.P.",
-  "Cruscotto di commessa",
 ];
 
 const CostiRicavi = ({ commessa }) => {
@@ -193,15 +187,24 @@ const CostiRicavi = ({ commessa }) => {
         <span
           style={{
             float: "right",
-            backgroundColor: "#d32f2f",
+            backgroundColor: (() => {
+              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+              if (stato.includes("chiuso")) return "#d32f2f"; // rosso
+              if (stato.includes("incorso")) return "#388e3c"; // verde
+              return "#fbc02d"; // giallo
+            })(),
             color: "white",
-            padding: "0.3rem 1.2rem",
+            padding: "0.3rem 1rem",
             fontWeight: "bold",
-            fontSize: "0.9rem",
-            borderRadius: 2,
+            borderRadius: 4,
           }}
         >
-          CHIUSO
+          {(() => {
+            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+            if (stato.includes("chiuso")) return "CHIUSO";
+            if (stato.includes("incorso")) return "APERTO";
+            return "BLOCCATO";
+          })()}
         </span>
       </div>
 
@@ -552,17 +555,28 @@ const DatiCommessa = ({ onComplete, commessa }) => {
             dateFormat="dd MMMM yyyy"
           />
         </div>
-        <button
+        <span
           style={{
-            backgroundColor: "#018E42",
+            float: "right",
+            backgroundColor: (() => {
+              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+              if (stato.includes("chiuso")) return "#d32f2f"; // rosso
+              if (stato.includes("incorso")) return "#388e3c"; // verde
+              return "#fbc02d"; // giallo
+            })(),
             color: "white",
-            padding: "0.5rem 1rem",
+            padding: "0.3rem 1rem",
             fontWeight: "bold",
-            fontSize: "0.85rem",
+            borderRadius: 4,
           }}
         >
-          APERTO
-        </button>
+          {(() => {
+            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+            if (stato.includes("chiuso")) return "CHIUSO";
+            if (stato.includes("incorso")) return "APERTO";
+            return "BLOCCATO";
+          })()}
+        </span>
       </div>
 
       <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
@@ -723,7 +737,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     </>
   );
 };
-const GestioneContratto = () => (
+const GestioneContratto = ({ commessa }) => (
   <div
     style={{
       padding: "1rem",
@@ -732,7 +746,8 @@ const GestioneContratto = () => (
     }}
   >
     <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>
-      Cod. 365 Bunge S.p.a. Via Baiona 237 «Silo»
+      Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+      {commessa?.Indirizzo || ""}
     </div>
     <div style={{ marginBottom: "1rem" }}>
       <div style={{ display: "flex", marginBottom: "0.5rem" }}>
@@ -981,16 +996,61 @@ const CommessaTecnico = () => {
   return (
     <div style={{ backgroundColor: "white", minHeight: "100vh" }}>
       <div style={{ padding: "1.5rem" }}>
-        <h2
+        <div
           style={{
-            textAlign: "center",
+            width: "100%",
+            padding: "1rem 1.5rem",
             fontSize: "1rem",
-            marginBottom: "1rem",
-            color: "#555",
+            fontWeight: "bold",
+            color: "#333",
+            textAlign: "center",
+            position: "relative",
           }}
         >
           Controllo gestione commessa
-        </h2>
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "180px", // solo sotto il testo
+              height: "3px",
+              backgroundColor: "#999", // più scuro
+              borderRadius: 2,
+            }}
+          />
+        </div>
+
+        <br></br>
+        <div
+          style={{
+            display: "table",
+            width: "100%",
+            tableLayout: "fixed",
+            marginBottom: "1rem",
+          }}
+        >
+          {tabsVisibili.map((label) => (
+            <div
+              key={label}
+              onClick={() => setSelectedTab(label)}
+              style={{
+                cursor: "pointer",
+                display: "table-cell",
+                textAlign: "center",
+                border: "1px solid gray",
+                backgroundColor: selectedTab === label ? "#e3ede5" : "#f5f5f5", // aggiornato
+                fontSize: "0.9rem",
+                padding: "0.4rem 0",
+                fontWeight: selectedTab === label ? "bold" : "normal",
+                color: "#333",
+              }}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
         <div style={{ marginBottom: "1rem" }}>
           <input
             type="text"
@@ -1033,85 +1093,62 @@ const CommessaTecnico = () => {
             </div>
           )}
         </div>
-
-        {isModalitaNuova || selectedCommessa ? (
-          <>
-            <div
-              style={{
-                display: "table",
-                width: "100%",
-                tableLayout: "fixed",
-                marginBottom: "1rem",
-              }}
-            >
-              {tabsVisibili.map((label) => (
-                <div
-                  key={label}
-                  onClick={() => setSelectedTab(label)}
-                  style={{
-                    cursor: "pointer",
-                    display: "table-cell",
-                    textAlign: "center",
-                    border: "1px solid gray",
-                    backgroundColor:
-                      selectedTab === label ? "#e3f2e8" : "white",
-                    fontSize: "0.9rem",
-                    padding: "0.4rem 0",
-                    fontWeight: selectedTab === label ? "bold" : "normal",
-                  }}
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            {selectedTab === "Dati commessa" && (
-              <DatiCommessa
-                commessa={selectedCommessa}
-                onComplete={handleComplete}
-              />
-            )}
-            {selectedTab === "Gestione contratto" && (
-              <GestioneContratto commessa={selectedCommessa} />
-            )}
-            {selectedTab === "Costi / Ricavi" && (
-              <CostiRicavi commessa={selectedCommessa} />
-            )}
-            {selectedTab === "Approvvigionamenti" && (
-              <Approvvigionamenti commessa={selectedCommessa} />
-            )}
-            {selectedTab === "C.D.P." && <CDP commessa={selectedCommessa} />}
-            {selectedTab === "Cruscotto di commessa" && (
-              <CruscottoCommessa commessa={selectedCommessa} />
-            )}
-          </>
-        ) : (
-          <div
-            style={{ textAlign: "center", color: "#888", marginTop: "2rem" }}
-          >
-            Seleziona una commessa per iniziare
-          </div>
+        {selectedTab === "Dati commessa" && (
+          <DatiCommessa
+            commessa={selectedCommessa}
+            onComplete={handleComplete}
+          />
+        )}
+        {selectedTab === "Gestione contratto" && (
+          <GestioneContratto commessa={selectedCommessa} />
+        )}
+        {selectedTab === "Costi / Ricavi" && (
+          <CostiRicavi commessa={selectedCommessa} />
+        )}
+        {selectedTab === "Approvvigionamenti" && (
+          <Approvvigionamenti commessa={selectedCommessa} />
+        )}
+        {selectedTab === "C.D.P." && <CDP commessa={selectedCommessa} />}
+        {selectedTab === "Cruscotto di commessa" && (
+          <CruscottoCommessa commessa={selectedCommessa} />
         )}
       </div>
     </div>
   );
 };
 
-const CruscottoCommessa = () => (
+const CruscottoCommessa = ({ commessa }) => (
   <div style={{ padding: "1rem", backgroundColor: "white" }}>
     <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>
-      Cod. 365 Bunge S.p.a. Via Baiona 237 «Silo»
+      <div
+        style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
+      >
+        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+        {commessa?.Indirizzo || ""}
+      </div>
       <span
         style={{
           float: "right",
-          backgroundColor: "#fbc02d",
-          color: "black",
+          backgroundColor: (() => {
+            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+            if (stato.includes("chiuso")) return "#d32f2f"; // rosso
+            if (stato.includes("incorso")) return "#388e3c"; // verde
+            return "#fbc02d"; // giallo
+          })(),
+          color: "white",
           padding: "0.3rem 1rem",
           fontWeight: "bold",
+          borderRadius: 4,
         }}
       >
-        BLOCCATO
+        {(() => {
+          const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+          if (stato.includes("chiuso")) return "CHIUSO";
+          if (stato.includes("incorso")) return "APERTO";
+          return "BLOCCATO";
+        })()}
       </span>
+      <br></br>
     </div>
     <div
       style={{
@@ -1179,70 +1216,299 @@ const CruscottoCommessa = () => (
   </div>
 );
 
-const CDP = () => (
-  <div style={{ padding: "1rem", backgroundColor: "white" }}>
-    <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>
-      Cod. 365 Bunge S.p.a. Via Baiona 237 «Silo»
-      <span
-        style={{
-          float: "right",
-          backgroundColor: "#fbc02d",
-          color: "black",
-          padding: "0.3rem 1rem",
-          fontWeight: "bold",
-        }}
+const CDP = ({ commessa }) => {
+  const [righe, setRighe] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+
+  useEffect(() => {
+    if (commessa?.IdCantiere) {
+      CDPService.leggi(commessa.IdCantiere)
+        .then(setRighe)
+        .catch((err) => console.error("Errore caricamento CDP:", err));
+    }
+  }, [commessa?.IdCantiere]);
+
+  const apriDrawer = (item = null) => {
+    setEditingItem(item);
+    setDrawerOpen(true);
+  };
+
+  const chiudiDrawer = () => {
+    setEditingItem(null);
+    setDrawerOpen(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const formData = Object.fromEntries(new FormData(e.target));
+    const payload = { ...formData, IdCantiere: commessa?.IdCantiere };
+
+    try {
+      if (editingItem) {
+        await CDPService.aggiorna({ ...editingItem, ...payload });
+      } else {
+        await CDPService.crea(payload);
+      }
+      const updated = await CDPService.leggi(commessa?.IdCantiere);
+      setRighe(updated);
+      chiudiDrawer();
+    } catch (err) {
+      console.error("Errore salvataggio CDP:", err);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingItem?.Numero) return;
+    const conferma = window.confirm("Confermi l'eliminazione del CDP?");
+    if (!conferma) return;
+
+    try {
+      await CDPService.elimina(editingItem.Numero);
+      const updated = await CDPService.leggi(commessa?.IdCantiere);
+      setRighe(updated);
+      chiudiDrawer();
+    } catch (err) {
+      console.error("Errore eliminazione CDP:", err);
+    }
+  };
+
+  return (
+    <div style={{ padding: "1rem", backgroundColor: "white" }}>
+      <div
+        style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
       >
-        BLOCCATO
-      </span>
-    </div>
-    <table style={{ ...tableStyle }}>
-      <thead>
-        <tr>
-          <th
-            colSpan="7"
-            style={{
-              ...cellStyle,
-              backgroundColor: "#d9ead3",
-              textAlign: "center",
-              fontWeight: "bold",
-            }}
-          >
-            GESTIONE C.D.P.
-          </th>
-        </tr>
-        <tr>
-          {"N°,DESCRIZIONE,FORNITORE,LINK RILIEVO,PERIODO LAVORAZIONI,RESPODNSABILE,LINK CDP"
-            .split(",")
-            .map((label, idx) => (
-              <th
-                key={idx}
+        <div
+          style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
+        >
+          Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+          {commessa?.Indirizzo || ""}
+        </div>
+        <span
+          style={{
+            float: "right",
+            backgroundColor: (() => {
+              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+              if (stato.includes("chiuso")) return "#d32f2f"; // rosso
+              if (stato.includes("incorso")) return "#388e3c"; // verde
+              return "#fbc02d"; // giallo
+            })(),
+            color: "white",
+            padding: "0.3rem 1rem",
+            fontWeight: "bold",
+            borderRadius: 4,
+          }}
+        >
+          {(() => {
+            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+            if (stato.includes("chiuso")) return "CHIUSO";
+            if (stato.includes("incorso")) return "APERTO";
+            return "BLOCCATO";
+          })()}
+        </span>
+        <br></br>
+      </div>
+
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th
+              colSpan="8"
+              style={{
+                ...cellStyle,
+                backgroundColor: "#d9ead3",
+                textAlign: "center",
+                fontWeight: "bold",
+              }}
+            >
+              GESTIONE C.D.P.
+            </th>
+          </tr>
+          {[
+            "N°",
+            "DESCRIZIONE",
+            "FORNITORE",
+            "LINK RILIEVO",
+            "PERIODO LAVORAZIONI",
+            "RESPONSABILE",
+            "LINK CDP",
+            "",
+          ].map((label, idx) => (
+            <th
+              key={idx}
+              style={{
+                ...cellStyle,
+                backgroundColor: "#ecf4ec",
+                textAlign: "center",
+                fontWeight: "bold",
+              }}
+            >
+              {label}
+            </th>
+          ))}
+        </thead>
+        <tbody>
+          {righe.map((r, i) => (
+            <tr key={i}>
+              <td style={cellStyle}>{r.Numero}</td>
+              <td style={cellStyle}>{r.Descrizione}</td>
+              <td style={cellStyle}>{r.Fornitore}</td>
+              <td style={cellStyle}>r.LinkRilievo</td>
+              <td style={cellStyle}>{r.PeriodoLavorazioni}</td>
+              <td style={cellStyle}>{r.Responsabile}</td>
+              <td style={cellStyle}>{r.LinkCDP}</td>
+              <td style={{ ...cellStyle, textAlign: "center" }}>
+                <button
+                  onClick={() => apriDrawer(r)}
+                  style={{
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  ⋯
+                </button>
+              </td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan="8" style={{ textAlign: "right", padding: "0.5rem" }}>
+              <button
+                onClick={() => apriDrawer(null)}
                 style={{
-                  ...cellStyle,
-                  backgroundColor: "#ecf4ec",
-                  textAlign: "center",
-                  fontWeight: "bold",
+                  border: "none",
+                  background: "none",
+                  fontSize: "1.5rem",
+                  cursor: "pointer",
                 }}
               >
-                {label}
-              </th>
-            ))}
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <tr key={i}>
-            {Array.from({ length: 7 }).map((_, j) => (
-              <td key={j} style={{ ...cellStyle, height: "2.2rem" }}></td>
-            ))}
+                +
+              </button>
+            </td>
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+        </tbody>
+      </table>
 
+      {drawerOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            width: "100%",
+            maxWidth: 400,
+            height: "100%",
+            backgroundColor: "#f7fdf8",
+            boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+            padding: "1.5rem",
+            zIndex: 1000,
+            overflowY: "auto",
+            borderLeft: "1px solid #d0e5d6",
+          }}
+        >
+          <h2 style={{ color: "#2e7d32", marginBottom: "1rem" }}>
+            {editingItem ? "Modifica CDP" : "Nuovo CDP"}
+          </h2>
+
+          <form onSubmit={handleSubmit}>
+            {[
+              "Numero",
+              "Descrizione",
+              "Fornitore",
+              "LinkRilievo",
+              "PeriodoLavorazioni",
+              "Responsabile",
+              "LinkCDP",
+            ].map((name, idx) => (
+              <div key={idx} style={{ marginBottom: "1rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "0.3rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  {name}
+                </label>
+                <input
+                  name={name}
+                  defaultValue={editingItem?.[name] || ""}
+                  required={name === "Numero" || name === "Descrizione"}
+                  style={{
+                    width: "100%",
+                    padding: "0.6rem",
+                    borderRadius: 6,
+                    border: "1px solid #cde5d4",
+                    fontSize: "0.9rem",
+                  }}
+                />
+              </div>
+            ))}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: editingItem ? "space-between" : "flex-end",
+                gap: "0.5rem",
+              }}
+            >
+              {editingItem && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  style={{
+                    backgroundColor: "#ffebee",
+                    color: "#d32f2f",
+                    padding: "0.7rem",
+                    borderRadius: 6,
+                    border: "1px solid #ffcdd2",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Elimina
+                </button>
+              )}
+              <button
+                type="submit"
+                style={{
+                  backgroundColor: "#2e7d32",
+                  color: "white",
+                  padding: "0.7rem",
+                  borderRadius: 6,
+                  border: "none",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Salva
+              </button>
+              <button
+                type="button"
+                onClick={chiudiDrawer}
+                style={{
+                  backgroundColor: "#e0f2f1",
+                  color: "#2e7d32",
+                  padding: "0.7rem",
+                  borderRadius: 6,
+                  border: "1px solid #b2dfdb",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Chiudi
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+};
 const Approvvigionamenti = ({ commessa }) => {
   const [righe, setRighe] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
     if (commessa?.IdCantiere) {
@@ -1254,31 +1520,94 @@ const Approvvigionamenti = ({ commessa }) => {
     }
   }, [commessa?.IdCantiere]);
 
+  const apriDrawer = (item = null) => {
+    setEditingItem(item);
+    setDrawerOpen(true);
+  };
+
+  const chiudiDrawer = () => {
+    setEditingItem(null);
+    setDrawerOpen(false);
+  };
+
+  const parseToDateInput = (val) => {
+    if (!val) return "";
+    try {
+      const d = new Date(val);
+      return d.toISOString().slice(0, 10);
+    } catch (err) {
+      return "";
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const formData = Object.fromEntries(new FormData(e.target));
+    const payload = {
+      ...formData,
+      IdCantiere: commessa?.IdCantiere,
+    };
+
+    try {
+      if (editingItem) {
+        await ApprovvigionamentoService.aggiorna({
+          ...editingItem,
+          ...payload,
+        });
+      } else {
+        await ApprovvigionamentoService.crea(payload);
+      }
+
+      const data = await ApprovvigionamentoService.leggi(commessa?.IdCantiere);
+      setRighe(data);
+      chiudiDrawer();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div style={{ padding: "1rem", backgroundColor: "white" }}>
       <div
         style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
       >
-        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
-        {commessa?.Indirizzo || ""}
+        <div
+          style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
+        >
+          Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+          {commessa?.Indirizzo || ""}
+        </div>
+
         <span
           style={{
             float: "right",
-            backgroundColor: "#fbc02d",
-            color: "black",
+            backgroundColor: (() => {
+              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+              if (stato.includes("chiuso")) return "#d32f2f"; // rosso
+              if (stato.includes("incorso")) return "#388e3c"; // verde
+              return "#fbc02d"; // giallo
+            })(),
+            color: "white",
             padding: "0.3rem 1rem",
             fontWeight: "bold",
+            borderRadius: 4,
           }}
         >
-          BLOCCATO
+          {(() => {
+            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+            if (stato.includes("chiuso")) return "CHIUSO";
+            if (stato.includes("incorso")) return "APERTO";
+            return "BLOCCATO";
+          })()}
         </span>
+        <br></br>
       </div>
 
       <table style={tableStyle}>
         <thead>
           <tr>
             <th
-              colSpan="7"
+              colSpan="8"
               style={{
                 ...cellStyle,
                 backgroundColor: "#d9ead3",
@@ -1298,6 +1627,7 @@ const Approvvigionamenti = ({ commessa }) => {
               "DATA DEFINIZIONE",
               "LINK CARTELLA",
               "RESPONSABILE",
+              "",
             ].map((label, idx) => (
               <th
                 key={idx}
@@ -1317,7 +1647,7 @@ const Approvvigionamenti = ({ commessa }) => {
           {righe.length === 0 ? (
             <tr>
               <td
-                colSpan="7"
+                colSpan="8"
                 style={{ ...cellStyle, textAlign: "center", color: "#999" }}
               >
                 Nessun dato disponibile.
@@ -1330,14 +1660,250 @@ const Approvvigionamenti = ({ commessa }) => {
                 <td style={cellStyle}>{r.Descrizione}</td>
                 <td style={cellStyle}>{r.Fornitura}</td>
                 <td style={cellStyle}>{r.Posa}</td>
-                <td style={cellStyle}>{r.DataDefinizione?.slice(0, 10)}</td>
-                <td style={cellStyle}>{r.LinkCartella}</td>
+                <td style={cellStyle}>
+                  {r.DataDefinizione?.slice(0, 10) || ""}
+                </td>
+                <td style={cellStyle}>
+                  {r.LinkCartella ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <span
+                        style={{ fontFamily: "monospace", fontSize: "0.85rem" }}
+                      >
+                        {r.LinkCartella}
+                      </span>
+                      <button
+                        onClick={() =>
+                          navigator.clipboard.writeText(r.LinkCartella)
+                        }
+                        title="Copia percorso"
+                        style={{
+                          background: "#e0f2f1",
+                          border: "1px solid #b2dfdb",
+                          padding: "0.2rem 0.4rem",
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                          borderRadius: 4,
+                        }}
+                      >
+                        📋
+                      </button>
+                    </div>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td style={cellStyle}>{r.Responsabile}</td>
+                <td style={{ ...cellStyle, textAlign: "center" }}>
+                  <button
+                    onClick={() => apriDrawer(r)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "1.5rem",
+                    }}
+                  >
+                    ⋯
+                  </button>
+                </td>
               </tr>
             ))
           )}
+          <tr>
+            <td colSpan="8" style={{ textAlign: "right", padding: "0.5rem" }}>
+              <button
+                onClick={() => apriDrawer(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "1.5rem",
+                }}
+              >
+                ⋯
+              </button>
+            </td>
+          </tr>
         </tbody>
       </table>
+
+      {drawerOpen && (
+        <>
+          <div
+            onClick={chiudiDrawer}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              backgroundColor: "rgba(0,0,0,0.3)",
+              zIndex: 999,
+            }}
+          />
+
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              width: "100%",
+              maxWidth: 400,
+              height: "100%",
+              backgroundColor: "#f7fdf8",
+              boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+              padding: "1.5rem",
+              zIndex: 1000,
+              overflowY: "auto",
+              borderLeft: "1px solid #d0e5d6",
+            }}
+          >
+            <h2
+              style={{
+                marginBottom: "1rem",
+                color: "#2e7d32",
+                fontSize: "1.2rem",
+              }}
+            >
+              {editingItem
+                ? "Modifica Approvvigionamento"
+                : "Nuovo Approvvigionamento"}
+            </h2>
+
+            <form onSubmit={handleSubmit}>
+              {[
+                { name: "Numero", type: "text", required: true },
+                { name: "Descrizione", type: "text", required: true },
+                { name: "Fornitura", type: "text" },
+                { name: "Posa", type: "text" },
+                { name: "DataDefinizione", type: "date" },
+                { name: "LinkCartella", type: "text" },
+                { name: "Responsabile", type: "text" },
+              ].map((field, idx) => (
+                <div key={idx} style={{ marginBottom: "1rem" }}>
+                  <label
+                    htmlFor={field.name}
+                    style={{
+                      display: "block",
+                      marginBottom: "0.3rem",
+                      color: "#4b6f55",
+                      fontWeight: 600,
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    {field.name}
+                  </label>
+                  <input
+                    name={field.name}
+                    type={field.type}
+                    required={field.required}
+                    defaultValue={
+                      field.type === "date"
+                        ? parseToDateInput(editingItem?.[field.name])
+                        : editingItem?.[field.name] || ""
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "0.6rem 0.8rem",
+                      borderRadius: 6,
+                      border: "1px solid #cde5d4",
+                      backgroundColor: "#ffffff",
+                      fontSize: "0.9rem",
+                      outlineColor: "#2e7d32",
+                    }}
+                  />
+                </div>
+              ))}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: editingItem ? "space-between" : "flex-end",
+                  gap: "0.5rem",
+                  marginTop: "1rem",
+                }}
+              >
+                {editingItem && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (
+                        window.confirm(
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
+                        )
+                      ) {
+                        try {
+                          await ApprovvigionamentoService.elimina(
+                            editingItem.Numero
+                          );
+                          const updated = await ApprovvigionamentoService.leggi(
+                            commessa?.IdCantiere
+                          );
+                          setRighe(updated);
+                          chiudiDrawer();
+                        } catch (err) {
+                          console.error("Errore nell'eliminazione:", err);
+                        }
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: "#ffebee",
+                      color: "#d32f2f",
+                      border: "1px solid #ffcdd2",
+                      padding: "0.7rem",
+                      borderRadius: 6,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Elimina
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#2e7d32",
+                    color: "white",
+                    border: "none",
+                    padding: "0.7rem",
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Salva
+                </button>
+
+                <button
+                  type="button"
+                  onClick={chiudiDrawer}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#e8f5e9",
+                    color: "#2e7d32",
+                    border: "1px solid #c8e6c9",
+                    padding: "0.7rem",
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Chiudi
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
     </div>
   );
 };
