@@ -216,36 +216,6 @@ function Buttons() {
     perse: "Gare Perse",
   };
 
-  const fetchLocationSuggestions = async (query) => {
-    if (!query) return;
-
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?country=Italia&format=json&limit=5&q=${encodeURIComponent(
-          query,
-        )}`,
-        {
-          headers: {
-            "User-Agent": "CentoImpiantiMap/1.0",
-          },
-        },
-      );
-      const data = await res.json();
-
-      if (Array.isArray(data)) {
-        const filtered = data.filter((place) =>
-          ["city", "town", "village"].includes(place.type),
-        );
-        setSuggestions(filtered.map((item) => item.display_name));
-      } else {
-        console.warn("Risposta inattesa dal server Nominatim:", data);
-        setSuggestions([]);
-      }
-    } catch (error) {
-      console.error("Errore durante il recupero dei suggerimenti:", error);
-      setSuggestions([]);
-    }
-  };
 
   const getMapUrl = async (indirizzo) => {
     const encoded = encodeURIComponent(indirizzo);
@@ -256,7 +226,7 @@ function Buttons() {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      },
+      }
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -315,7 +285,7 @@ function Buttons() {
           acc[name] = value;
           return acc;
         },
-        {},
+        {}
       );
 
       updatedForm.tipoLavori = gara.TipoLavori || tipoLavoriMap[selectedMenu];
@@ -330,36 +300,7 @@ function Buttons() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const obbligatoriStudio = [
-    "codice",
-    "cliente",
-    "telefono",
-    "tipoLavori",
-    "tipoAppalto",
-    "indirizzo", // <-- questo!
-    "scadenzaConsegna",
-    "responsabileCliente",
-    "responsabileGara",
-    "importoOffAgg",
-  ];
 
-  const obbligatoriConsegnata = [
-    "codice",
-    "cliente",
-    "telefono",
-    "mail",
-    "tipoLavori",
-    "tipoAppalto",
-    "indirizzo", // <-- questo!
-    "scadenzaConsegna",
-    "dataConsegna",
-    "responsabileCliente",
-    "responsabileGara",
-    "importoOffAgg",
-    "opereEdili",
-    "impiantiMeccanici",
-    "impiantiElettrici",
-  ];
 
   const getLabelStyle = (name) => {
     const obbligatori = getObbligatori(form.tipoLavori || "");
@@ -374,7 +315,7 @@ function Buttons() {
     const obbligatori = getObbligatori(form.tipoLavori);
     const mancanti = obbligatori.filter(
       (campo) =>
-        typeof form[campo] === "undefined" || String(form[campo]).trim() === "",
+        typeof form[campo] === "undefined" || String(form[campo]).trim() === ""
     );
 
     if (mancanti.length > 0) {
@@ -395,8 +336,8 @@ function Buttons() {
     const baseGara = {
       CodiceGara: form.codice,
       Cliente: form.cliente,
-      UbicazioneLavori: form.indirizzo, // usato per mappe e tabella
-      IndirizzoCantiere: form.indirizzo, // duplicato per compatibilità
+      UbicazioneLavori: form.indirizzo,
+      IndirizzoCantiere: form.indirizzo,
       Telefono: form.telefono,
       Mail: form.mail,
       PivaCf: form.pivaCf,
@@ -411,7 +352,6 @@ function Buttons() {
       CSEEmail: form.cseMail,
       TipoLavori: form.tipoLavori,
       TipoAppalto: form.tipoAppalto,
-      IndirizzoCantiere: form.indirizzoCantiere,
       ScadenzaConsegna: form.scadenzaConsegna,
       DataConsegna: form.dataConsegna,
       DataInizioCantiere: form.dataInizioCantiere,
@@ -449,7 +389,7 @@ function Buttons() {
       console.error("Errore durante il salvataggio della gara:", error);
       alert(
         "Errore durante il salvataggio della gara:\n" +
-          (error?.message || "Errore sconosciuto"),
+          (error?.message || "Errore sconosciuto")
       );
     }
   };
@@ -622,14 +562,14 @@ function Buttons() {
                 €
                 {filteredGare.reduce(
                   (sum, g) => sum + (g.TotaleMeccanici || 0),
-                  0,
+                  0
                 )}
               </td>
               <td style={centeredCellStyle}>
                 €
                 {filteredGare.reduce(
                   (sum, g) => sum + (g.TotaleElettrici || 0),
-                  0,
+                  0
                 )}
               </td>
               <td style={centeredCellStyle}>
@@ -917,7 +857,6 @@ function Buttons() {
                 }
 
                 try {
-                  const res = await ClienteService.creaCliente(formCliente);
 
                   await loadClienti();
                   setDrawerClienteOpen(false);
