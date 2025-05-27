@@ -76,6 +76,7 @@ const CostiRicavi = ({ commessa }) => {
         "A02 Posa infissi",
       ],
     },
+
     {
       nodo: "E",
       coloreNodo: "#f7e7af",
@@ -115,13 +116,94 @@ const CostiRicavi = ({ commessa }) => {
   ]);
 
   const [documentiArchivio, setDocumentiArchivio] = useState([]);
+  const [datiExternal, setDatiExternal] = useState([]);
+  useEffect(() => {
+    if (!commessa?.IdCantiere) return;
+
+    const fetchData = async () => {
+      try {
+        const dati = await CantiereService.nodidettagli({
+          Codice: commessa.IdCantiere,
+        });
+
+        const datiPuliti = dati.map((nodo) => ({
+          ...nodo,
+          CodiceNodo: nodo.CodiceNodo?.trim?.(),
+        }));
+
+        setDatiExternal(datiPuliti);
+      } catch (err) {
+        console.error("Errore nel caricamento commesse:", err);
+      }
+    };
+
+    fetchData();
+  }, [commessa?.IdCantiere]); // <-- la dipendenza corretta
+
+  useEffect(() => {
+    if (datiExternal.length === 0) return;
+
+    const sezioniBase = [
+      {
+        nodo: "A",
+        coloreNodo: "#cde1bc",
+        coloreRiga: "#f3fdf5",
+        titolo: "OPERE EDILI",
+      },
+      {
+        nodo: "E",
+        coloreNodo: "#f7e7af",
+        coloreRiga: "#fef9e6",
+        titolo: "IMPIANTI ELETTRICI",
+      },
+      {
+        nodo: "M",
+        coloreNodo: "#a4b8cb",
+        coloreRiga: "#e4ebf3",
+        titolo: "IMPIANTI MECCANICI",
+      },
+      {
+        nodo: "I",
+        coloreNodo: "#eac3e2",
+        coloreRiga: "#fce9f8",
+        titolo: "COSTI INDIRETTI",
+      },
+      {
+        nodo: "R",
+        coloreNodo: "#d0d0d0",
+        coloreRiga: "#f3f3f3",
+        titolo: "RICAVI",
+      },
+    ];
+
+    // Crea mappa base dei gruppi A, E, M, I, R
+    const sezioniMap = Object.fromEntries(
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
+    );
+
+    // Popola i gruppi con i nodi dettagliati
+    for (const nodo of datiExternal) {
+      const { CodiceNodo, Descrizione } = nodo;
+      if (!CodiceNodo || CodiceNodo.length <= 1) continue; // ignora A, E, M, I, R singole
+
+      const prefisso = CodiceNodo.charAt(0);
+      if (sezioniMap[prefisso]) {
+        sezioniMap[prefisso].sotto.push(`${CodiceNodo} ${Descrizione}`);
+      }
+    }
+
+    // Ordina per chiave originale (A, E, M, I, R)
+    const sezioniFinali = ["A", "E", "M", "I", "R"].map((k) => sezioniMap[k]);
+
+    setSezioni(sezioniFinali);
+  }, [datiExternal]);
 
   useEffect(() => {
     if (openArchivio && commessa?.IdCantiere) {
       CantiereService.elencoDocumenti(commessa.IdCantiere)
         .then(setDocumentiArchivio)
         .catch((err) =>
-          console.error("Errore caricamento documenti archivio:", err),
+          console.error("Errore caricamento documenti archivio:", err)
         );
     }
   }, [openArchivio, commessa?.IdCantiere]);
@@ -198,7 +280,7 @@ const CostiRicavi = ({ commessa }) => {
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
-      "CostiRicavi.xlsx",
+      "CostiRicavi.xlsx"
     );
 
     // ▶️ 3. Screenshot della sezione visibile
@@ -667,7 +749,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
 
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.indirizzo,
+        datiGenerali.indirizzo
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -805,7 +887,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      },
+      }
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -826,8 +908,8 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          indirizzo,
-        )}&format=json&limit=1`,
+          indirizzo
+        )}&format=json&limit=1`
       );
       const data = await res.json();
       if (data.length > 0) {
@@ -847,7 +929,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
             lon - 0.005
           },${lat - 0.005},${lon + 0.005},${
             lat + 0.005
-          }&layer=mapnik&marker=${lat},${lon}`,
+          }&layer=mapnik&marker=${lat},${lon}`
         );
       } else {
         setZonaImageUrl(null);
@@ -1573,7 +1655,7 @@ const CommessaTecnico = () => {
           (c.IdCantiere && c.IdCantiere.toString().includes(searchTerm)) ||
           (c.RagioneSociale &&
             c.RagioneSociale.toLowerCase().includes(
-              searchTerm.toLowerCase(),
+              searchTerm.toLowerCase()
             )) ||
           (c.Indirizzo &&
             c.Indirizzo.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -2142,7 +2224,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -2462,15 +2544,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
