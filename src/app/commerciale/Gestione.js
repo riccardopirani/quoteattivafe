@@ -325,8 +325,7 @@ const CostiRicavi = ({ commessa }) => {
                       backgroundColor: "white",
                       border: "none",
                     }}
-                  ></td>{" "}
-                  {/* Spazio */}
+                  ></td>
                   {Array(10)
                     .fill(null)
                     .map((_, k) => (
@@ -340,6 +339,41 @@ const CostiRicavi = ({ commessa }) => {
                     ))}
                 </tr>
               ))}
+              {/* Riga Totale */}
+              <tr>
+                <td
+                  style={{ ...cella, backgroundColor: sezione.coloreRiga }}
+                ></td>
+                <td
+                  style={{
+                    ...cella,
+                    backgroundColor: sezione.coloreRiga,
+                    fontWeight: "bold",
+                  }}
+                >
+                  Totale
+                </td>
+                <td
+                  style={{
+                    ...cella,
+                    backgroundColor: sezione.coloreRiga,
+                    fontWeight: "bold",
+                  }}
+                >
+                  0
+                </td>
+                <td
+                  style={{ ...cella, backgroundColor: "white", border: "none" }}
+                ></td>
+                {Array(10)
+                  .fill(null)
+                  .map((_, k) => (
+                    <td
+                      key={k}
+                      style={{ ...cella, backgroundColor: sezione.coloreRiga }}
+                    ></td>
+                  ))}
+              </tr>
             </React.Fragment>
           ))}
         </tbody>
@@ -366,7 +400,7 @@ const CostiRicavi = ({ commessa }) => {
             }}
             onClick={() => setOpenArchivio(true)}
           >
-            Archivio costi/ricavi »
+            Archivio Report PDF & Excel »
           </button>
           <button
             onClick={handleExportExcel}
@@ -378,7 +412,7 @@ const CostiRicavi = ({ commessa }) => {
               marginLeft: "100px",
             }}
           >
-            Genera costi/ricavi
+            Report PDF & Excel
           </button>
         </div>
         <div style={{ textAlign: "right", fontSize: "0.85rem" }}>
