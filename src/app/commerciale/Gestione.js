@@ -18,7 +18,6 @@ import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
 import CDPService from "../services/cdp"; // Assicurati che il file esista con metodi: crea, leggi, aggiorna, elimina
-import dayjs from "dayjs";
 import Swal from "sweetalert2";
 const CustomInput = React.forwardRef(({ value, onClick }, ref) => (
   <button
@@ -115,6 +114,17 @@ const CostiRicavi = ({ commessa }) => {
     },
   ]);
 
+  const [documentiArchivio, setDocumentiArchivio] = useState([]);
+
+  useEffect(() => {
+    if (openArchivio && commessa?.IdCantiere) {
+      CantiereService.elencoDocumenti(commessa.IdCantiere)
+        .then(setDocumentiArchivio)
+        .catch((err) =>
+          console.error("Errore caricamento documenti archivio:", err),
+        );
+    }
+  }, [openArchivio, commessa?.IdCantiere]);
   const aggiungiRiga = (index) => {
     const nuovo = [...sezioni];
     nuovo[index].sotto.push("");
@@ -164,13 +174,34 @@ const CostiRicavi = ({ commessa }) => {
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "CostiRicavi");
+
+    // ▶️ 1. Invia a backend in Base64
+    try {
+      const wboutBase64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+
+      const idUtente = localStorage.getItem("userId");
+      const idCantiere = commessa?.IdCantiere;
+
+      await CantiereService.inserisciDocumento({
+        IdUtente: parseInt(idUtente),
+        IdCantiere: idCantiere,
+        File: wboutBase64,
+      });
+
+      Swal.fire("Successo", "Documento Excel caricato nel sistema!", "success");
+    } catch (err) {
+      console.error("Errore upload documento:", err);
+      Swal.fire("Errore", "Impossibile caricare il documento.", "error");
+    }
+
+    // ▶️ 2. Salva localmente Excel
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
       "CostiRicavi.xlsx",
     );
 
-    // 🔹 2. Screenshot della sezione visibile
+    // ▶️ 3. Screenshot della sezione visibile
     if (contentRef.current) {
       const canvas = await html2canvas(contentRef.current, {
         scale: 2,
@@ -183,6 +214,7 @@ const CostiRicavi = ({ commessa }) => {
       });
     }
   };
+
   const contentRef = useRef();
   return (
     <div
@@ -379,7 +411,6 @@ const CostiRicavi = ({ commessa }) => {
         </tbody>
       </table>
 
-      {/* Footer */}
       <div
         style={{
           display: "flex",
@@ -1509,7 +1540,7 @@ const CommessaTecnico = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const dati = await CantiereService.ricercaCantieri({});
+        const dati = await CantiereService.ricercaCantieriArca({});
         setAllCommesse(dati);
       } catch (err) {
         console.error("Errore nel caricamento commesse:", err);

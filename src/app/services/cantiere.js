@@ -2,6 +2,24 @@ import axios from "axios";
 import { BASE_URL } from "./api";
 
 const CantiereService = {
+  caricadocumenti: async (data) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/cantieri/caricadocumenti`,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
   inserisciDocumento: async (data) => {
     try {
       const response = await axios.post(
@@ -11,7 +29,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       return response.data;
@@ -20,7 +38,23 @@ const CantiereService = {
       throw error;
     }
   },
-
+  ricercaCantieriArca: async (params = {}) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/cantieri/ricerca/progetti`,
+        params,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Errore nella ricerca delle commesse:", error);
+      throw error;
+    }
+  },
   ricercaCantieri: async (params = {}) => {
     try {
       const response = await axios.post(
@@ -30,7 +64,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -55,7 +89,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       return response.data;
@@ -75,7 +109,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       // La response contiene un oggetto con la proprietà "return" che è true/false
@@ -94,7 +128,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       return response.data;
