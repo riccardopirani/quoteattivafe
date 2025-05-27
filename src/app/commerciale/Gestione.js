@@ -64,59 +64,10 @@ const chartData = [
 
 const CostiRicavi = ({ commessa }) => {
   const [openArchivio, setOpenArchivio] = useState(false);
-  const [sezioni, setSezioni] = useState([
-    {
-      nodo: "A",
-      coloreNodo: "#cde1bc",
-      coloreRiga: "#f3fdf5",
-      titolo: "OPERE EDILI",
-      sotto: [
-        "A00 Demolizione muri",
-        "A01 Realizzazione tetto",
-        "A02 Posa infissi",
-      ],
-    },
-
-    {
-      nodo: "E",
-      coloreNodo: "#f7e7af",
-      coloreRiga: "#fef9e6",
-      titolo: "IMPIANTI ELETTRICI",
-      sotto: ["E00 Posa corrugato", "E01 Posa interruttori", "E02 Posa cavi"],
-    },
-    {
-      nodo: "M",
-      coloreNodo: "#a4b8cb",
-      coloreRiga: "#e4ebf3",
-      titolo: "IMPIANTI MECCANICI",
-      sotto: ["M00 Posa sanitari", "M01 Posa tubazioni", "M02 Posa scarichi"],
-    },
-    {
-      nodo: "I",
-      coloreNodo: "#eac3e2",
-      coloreRiga: "#fce9f8",
-      titolo: "COSTI INDIRETTI",
-      sotto: [
-        "I00 Affitto alloggio",
-        "I01 Occupazione suolo pubblico",
-        "I02 Costi partecipazione gara",
-      ],
-    },
-    {
-      nodo: "R",
-      coloreNodo: "#d0d0d0",
-      coloreRiga: "#f3f3f3",
-      titolo: "RICAVI",
-      sotto: [
-        "R00 Sal 1 Contratto",
-        "R01 Sal 2 Contratto",
-        "R03 Sal 1 Preventivo tetto",
-      ],
-    },
-  ]);
-
+  const [sezioni, setSezioni] = useState([]);
   const [documentiArchivio, setDocumentiArchivio] = useState([]);
   const [datiExternal, setDatiExternal] = useState([]);
+
   useEffect(() => {
     if (!commessa?.IdCantiere) return;
 
@@ -138,7 +89,7 @@ const CostiRicavi = ({ commessa }) => {
     };
 
     fetchData();
-  }, [commessa?.IdCantiere]); // <-- la dipendenza corretta
+  }, [commessa?.IdCantiere]);
 
   useEffect(() => {
     if (datiExternal.length === 0) return;
@@ -176,171 +127,49 @@ const CostiRicavi = ({ commessa }) => {
       },
     ];
 
-    // Crea mappa base dei gruppi A, E, M, I, R
     const sezioniMap = Object.fromEntries(
       sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
     );
 
-    // Popola i gruppi con i nodi dettagliati
     for (const nodo of datiExternal) {
-      const { CodiceNodo, Descrizione } = nodo;
-      if (!CodiceNodo || CodiceNodo.length <= 1) continue; // ignora A, E, M, I, R singole
-
+      const { CodiceNodo, Descrizione, Costo } = nodo;
+      if (!CodiceNodo || CodiceNodo.length < 1) continue;
       const prefisso = CodiceNodo.charAt(0);
       if (sezioniMap[prefisso]) {
-        sezioniMap[prefisso].sotto.push(`${CodiceNodo} ${Descrizione}`);
+        sezioniMap[prefisso].sotto.push({
+          codice: CodiceNodo,
+          descrizione: Descrizione,
+          costo: Costo,
+        });
       }
     }
 
-    // Ordina per chiave originale (A, E, M, I, R)
     const sezioniFinali = ["A", "E", "M", "I", "R"].map((k) => sezioniMap[k]);
-
     setSezioni(sezioniFinali);
   }, [datiExternal]);
 
-  useEffect(() => {
-    if (openArchivio && commessa?.IdCantiere) {
-      CantiereService.elencoDocumenti(commessa.IdCantiere)
-        .then(setDocumentiArchivio)
-        .catch((err) =>
-          console.error("Errore caricamento documenti archivio:", err)
-        );
-    }
-  }, [openArchivio, commessa?.IdCantiere]);
   const aggiungiRiga = (index) => {
     const nuovo = [...sezioni];
-    nuovo[index].sotto.push("");
+    nuovo[index].sotto.push({ codice: "", descrizione: "", costo: 0 });
     setSezioni(nuovo);
   };
 
-  const handleExportExcel = async () => {
-    const headers = [
-      "NODO",
-      "SOTTONODO",
-      "COSTI",
-      "Aggiornata al",
-      "Giacenze",
-      "Costi per raffronto",
-      "BCWP",
-      "Contabilità",
-      "Da contabilizzare",
-      "Ricavi raffronto",
-      "MDC",
-      "MDC%",
-      "Note",
-    ];
-
-    const rows = [];
-    sezioni.forEach((sezione) => {
-      rows.push([sezione.nodo, sezione.titolo]);
-      sezione.sotto.forEach((sotto) => {
-        rows.push([null, sotto, "", "", "", "", "", "", "", "", "", "", ""]);
-      });
-    });
-    rows.push([]);
-    rows.push([
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "Margine di commessa",
-      "€ 20.000",
-    ]);
-    rows.push(["", "", "", "", "", "", "", "", "", "Margine %", "20 %"]);
-
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "CostiRicavi");
-
-    // ▶️ 1. Invia a backend in Base64
-    try {
-      const wboutBase64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-
-      const idUtente = localStorage.getItem("userId");
-      const idCantiere = commessa?.IdCantiere;
-
-      await CantiereService.inserisciDocumento({
-        IdUtente: parseInt(idUtente),
-        IdCantiere: idCantiere,
-        File: wboutBase64,
-      });
-
-      Swal.fire("Successo", "Documento Excel caricato nel sistema!", "success");
-    } catch (err) {
-      console.error("Errore upload documento:", err);
-      Swal.fire("Errore", "Impossibile caricare il documento.", "error");
-    }
-
-    // ▶️ 2. Salva localmente Excel
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(
-      new Blob([wbout], { type: "application/octet-stream" }),
-      "CostiRicavi.xlsx"
-    );
-
-    // ▶️ 3. Screenshot della sezione visibile
-    if (contentRef.current) {
-      const canvas = await html2canvas(contentRef.current, {
-        scale: 2,
-        useCORS: true,
-      });
-      canvas.toBlob((blob) => {
-        if (blob) {
-          saveAs(blob, "CostiRicavi_Screenshot.png");
-        }
-      });
-    }
-  };
-
   const contentRef = useRef();
-  return (
-    <div
-      ref={contentRef}
-      style={{
-        padding: "1rem",
-        backgroundColor: "white",
-        fontFamily: "sans-serif",
-      }}
-    >
-      <div
-        style={{
-          fontWeight: "bold",
-          marginBottom: "1rem",
-          fontSize: "1rem",
-          alignItems: "center",
-        }}
-      >
-        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
-        {commessa?.Indirizzo || ""}
-        <span
-          style={{
-            float: "right",
-            backgroundColor: (() => {
-              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-              if (stato.includes("chiuso")) return "#d32f2f"; // rosso
-              if (stato.includes("incorso")) return "#388e3c"; // verde
-              return "#fbc02d"; // giallo
-            })(),
-            color: "white",
-            padding: "0.3rem 1rem",
-            fontWeight: "bold",
-            borderRadius: 4,
-          }}
-        >
-          {(() => {
-            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-            if (stato.includes("chiuso")) return "CHIUSO";
-            if (stato.includes("incorso")) return "APERTO";
-            return "BLOCCATO";
-          })()}
-        </span>
-      </div>
 
+  const maxCostoSenzaRicavi = Math.max(
+    0,
+    ...sezioni
+      .filter((s) => s.nodo !== "R")
+      .flatMap((s) => s.sotto)
+      .map((el) => Number(el.costo) || 0)
+  );
+
+  const ricavo = sezioni
+    .find((s) => s.nodo === "R")
+    ?.sotto.reduce((acc, el) => acc + (Number(el.costo) || 0), 0);
+
+  return (
+    <div ref={contentRef} style={{ padding: "1rem", backgroundColor: "white" }}>
       <table
         style={{
           width: "100%",
@@ -354,7 +183,7 @@ const CostiRicavi = ({ commessa }) => {
               "NODO",
               "SOTTONODO",
               "COSTI",
-              "", // Spazio bianco
+              "",
               "Aggiornata al:",
               "Giacenze",
               "Costi per raffronto",
@@ -369,7 +198,6 @@ const CostiRicavi = ({ commessa }) => {
               <th
                 key={i}
                 style={{
-                  ...cella,
                   backgroundColor:
                     i >= 4 ? "#eaf4ea" : i === 3 ? "white" : "#e2f0d9",
                   border: i === 3 ? "none" : "1px solid #ccc",
@@ -389,7 +217,6 @@ const CostiRicavi = ({ commessa }) => {
               <tr>
                 <td
                   style={{
-                    ...cella,
                     backgroundColor: sezione.coloreNodo,
                     textAlign: "center",
                     fontWeight: "bold",
@@ -400,7 +227,6 @@ const CostiRicavi = ({ commessa }) => {
                 <td
                   colSpan={13}
                   style={{
-                    ...cella,
                     backgroundColor: sezione.coloreNodo,
                     fontWeight: "bold",
                   }}
@@ -422,295 +248,63 @@ const CostiRicavi = ({ commessa }) => {
                   </button>
                 </td>
               </tr>
-              {sezione.sotto.map((sottoNodo, i) => (
-                <tr key={i}>
-                  <td
-                    style={{ ...cella, backgroundColor: sezione.coloreRiga }}
-                  ></td>
-                  <td style={{ ...cella, backgroundColor: sezione.coloreRiga }}>
-                    {sottoNodo}
-                  </td>
-                  <td
-                    style={{ ...cella, backgroundColor: sezione.coloreRiga }}
-                  ></td>
-                  <td
-                    style={{
-                      ...cella,
-                      backgroundColor: "white",
-                      border: "none",
-                    }}
-                  ></td>
-                  {Array(10)
-                    .fill(null)
-                    .map((_, k) => (
-                      <td
-                        key={k}
-                        style={{
-                          ...cella,
-                          backgroundColor: sezione.coloreRiga,
-                        }}
-                      ></td>
-                    ))}
-                </tr>
-              ))}
-              {/* Riga Totale */}
-              <tr>
-                <td
-                  style={{ ...cella, backgroundColor: sezione.coloreRiga }}
-                ></td>
-                <td
-                  style={{
-                    ...cella,
-                    backgroundColor: sezione.coloreRiga,
-                    fontWeight: "bold",
-                  }}
-                >
-                  Totale
-                </td>
-                <td
-                  style={{
-                    ...cella,
-                    backgroundColor: sezione.coloreRiga,
-                    fontWeight: "bold",
-                  }}
-                >
-                  0
-                </td>
-                <td
-                  style={{ ...cella, backgroundColor: "white", border: "none" }}
-                ></td>
-                {Array(10)
-                  .fill(null)
-                  .map((_, k) => (
+              {sezione.sotto.map((sotto, i) => {
+                const isCategoria = sotto.codice.length === 3;
+                const mostraCosto =
+                  sezione.nodo === "R"
+                    ? (Number(sotto.costo) || 0).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : "";
+                return (
+                  <tr key={i}>
+                    <td style={{ backgroundColor: sezione.coloreRiga }}>
+                      {isCategoria ? sotto.codice : ""}
+                    </td>
+                    <td style={{ backgroundColor: sezione.coloreRiga }}>
+                      {isCategoria
+                        ? sotto.descrizione
+                        : `${sotto.codice} ${sotto.descrizione}`}
+                    </td>
+                    <td style={{ backgroundColor: sezione.coloreRiga }}>
+                      {mostraCosto}
+                    </td>
                     <td
-                      key={k}
-                      style={{ ...cella, backgroundColor: sezione.coloreRiga }}
+                      style={{ backgroundColor: "white", border: "none" }}
                     ></td>
-                  ))}
-              </tr>
+                    {Array(10)
+                      .fill(null)
+                      .map((_, k) => (
+                        <td
+                          key={k}
+                          style={{ backgroundColor: sezione.coloreRiga }}
+                        ></td>
+                      ))}
+                  </tr>
+                );
+              })}
             </React.Fragment>
           ))}
+          <tr>
+            <td style={{ fontWeight: "bold" }} colSpan={2}>
+              Totale Costi (esclusi Ricavi)
+            </td>
+            <td style={{ fontWeight: "bold" }}>
+              {maxCostoSenzaRicavi > 0
+                ? maxCostoSenzaRicavi.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                : ""}
+            </td>
+            <td colSpan={11}></td>
+          </tr>
         </tbody>
       </table>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: "1.5rem",
-          alignItems: "flex-start",
-        }}
-      >
-        <div>
-          <button
-            style={{
-              padding: "0.5rem 1rem",
-              border: "1px solid black",
-              background: "white",
-              fontWeight: "bold",
-              marginRight: "1rem",
-              marginLeft: "200px",
-            }}
-            onClick={() => setOpenArchivio(true)}
-          >
-            Archivio Report PDF & Excel »
-          </button>
-          <button
-            onClick={handleExportExcel}
-            style={{
-              padding: "0.5rem 1rem",
-              border: "1px solid black",
-              background: "#b3dbff",
-              fontWeight: "bold",
-              marginLeft: "100px",
-            }}
-          >
-            Report PDF & Excel
-          </button>
-        </div>
-        <div style={{ textAlign: "right", fontSize: "0.85rem" }}>
-          <div
-            style={{
-              backgroundColor: "#e6f2e6",
-              padding: "0.4rem 0.6rem",
-              marginBottom: 4,
-            }}
-          >
-            <strong>Data aggiornamento</strong>:{" "}
-            <span style={{ float: "right" }}>10 giu. 2025</span>
-          </div>
-          <div
-            style={{
-              backgroundColor: "#e6f2e6",
-              padding: "0.4rem 0.6rem",
-              marginBottom: 4,
-            }}
-          >
-            <strong>Margine di commessa</strong>:{" "}
-            <span style={{ float: "right" }}>€ 20.000</span>
-          </div>
-          <div style={{ backgroundColor: "#e6f2e6", padding: "0.4rem 0.6rem" }}>
-            <strong>Margine %</strong>:{" "}
-            <span style={{ float: "right" }}>20 %</span>
-          </div>
-        </div>
-      </div>
-      {openArchivio && (
-        <>
-          {/* Sfondo oscurato */}
-          <div
-            onClick={() => setOpenArchivio(false)}
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "100vw",
-              height: "100vh",
-              backgroundColor: "rgba(0, 0, 0, 0.3)",
-              zIndex: 999,
-            }}
-          ></div>
-
-          {/* Drawer */}
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              right: 0,
-              height: "100%",
-              width: "90%",
-              maxWidth: "400px",
-              backgroundColor: "#fff",
-              boxShadow: "-2px 0 8px rgba(0,0,0,0.15)",
-              zIndex: 1000,
-              display: "flex",
-              flexDirection: "column",
-              transition: "transform 0.3s ease-in-out",
-              animation: "slideInDrawer 0.3s ease-out forwards",
-            }}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: "1rem",
-                borderBottom: "1px solid #eee",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: "#f9fafb",
-              }}
-            >
-              <h2 style={{ fontSize: "1.1rem", fontWeight: "bold" }}>
-                Archivio Costi/Ricavi
-              </h2>
-              <button
-                onClick={() => setOpenArchivio(false)}
-                style={{
-                  fontSize: "1.5rem",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Contenuto */}
-            <div style={{ padding: "1rem", overflowY: "auto", flex: 1 }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.9rem",
-                }}
-              >
-                Filtro per data
-              </label>
-              <input
-                type="date"
-                style={{
-                  padding: "0.5rem",
-                  border: "1px solid #ccc",
-                  borderRadius: 4,
-                  width: "100%",
-                  marginBottom: "1rem",
-                }}
-              />
-
-              {/* Lista documenti */}
-              {[
-                {
-                  nome: "CostiRicavi_Maggio2025.xlsx",
-                  tipo: "excel",
-                  data: "2025-05-10",
-                  link: "/files/maggio2025.xlsx",
-                },
-                {
-                  nome: "CostiRicavi_Aprile2025.pdf",
-                  tipo: "pdf",
-                  data: "2025-04-15",
-                  link: "/files/aprile2025.pdf",
-                },
-              ].map((doc, i) => (
-                <div
-                  key={i}
-                  style={{
-                    border: "1px solid #ddd",
-                    borderRadius: 6,
-                    padding: "0.75rem",
-                    marginBottom: "0.75rem",
-                    backgroundColor: "#f8f9fa",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "0.5rem",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 20,
-                        color: doc.tipo === "pdf" ? "#b91c1c" : "#15803d",
-                      }}
-                    >
-                      {doc.tipo === "pdf" ? "📄" : "📊"}
-                    </span>
-                    <div>
-                      <div style={{ fontWeight: "bold" }}>{doc.nome}</div>
-                      <div style={{ fontSize: "0.75rem", color: "#777" }}>
-                        {doc.data}
-                      </div>
-                    </div>
-                  </div>
-                  <a
-                    href={doc.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: "#2563eb",
-                      fontSize: "0.85rem",
-                      fontWeight: "bold",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Visualizza »
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 };
-
 // Stile base per ogni cella
 const cella = {
   padding: "0.4rem",
