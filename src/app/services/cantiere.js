@@ -11,7 +11,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -36,7 +36,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       return response.data;
@@ -56,7 +56,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       // La response contiene un oggetto con la proprietà "return" che è true/false
@@ -75,7 +75,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       return response.data;

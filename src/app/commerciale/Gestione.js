@@ -167,7 +167,7 @@ const CostiRicavi = ({ commessa }) => {
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(
       new Blob([wbout], { type: "application/octet-stream" }),
-      "CostiRicavi.xlsx"
+      "CostiRicavi.xlsx",
     );
 
     // 🔹 2. Screenshot della sezione visibile
@@ -636,7 +636,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
 
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.indirizzo
+        datiGenerali.indirizzo,
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -774,7 +774,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      }
+      },
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -795,8 +795,8 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          indirizzo
-        )}&format=json&limit=1`
+          indirizzo,
+        )}&format=json&limit=1`,
       );
       const data = await res.json();
       if (data.length > 0) {
@@ -816,7 +816,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
             lon - 0.005
           },${lat - 0.005},${lon + 0.005},${
             lat + 0.005
-          }&layer=mapnik&marker=${lat},${lon}`
+          }&layer=mapnik&marker=${lat},${lon}`,
         );
       } else {
         setZonaImageUrl(null);
@@ -1542,7 +1542,7 @@ const CommessaTecnico = () => {
           (c.IdCantiere && c.IdCantiere.toString().includes(searchTerm)) ||
           (c.RagioneSociale &&
             c.RagioneSociale.toLowerCase().includes(
-              searchTerm.toLowerCase()
+              searchTerm.toLowerCase(),
             )) ||
           (c.Indirizzo &&
             c.Indirizzo.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -2111,7 +2111,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err)
+          console.error("Errore nel caricamento approvvigionamenti:", err),
         );
     }
   }, [commessa?.IdCantiere]);
@@ -2431,15 +2431,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?"
+                          "Sei sicuro di voler eliminare questo approvvigionamento?",
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero
+                            editingItem.Numero,
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere
+                            commessa?.IdCantiere,
                           );
                           setRighe(updated);
                           chiudiDrawer();
