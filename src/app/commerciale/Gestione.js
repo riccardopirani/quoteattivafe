@@ -17,8 +17,14 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
+import dayjs from "dayjs";
 import CDPService from "../services/cdp"; // Assicurati che il file esista con metodi: crea, leggi, aggiorna, elimina
 import Swal from "sweetalert2";
+import moment from "moment";
+import "moment/locale/it";
+
+moment.locale("it"); // Imposta la lingua italiana
+
 const CustomInput = React.forwardRef(({ value, onClick }, ref) => (
   <button
     type="button"
@@ -1419,105 +1425,170 @@ const CommessaTecnico = () => {
   );
 };
 
-const CruscottoCommessa = ({ commessa }) => (
-  <div style={{ padding: "1rem", backgroundColor: "white" }}>
-    <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>
+const CruscottoCommessa = ({ commessa }) => {
+  const [chartData, setChartData] = useState([]);
+  const [marginePerc, setMarginePerc] = useState(0);
+  const [margineVal, setMargineVal] = useState(0);
+  const [dataAggiornamento, setDataAggiornamento] = useState("");
+
+  useEffect(() => {
+    const fetchGrafico = async () => {
+      try {
+        const dati = await CantiereService.graficoCommessa({
+          Codice: commessa.IdCantiere,
+        });
+
+        const datiPerMese = {};
+
+        let totaleCosti = 0;
+        let totaleRicavi = 0;
+        let ultimaData = null;
+
+        for (const voce of dati) {
+          const mese = voce.MeseAnno;
+          if (!datiPerMese[mese]) {
+            datiPerMese[mese] = { month: mese, costi: 0, ricavi: 0 };
+          }
+
+          if (voce.Descrizione.toLowerCase() === "costi") {
+            datiPerMese[mese].costi += voce.CostoTotale;
+            totaleCosti += voce.CostoTotale;
+          } else if (voce.Descrizione.toLowerCase() === "ricavi") {
+            datiPerMese[mese].ricavi += voce.CostoTotale;
+            totaleRicavi += voce.CostoTotale;
+          }
+
+          if (!ultimaData || dayjs(mese) > dayjs(ultimaData)) {
+            ultimaData = mese;
+          }
+        }
+
+        const chart = Object.values(datiPerMese).sort((a, b) =>
+          a.month.localeCompare(b.month)
+        );
+        setChartData(chart);
+
+        const margine = totaleRicavi - totaleCosti;
+        const perc = totaleRicavi
+          ? ((margine / totaleRicavi) * 100).toFixed(2)
+          : 0;
+
+        setMargineVal(margine);
+        setMarginePerc(perc);
+        setDataAggiornamento(dayjs(ultimaData).format("DD MMM YYYY"));
+      } catch (error) {
+        console.error("Errore caricamento dati grafico:", error);
+      }
+    };
+
+    if (commessa?.IdCantiere) fetchGrafico();
+  }, [commessa]);
+
+  return (
+    <div style={{ padding: "1rem", backgroundColor: "white" }}>
       <div
         style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
       >
         Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
         {commessa?.Indirizzo || ""}
+        <span
+          style={{
+            float: "right",
+            backgroundColor: (() => {
+              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+              if (stato.includes("chiuso")) return "#d32f2f";
+              if (stato.includes("incorso")) return "#388e3c";
+              return "#fbc02d";
+            })(),
+            color: "white",
+            padding: "0.3rem 1rem",
+            fontWeight: "bold",
+            borderRadius: 4,
+          }}
+        >
+          {(() => {
+            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
+            if (stato.includes("chiuso")) return "CHIUSO";
+            if (stato.includes("incorso")) return "APERTO";
+            return "BLOCCATO";
+          })()}
+        </span>
       </div>
 
-      <span
-        style={{
-          float: "right",
-          backgroundColor: (() => {
-            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-            if (stato.includes("chiuso")) return "#d32f2f"; // rosso
-            if (stato.includes("incorso")) return "#388e3c"; // verde
-            return "#fbc02d"; // giallo
-          })(),
-          color: "white",
-          padding: "0.3rem 1rem",
-          fontWeight: "bold",
-          borderRadius: 4,
-        }}
-      >
-        {(() => {
-          const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-          if (stato.includes("chiuso")) return "CHIUSO";
-          if (stato.includes("incorso")) return "APERTO";
-          return "BLOCCATO";
-        })()}
-      </span>
-      <br></br>
-    </div>
-    <div
-      style={{
-        textAlign: "center",
-        fontWeight: "bold",
-        fontSize: "1rem",
-        marginBottom: "0.5rem",
-      }}
-    >
-      Costi Ricavi Margine
-    </div>
-    <div
-      style={{
-        textAlign: "center",
-        fontSize: "0.85rem",
-        marginBottom: "0.5rem",
-      }}
-    >
-      <span style={{ backgroundColor: "#e0e0e0", padding: "0.2rem 1rem" }}>
-        Data aggiornamento
-      </span>
-      <span style={{ padding: "0.2rem 1rem" }}>10 giu. 2025</span>
-    </div>
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: "2rem",
-        marginBottom: "1rem",
-      }}
-    >
       <div
         style={{
-          backgroundColor: "#e0eee3",
-          padding: "0.5rem 1rem",
+          textAlign: "center",
           fontWeight: "bold",
+          fontSize: "1rem",
+          marginBottom: "0.5rem",
         }}
       >
-        Margine %<span style={{ marginLeft: "1rem" }}>20 %</span>
+        Costi Ricavi Margine
       </div>
+
       <div
         style={{
-          backgroundColor: "#e0eee3",
-          padding: "0.5rem 1rem",
-          fontWeight: "bold",
+          textAlign: "center",
+          fontSize: "0.85rem",
+          marginBottom: "0.5rem",
         }}
       >
-        Margine di commessa<span style={{ marginLeft: "1rem" }}>€ 20.000</span>
+        <span style={{ backgroundColor: "#e0e0e0", padding: "0.2rem 1rem" }}>
+          Data aggiornamento
+        </span>
+        <span style={{ padding: "0.2rem 1rem" }}>
+          {moment(dataAggiornamento).format("D MMM YYYY")}
+        </span>
       </div>
-    </div>
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart
-        data={chartData}
-        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "2rem",
+          marginBottom: "1rem",
+        }}
       >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" />
-        <YAxis tickFormatter={(value) => `${value.toLocaleString()} €`} />
-        <Tooltip formatter={(value) => `${value.toLocaleString()} €`} />
-        <Legend />
-        <Line type="monotone" dataKey="costi" stroke="red" name="Costi" />
-        <Line type="monotone" dataKey="ricavi" stroke="green" name="Ricavi" />
-      </LineChart>
-    </ResponsiveContainer>
-  </div>
-);
+        <div
+          style={{
+            backgroundColor: "#e0eee3",
+            padding: "0.5rem 1rem",
+            fontWeight: "bold",
+          }}
+        >
+          Margine %<span style={{ marginLeft: "1rem" }}>{marginePerc} %</span>
+        </div>
+        <div
+          style={{
+            backgroundColor: "#e0eee3",
+            padding: "0.5rem 1rem",
+            fontWeight: "bold",
+          }}
+        >
+          Margine di commessa
+          <span style={{ marginLeft: "1rem" }}>
+            € {margineVal.toLocaleString()}
+          </span>
+        </div>
+      </div>
+
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="month" />
+          <YAxis tickFormatter={(value) => `${value.toLocaleString()} €`} />
+          <Tooltip formatter={(value) => `${value.toLocaleString()} €`} />
+          <Legend />
+          <Line type="monotone" dataKey="costi" stroke="red" name="Costi" />
+          <Line type="monotone" dataKey="ricavi" stroke="green" name="Ricavi" />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 
 const CDP = ({ commessa }) => {
   const [righe, setRighe] = useState([]);
