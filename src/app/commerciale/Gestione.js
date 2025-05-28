@@ -13,7 +13,6 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
 import ApprovvigionamentoService from "../services/approvigionamenti";
-import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
@@ -23,7 +22,7 @@ import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/it";
 
-moment.locale("it"); // Imposta la lingua italiana
+moment.locale("it");
 
 const CustomInput = React.forwardRef(({ value, onClick }, ref) => (
   <button
@@ -53,26 +52,44 @@ const cellStyle = {
 
   verticalAlign: "middle",
 };
-const chartData = [
-  { month: "Jan-25", costi: 50000, ricavi: 20000 },
-  { month: "Feb-25", costi: 60000, ricavi: 50000 },
-  { month: "Mar-25", costi: 70000, ricavi: 90000 },
-  { month: "Apr-25", costi: 85000, ricavi: 87000 },
-  { month: "May-25", costi: 100000, ricavi: 105000 },
-  { month: "Jun-25", costi: 120000, ricavi: 130000 },
-  { month: "Jul-25", costi: 150000, ricavi: 145000 },
-  { month: "Aug-25", costi: 180000, ricavi: 170000 },
-  { month: "Sep-25", costi: 200000, ricavi: 190000 },
-  { month: "Oct-25", costi: 220000, ricavi: 250000 },
-  { month: "Nov-25", costi: 260000, ricavi: 270000 },
-  { month: "Dec-25", costi: 280000, ricavi: 320000 },
-];
 
 const CostiRicavi = ({ commessa }) => {
   const [openArchivio, setOpenArchivio] = useState(false);
   const [sezioni, setSezioni] = useState([]);
   const [documentiArchivio, setDocumentiArchivio] = useState([]);
   const [datiExternal, setDatiExternal] = useState([]);
+  const [datiGenerali, setDatiGenerali] = useState({
+    statoDinamico: "BLOCCATO",
+  });
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (commessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: commessa.IdCantiere,
+          });
+
+          const statoGrezzo = result;
+          const statoPulito = statoGrezzo.trim().toUpperCase();
+
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+          setDatiGenerali((prev) => ({
+            ...prev,
+            statoDinamico: statoLabel,
+          }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+
+    fetchStato();
+  }, [commessa?.IdCantiere]);
 
   useEffect(() => {
     if (!commessa?.IdCantiere) return;
@@ -134,7 +151,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
     );
 
     for (const nodo of datiExternal) {
@@ -162,20 +179,57 @@ const CostiRicavi = ({ commessa }) => {
 
   const contentRef = useRef();
 
+  const handleExportExcel = async () => {
+    const content = contentRef.current;
+    if (content) {
+      try {
+        const canvas = await html2canvas(content, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff", // evita trasparenze
+        });
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            saveAs(blob, "CostiRicavi_Screenshot.png");
+          }
+        }, "image/png");
+      } catch (error) {
+        console.error("Errore durante lo screenshot:", error);
+      }
+    }
+  };
   const maxCostoSenzaRicavi = Math.max(
     0,
     ...sezioni
       .filter((s) => s.nodo !== "R")
       .flatMap((s) => s.sotto)
-      .map((el) => Number(el.costo) || 0)
+      .map((el) => Number(el.costo) || 0),
   );
-
-  const ricavo = sezioni
-    .find((s) => s.nodo === "R")
-    ?.sotto.reduce((acc, el) => acc + (Number(el.costo) || 0), 0);
 
   return (
     <div ref={contentRef} style={{ padding: "1rem", backgroundColor: "white" }}>
+      <span
+        style={{
+          float: "right",
+          backgroundColor: (() => {
+            const stato = datiGenerali?.statoDinamico || "";
+            if (stato === "CHIUSO") return "#d32f2f";
+            if (stato === "APERTO") return "#388e3c";
+            return "#fbc02d"; // BLOCCATO o default
+          })(),
+          color: "white",
+          padding: "0.3rem 1rem",
+          fontWeight: "bold",
+          borderRadius: 4,
+          marginBottom: "10px",
+        }}
+      >
+        {datiGenerali?.statoDinamico || "BLOCCATO"}
+      </span>
+
+      <br></br>
       <table
         style={{
           width: "100%",
@@ -304,34 +358,51 @@ const CostiRicavi = ({ commessa }) => {
                   })
                 : ""}
             </td>
-            <td colSpan={11}></td>
+            <td colSpan={11}>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  gap: "1rem",
+                  padding: "1rem 0",
+                }}
+              >
+                <button
+                  style={{
+                    padding: "0.5rem 1rem",
+                    border: "1px solid black",
+                    background: "white",
+                    fontWeight: "bold",
+                    minWidth: "200px",
+                    flex: "1 1 250px",
+                  }}
+                  onClick={() => setOpenArchivio(true)}
+                >
+                  Archivio costi/ricavi »
+                </button>
+
+                <button
+                  onClick={handleExportExcel}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    border: "1px solid black",
+                    background: "#b3dbff",
+                    fontWeight: "bold",
+                    minWidth: "200px",
+                    flex: "1 1 250px",
+                  }}
+                >
+                  Genera costi/ricavi
+                </button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
   );
 };
-// Stile base per ogni cella
-const cella = {
-  padding: "0.4rem",
-  border: "1px solid #ccc",
-  verticalAlign: "middle",
-};
-
-const documenti = [
-  {
-    nome: "CostiRicavi_Maggio2025.xlsx",
-    tipo: "excel",
-    data: "2025-05-10",
-    link: "/download/maggio2025.xlsx",
-  },
-  {
-    nome: "CostiRicavi_Aprile2025.pdf",
-    tipo: "pdf",
-    data: "2025-04-15",
-    link: "/download/aprile2025.pdf",
-  },
-];
 
 const DatiCommessa = ({ onComplete, commessa }) => {
   const [triggered, setTriggered] = useState(false);
@@ -339,6 +410,38 @@ const DatiCommessa = ({ onComplete, commessa }) => {
   const [dataFine, setDataFine] = useState(new Date());
   const [mappaUrl, setMappaUrl] = useState(null);
   const [zonaImageUrl, setZonaImageUrl] = useState(null);
+  const [datiGenerali2, setDatiGenerali2] = useState({
+    statoDinamico: "BLOCCATO",
+  });
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (commessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: commessa.IdCantiere,
+          });
+
+          const statoGrezzo = result;
+          const statoPulito = statoGrezzo.trim().toUpperCase();
+
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+          setDatiGenerali2((prev) => ({
+            ...prev,
+            statoDinamico: statoLabel,
+          }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+
+    fetchStato();
+  }, [commessa?.IdCantiere]);
 
   const creaClienteECantiereECommessa = async () => {
     try {
@@ -349,7 +452,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
 
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.indirizzo
+        datiGenerali.indirizzo,
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -487,7 +590,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      }
+      },
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -508,18 +611,16 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          indirizzo
-        )}&format=json&limit=1`
+          indirizzo,
+        )}&format=json&limit=1`,
       );
       const data = await res.json();
       if (data.length > 0) {
         const { lat, lon } = data[0];
 
         // Fallback su una mappa satellite statica generica
-        const fallbackUrl = `https://maps.wikimedia.org/img/osm-intl,${lat},${lon},15,600x400.png`;
 
         // Proviamo a costruire un'immagine da Wikimedia Maps (stile standard, nessun token)
-        const imageUrl = `https://maps.wikimedia.org/osm-intl/${lon},${lat},15/600x400.png`;
 
         // Ma poiché il server di Wikimedia non genera immagini così direttamente,
         // ci basiamo su OpenStreetMap tile via iframe o non usiamo più un'immagine vera, ma l'iframe mappa stesso.
@@ -529,7 +630,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
             lon - 0.005
           },${lat - 0.005},${lon + 0.005},${
             lat + 0.005
-          }&layer=mapnik&marker=${lat},${lon}`
+          }&layer=mapnik&marker=${lat},${lon}`,
         );
       } else {
         setZonaImageUrl(null);
@@ -665,10 +766,10 @@ const DatiCommessa = ({ onComplete, commessa }) => {
             style={{
               float: "right",
               backgroundColor: (() => {
-                const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-                if (stato.includes("chiuso")) return "#d32f2f"; // rosso
-                if (stato.includes("incorso")) return "#388e3c"; // verde
-                return "#fbc02d"; // giallo
+                const stato = datiGenerali2?.statoDinamico || "";
+                if (stato === "CHIUSO") return "#d32f2f";
+                if (stato === "APERTO") return "#388e3c";
+                return "#fbc02d"; // BLOCCATO o default
               })(),
               color: "white",
               padding: "0.3rem 1rem",
@@ -676,12 +777,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
               borderRadius: 4,
             }}
           >
-            {(() => {
-              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-              if (stato.includes("chiuso")) return "CHIUSO";
-              if (stato.includes("incorso")) return "APERTO";
-              return "BLOCCATO";
-            })()}
+            {datiGenerali2?.statoDinamico || "BLOCCATO"}
           </span>
         )}
       </div>
@@ -1020,184 +1116,361 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     </>
   );
 };
-const GestioneContratto = ({ commessa }) => (
-  <div
-    style={{
-      padding: "1rem",
-      backgroundColor: "white",
-      border: "1px solid #ccc",
-    }}
-  >
-    <div style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}>
-      Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
-      {commessa?.Indirizzo || ""}
-    </div>
-    <div style={{ marginBottom: "1rem" }}>
-      <div style={{ display: "flex", marginBottom: "0.5rem" }}>
-        <div style={{ flex: 1 }}>Avanzamento commessa</div>
+
+const GestioneContratto = ({ commessa }) => {
+  const [datiGenerali2, setDatiGenerali2] = useState({
+    statoDinamico: "BLOCCATO",
+  });
+  const [contratti, setContratti] = useState([]);
+
+  const handleChange = (index, field, value) => {
+    const newContratti = [...contratti];
+    newContratti[index] = {
+      ...newContratti[index],
+      [field]: value,
+    };
+    setContratti(newContratti);
+  };
+
+  const aggiungiRiga = () => {
+    setContratti([
+      ...contratti,
+      {
+        Descrizione: "",
+        Data: new Date().toISOString().substring(0, 10), // formato YYYY-MM-DD
+        Costo: 0,
+        Quantita: 1,
+      },
+    ]);
+  };
+
+  useEffect(() => {
+    console.log("Trigger fetchContratti, IdCantiere:", commessa?.IdCantiere);
+    if (commessa?.IdCantiere) {
+      const fetch = async () => {
+        try {
+          const result = await CantiereService.contrattoCommessa({
+            Codice: commessa.IdCantiere,
+          });
+          console.log("Contratti ricevuti:", result);
+          setContratti(result || []);
+        } catch (err) {
+          console.error("Errore nel fetch dei contratti:", err);
+        }
+      };
+      fetch();
+    }
+  }, [commessa?.IdCantiere]);
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (commessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: commessa.IdCantiere,
+          });
+
+          const statoGrezzo = result;
+          const statoPulito = statoGrezzo.trim().toUpperCase();
+
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+          setDatiGenerali2((prev) => ({
+            ...prev,
+            statoDinamico: statoLabel,
+          }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+
+    fetchStato();
+  }, [commessa?.IdCantiere]);
+
+  return (
+    <div
+      style={{
+        padding: "1rem",
+        backgroundColor: "white",
+        border: "1px solid #ccc",
+      }}
+    >
+      <span
+        style={{
+          float: "right",
+          backgroundColor: (() => {
+            const stato = datiGenerali2?.statoDinamico || "";
+            if (stato === "CHIUSO") return "#d32f2f";
+            if (stato === "APERTO") return "#388e3c";
+            return "#fbc02d"; // BLOCCATO o default
+          })(),
+          color: "white",
+          padding: "0.3rem 1rem",
+          fontWeight: "bold",
+          borderRadius: 4,
+        }}
+      >
+        {datiGenerali2?.statoDinamico || "BLOCCATO"}
+      </span>
+      <br></br>
+      <div
+        style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
+      >
+        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+        {commessa?.Indirizzo || ""}
+      </div>
+
+      <div style={{ marginBottom: "1rem" }}>
+        <div style={{ display: "flex", marginBottom: "0.5rem" }}>
+          <div style={{ flex: 1 }}>Avanzamento commessa</div>
+          <div
+            style={{
+              flex: 5,
+              background: "#4caf50",
+              color: "white",
+              textAlign: "center",
+            }}
+          >
+            Avanzamento produzione: 75,90% €113.850
+          </div>
+          <div style={{ flex: 2, background: "#c8e6c9" }}>
+            Lavori residui: 24,10% €36.150
+          </div>
+        </div>
+        <div style={{ display: "flex", marginBottom: "0.5rem" }}>
+          <div style={{ flex: 1 }}>Avanzamento SAL</div>
+          <div style={{ flex: 5, background: "#a5d6a7", textAlign: "center" }}>
+            Avanzamento SAL: 66,66% €100.000
+          </div>
+          <div style={{ flex: 2, background: "#ef9a9a" }}>
+            SAL da fare: 33,34% €50.000
+          </div>
+        </div>
+        <div style={{ display: "flex", marginBottom: "0.5rem" }}>
+          <div style={{ flex: 1 }}>Avanzamento fatturazione</div>
+          <div style={{ flex: 5, background: "#81c784", textAlign: "center" }}>
+            Avanzamento fatturazione: 50% €75.000
+          </div>
+          <div style={{ flex: 2, background: "#e0e0e0" }}>
+            Residuo da fatturare: 50% €75.000
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", marginBottom: "1rem" }}>
         <div
           style={{
-            flex: 5,
-            background: "#4caf50",
-            color: "white",
+            flex: 1,
+            background: "#ffcc80",
+            padding: "0.5rem",
             textAlign: "center",
+            fontWeight: "bold",
           }}
         >
-          Avanzamento produzione: 75,90% €113.850
+          PRODUZIONE NON FATTURATA €38.850
         </div>
-        <div style={{ flex: 2, background: "#c8e6c9" }}>
-          Lavori residui: 24,10% €36.150
-        </div>
-      </div>
-      <div style={{ display: "flex", marginBottom: "0.5rem" }}>
-        <div style={{ flex: 1 }}>Avanzamento SAL</div>
-        <div style={{ flex: 5, background: "#a5d6a7", textAlign: "center" }}>
-          Avanzamento SAL: 66,66% €100.000
-        </div>
-        <div style={{ flex: 2, background: "#ef9a9a" }}>
-          SAL da fare: 33,34% €50.000
-        </div>
-      </div>
-      <div style={{ display: "flex", marginBottom: "0.5rem" }}>
-        <div style={{ flex: 1 }}>Avanzamento fatturazione</div>
-        <div style={{ flex: 5, background: "#81c784", textAlign: "center" }}>
-          Avanzamento fatturazione: 50% €75.000
-        </div>
-        <div style={{ flex: 2, background: "#e0e0e0" }}>
-          Residuo da fatturare: 50% €75.000
+        <div
+          style={{
+            flex: 1,
+            background: "#f44336",
+            color: "white",
+            padding: "0.5rem",
+            textAlign: "center",
+            fontWeight: "bold",
+          }}
+        >
+          SAL NON FATTURATI €25.000
         </div>
       </div>
-    </div>
-    <div style={{ display: "flex", marginBottom: "1rem" }}>
-      <div
+      <table style={tableStyle}>
+        <thead>
+          <tr style={{ backgroundColor: "#ddf0e3" }}>
+            <th style={cellStyle}>Lavori</th>
+            <th style={cellStyle}>Data</th>
+            <th style={cellStyle}>Importo</th>
+            <th style={cellStyle}>Produzione totale</th>
+            <th style={cellStyle}>Produzione residua</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contratti.map((contratto, index) => {
+            const costo = Number(contratto?.Costo || 0);
+            const quantita = Number(contratto?.Quantita || 1);
+            const produzioneTotale = costo * quantita;
+            const produzioneResidua = produzioneTotale; // Puoi cambiare la logica se serve
+
+            return (
+              <tr key={index}>
+                <td style={cellStyle}>
+                  <input
+                    type="text"
+                    value={contratto?.Descrizione || ""}
+                    onChange={(e) =>
+                      handleChange(index, "Descrizione", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
+                <td style={cellStyle}>
+                  <input
+                    type="date"
+                    value={contratto?.Data?.substring(0, 10) || ""}
+                    onChange={(e) =>
+                      handleChange(index, "Data", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
+                <td style={cellStyle}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={contratto?.Costo}
+                    onChange={(e) =>
+                      handleChange(index, "Costo", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
+                <td style={cellStyle}>
+                  €
+                  {produzioneTotale.toLocaleString("it-IT", {
+                    minimumFractionDigits: 2,
+                  })}
+                </td>
+                <td style={cellStyle}>
+                  €
+                  {produzioneResidua.toLocaleString("it-IT", {
+                    minimumFractionDigits: 2,
+                  })}
+                </td>
+              </tr>
+            );
+          })}
+
+          <tr>
+            <td style={cellStyle} colSpan="2">
+              TOTALI
+            </td>
+            <td style={cellStyle}>
+              €
+              {contratti
+                .reduce((tot, c) => tot + Number(c?.Costo || 0), 0)
+                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+            </td>
+            <td style={cellStyle}>
+              €
+              {contratti
+                .reduce(
+                  (tot, c) =>
+                    tot + Number(c?.Costo || 0) * Number(c?.Quantita || 1),
+                  0,
+                )
+                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+            </td>
+            <td style={cellStyle}>
+              €
+              {contratti
+                .reduce(
+                  (tot, c) =>
+                    tot + Number(c?.Costo || 0) * Number(c?.Quantita || 1),
+                  0,
+                )
+                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <button
+        onClick={aggiungiRiga}
         style={{
-          flex: 1,
-          background: "#ffcc80",
-          padding: "0.5rem",
-          textAlign: "center",
-          fontWeight: "bold",
-        }}
-      >
-        PRODUZIONE NON FATTURATA €38.850
-      </div>
-      <div
-        style={{
-          flex: 1,
-          background: "#f44336",
+          marginTop: "1rem",
+          padding: "0.5rem 1rem",
+          backgroundColor: "#4caf50",
           color: "white",
-          padding: "0.5rem",
-          textAlign: "center",
-          fontWeight: "bold",
+          border: "none",
+          borderRadius: 4,
+          cursor: "pointer",
         }}
       >
-        SAL NON FATTURATI €25.000
-      </div>
+        + Aggiungi Riga
+      </button>
+      <p></p>
+      <br />
+      <table style={tableStyle}>
+        <thead>
+          <tr style={{ backgroundColor: "#ddf0e3" }}>
+            <th style={cellStyle}>Lavori</th>
+            <th style={cellStyle}>Importo</th>
+            <th style={cellStyle}>Nodo</th>
+            <th style={cellStyle}>N°</th>
+            <th style={cellStyle}>Data</th>
+            <th style={cellStyle}>Importo</th>
+            <th style={cellStyle}>N°</th>
+            <th style={cellStyle}>Data</th>
+            <th style={cellStyle}>Importo</th>
+            <th style={cellStyle}>Sal non fatturati</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={cellStyle}>Contratto principale</td>
+            <td style={cellStyle}>€100.000</td>
+            <td style={cellStyle}>fsf</td>
+            <td style={cellStyle}>1</td>
+            <td style={cellStyle}>1 maggio 2025</td>
+            <td style={cellStyle}>€25.000</td>
+            <td style={cellStyle}>1</td>
+            <td style={cellStyle}>1 maggio 2025</td>
+            <td style={cellStyle}>€30.000</td>
+            <td style={cellStyle}>€5.000</td>
+          </tr>
+          <tr>
+            <td style={cellStyle}>Contratto principale</td>
+            <td style={cellStyle}>€100.000</td>
+            <td style={cellStyle}>tsfs</td>
+            <td style={cellStyle}>2</td>
+            <td style={cellStyle}>1 giugno 2025</td>
+            <td style={cellStyle}>€25.000</td>
+            <td style={cellStyle}>2</td>
+            <td style={cellStyle}>1 giugno 2025</td>
+            <td style={cellStyle}>€40.000</td>
+            <td style={cellStyle}>€15.000</td>
+          </tr>
+          <tr>
+            <td style={cellStyle}>Preventivo rifacimento tetto</td>
+            <td style={cellStyle}>€50.000</td>
+            <td style={cellStyle}>fsfsf</td>
+            <td style={cellStyle}>3</td>
+            <td style={cellStyle}>1 giugno 2025</td>
+            <td style={cellStyle}>€25.000</td>
+            <td style={cellStyle}>3</td>
+            <td style={cellStyle}>1 giugno 2025</td>
+            <td style={cellStyle}>€30.000</td>
+            <td style={cellStyle}>€5.000</td>
+          </tr>
+          <tr>
+            <td style={cellStyle} colSpan="2">
+              TOTALI
+            </td>
+            <td style={cellStyle}></td>
+            <td style={cellStyle}></td>
+            <td style={cellStyle}></td>
+            <td style={cellStyle}>€75.000</td>
+            <td style={cellStyle}></td>
+            <td style={cellStyle}></td>
+            <td style={cellStyle}>€100.000</td>
+            <td style={cellStyle}>€25.000</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <table style={tableStyle}>
-      <thead>
-        <tr style={{ backgroundColor: "#ddf0e3" }}>
-          <th style={cellStyle}>Lavori</th>
-          <th style={cellStyle}>Data</th>
-          <th style={cellStyle}>Importo</th>
-          <th style={cellStyle}>Produzione totale</th>
-          <th style={cellStyle}>Produzione residua</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style={cellStyle}>Contratto principale</td>
-          <td style={cellStyle}>1 maggio 2025</td>
-          <td style={cellStyle}>€100.000</td>
-          <td style={cellStyle}>€80.000</td>
-          <td style={cellStyle}>€20.000</td>
-        </tr>
-        <tr>
-          <td style={cellStyle}>Preventivo rifacimento tetto</td>
-          <td style={cellStyle}>1 giugno 2025</td>
-          <td style={cellStyle}>€50.000</td>
-          <td style={cellStyle}>€33.850</td>
-          <td style={cellStyle}>€16.150</td>
-        </tr>
-        <tr>
-          <td style={cellStyle} colSpan="2">
-            TOTALI
-          </td>
-          <td style={cellStyle}>€150.000</td>
-          <td style={cellStyle}>€113.850</td>
-          <td style={cellStyle}>€36.150</td>
-        </tr>
-      </tbody>
-    </table>
-    <br />
-    <table style={tableStyle}>
-      <thead>
-        <tr style={{ backgroundColor: "#ddf0e3" }}>
-          <th style={cellStyle}>Lavori</th>
-          <th style={cellStyle}>Importo</th>
-          <th style={cellStyle}>Nodo</th>
-          <th style={cellStyle}>N°</th>
-          <th style={cellStyle}>Data</th>
-          <th style={cellStyle}>Importo</th>
-          <th style={cellStyle}>N°</th>
-          <th style={cellStyle}>Data</th>
-          <th style={cellStyle}>Importo</th>
-          <th style={cellStyle}>Sal non fatturati</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style={cellStyle}>Contratto principale</td>
-          <td style={cellStyle}>€100.000</td>
-          <td style={cellStyle}>fsf</td>
-          <td style={cellStyle}>1</td>
-          <td style={cellStyle}>1 maggio 2025</td>
-          <td style={cellStyle}>€25.000</td>
-          <td style={cellStyle}>1</td>
-          <td style={cellStyle}>1 maggio 2025</td>
-          <td style={cellStyle}>€30.000</td>
-          <td style={cellStyle}>€5.000</td>
-        </tr>
-        <tr>
-          <td style={cellStyle}>Contratto principale</td>
-          <td style={cellStyle}>€100.000</td>
-          <td style={cellStyle}>tsfs</td>
-          <td style={cellStyle}>2</td>
-          <td style={cellStyle}>1 giugno 2025</td>
-          <td style={cellStyle}>€25.000</td>
-          <td style={cellStyle}>2</td>
-          <td style={cellStyle}>1 giugno 2025</td>
-          <td style={cellStyle}>€40.000</td>
-          <td style={cellStyle}>€15.000</td>
-        </tr>
-        <tr>
-          <td style={cellStyle}>Preventivo rifacimento tetto</td>
-          <td style={cellStyle}>€50.000</td>
-          <td style={cellStyle}>fsfsf</td>
-          <td style={cellStyle}>3</td>
-          <td style={cellStyle}>1 giugno 2025</td>
-          <td style={cellStyle}>€25.000</td>
-          <td style={cellStyle}>3</td>
-          <td style={cellStyle}>1 giugno 2025</td>
-          <td style={cellStyle}>€30.000</td>
-          <td style={cellStyle}>€5.000</td>
-        </tr>
-        <tr>
-          <td style={cellStyle} colSpan="2">
-            TOTALI
-          </td>
-          <td style={cellStyle}></td>
-          <td style={cellStyle}></td>
-          <td style={cellStyle}></td>
-          <td style={cellStyle}>€75.000</td>
-          <td style={cellStyle}></td>
-          <td style={cellStyle}></td>
-          <td style={cellStyle}>€100.000</td>
-          <td style={cellStyle}>€25.000</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-);
+  );
+};
 
 const CommessaTecnico = () => {
   const tabsOriginali = [
@@ -1241,7 +1514,6 @@ const CommessaTecnico = () => {
         confirmButtonText: "OK",
       }).then((result) => {
         if (result.isConfirmed) {
-          // Qui metti il codice da eseguire dopo che l'alert è stato chiuso
           console.log("Alert chiuso con OK");
         }
       });
@@ -1251,14 +1523,13 @@ const CommessaTecnico = () => {
   useEffect(() => {
     if (searchTerm.length > 1) {
       const filtered = allCommesse.filter((c) => {
+        const term = searchTerm.toLowerCase();
         return (
-          (c.IdCantiere && c.IdCantiere.toString().includes(searchTerm)) ||
-          (c.RagioneSociale &&
-            c.RagioneSociale.toLowerCase().includes(
-              searchTerm.toLowerCase()
-            )) ||
-          (c.Indirizzo &&
-            c.Indirizzo.toLowerCase().includes(searchTerm.toLowerCase()))
+          (c.IdCantiere &&
+            c.IdCantiere.toString().toLowerCase().includes(term)) ||
+          (c.Codice && c.Codice.toLowerCase().includes(term)) ||
+          (c.RagioneSociale && c.RagioneSociale.toLowerCase().includes(term)) ||
+          (c.Indirizzo && c.Indirizzo.toLowerCase().includes(term))
         );
       });
       setFilteredOptions(filtered.slice(0, 10));
@@ -1431,6 +1702,39 @@ const CruscottoCommessa = ({ commessa }) => {
   const [margineVal, setMargineVal] = useState(0);
   const [dataAggiornamento, setDataAggiornamento] = useState("");
 
+  const [datiGenerali, setDatiGenerali] = useState({
+    statoDinamico: "BLOCCATO",
+  });
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (commessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: commessa.IdCantiere,
+          });
+
+          const statoGrezzo = result;
+          const statoPulito = statoGrezzo.trim().toUpperCase();
+
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+          setDatiGenerali((prev) => ({
+            ...prev,
+            statoDinamico: statoLabel,
+          }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+
+    fetchStato();
+  }, [commessa?.IdCantiere]);
+
   useEffect(() => {
     const fetchGrafico = async () => {
       try {
@@ -1464,7 +1768,7 @@ const CruscottoCommessa = ({ commessa }) => {
         }
 
         const chart = Object.values(datiPerMese).sort((a, b) =>
-          a.month.localeCompare(b.month)
+          a.month.localeCompare(b.month),
         );
         setChartData(chart);
 
@@ -1495,10 +1799,10 @@ const CruscottoCommessa = ({ commessa }) => {
           style={{
             float: "right",
             backgroundColor: (() => {
-              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-              if (stato.includes("chiuso")) return "#d32f2f";
-              if (stato.includes("incorso")) return "#388e3c";
-              return "#fbc02d";
+              const stato = datiGenerali.statoDinamico || "";
+              if (stato === "CHIUSO") return "#d32f2f";
+              if (stato === "APERTO") return "#388e3c";
+              return "#fbc02d"; // BLOCCATO o default
             })(),
             color: "white",
             padding: "0.3rem 1rem",
@@ -1506,12 +1810,7 @@ const CruscottoCommessa = ({ commessa }) => {
             borderRadius: 4,
           }}
         >
-          {(() => {
-            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-            if (stato.includes("chiuso")) return "CHIUSO";
-            if (stato.includes("incorso")) return "APERTO";
-            return "BLOCCATO";
-          })()}
+          {datiGenerali?.statoDinamico || "BLOCCATO"}
         </span>
       </div>
 
@@ -1595,6 +1894,39 @@ const CDP = ({ commessa }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
+  const [datiGenerali, setDatiGenerali] = useState({
+    statoDinamico: "BLOCCATO",
+  });
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (commessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: commessa.IdCantiere,
+          });
+
+          const statoGrezzo = result;
+          const statoPulito = statoGrezzo.trim().toUpperCase();
+
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+          setDatiGenerali((prev) => ({
+            ...prev,
+            statoDinamico: statoLabel,
+          }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+
+    fetchStato();
+  }, [commessa?.IdCantiere]);
+
   useEffect(() => {
     if (commessa?.IdCantiere) {
       CDPService.leggi(commessa.IdCantiere)
@@ -1662,10 +1994,10 @@ const CDP = ({ commessa }) => {
           style={{
             float: "right",
             backgroundColor: (() => {
-              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-              if (stato.includes("chiuso")) return "#d32f2f"; // rosso
-              if (stato.includes("incorso")) return "#388e3c"; // verde
-              return "#fbc02d"; // giallo
+              const stato = datiGenerali.statoDinamico || "";
+              if (stato === "CHIUSO") return "#d32f2f";
+              if (stato === "APERTO") return "#388e3c";
+              return "#fbc02d"; // BLOCCATO o default
             })(),
             color: "white",
             padding: "0.3rem 1rem",
@@ -1673,12 +2005,7 @@ const CDP = ({ commessa }) => {
             borderRadius: 4,
           }}
         >
-          {(() => {
-            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-            if (stato.includes("chiuso")) return "CHIUSO";
-            if (stato.includes("incorso")) return "APERTO";
-            return "BLOCCATO";
-          })()}
+          {datiGenerali?.statoDinamico || "BLOCCATO"}
         </span>
         <br></br>
       </div>
@@ -1884,12 +2211,45 @@ const Approvvigionamenti = ({ commessa }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
+  const [datiGenerali2, setDatiGenerali2] = useState({
+    statoDinamico: "BLOCCATO",
+  });
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (commessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: commessa.IdCantiere,
+          });
+
+          const statoGrezzo = result;
+          const statoPulito = statoGrezzo.trim().toUpperCase();
+
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+          setDatiGenerali2((prev) => ({
+            ...prev,
+            statoDinamico: statoLabel,
+          }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+
+    fetchStato();
+  }, [commessa?.IdCantiere]);
+
   useEffect(() => {
     if (commessa?.IdCantiere) {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err)
+          console.error("Errore nel caricamento approvvigionamenti:", err),
         );
     }
   }, [commessa?.IdCantiere]);
@@ -1956,10 +2316,10 @@ const Approvvigionamenti = ({ commessa }) => {
           style={{
             float: "right",
             backgroundColor: (() => {
-              const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-              if (stato.includes("chiuso")) return "#d32f2f"; // rosso
-              if (stato.includes("incorso")) return "#388e3c"; // verde
-              return "#fbc02d"; // giallo
+              const stato = datiGenerali2?.statoDinamico || "";
+              if (stato === "CHIUSO") return "#d32f2f";
+              if (stato === "APERTO") return "#388e3c";
+              return "#fbc02d"; // BLOCCATO o default
             })(),
             color: "white",
             padding: "0.3rem 1rem",
@@ -1967,12 +2327,7 @@ const Approvvigionamenti = ({ commessa }) => {
             borderRadius: 4,
           }}
         >
-          {(() => {
-            const stato = commessa?.StatoCantiere?.toLowerCase() || "";
-            if (stato.includes("chiuso")) return "CHIUSO";
-            if (stato.includes("incorso")) return "APERTO";
-            return "BLOCCATO";
-          })()}
+          {datiGenerali2?.statoDinamico || "BLOCCATO"}
         </span>
         <br></br>
       </div>
@@ -2209,15 +2564,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?"
+                          "Sei sicuro di voler eliminare questo approvvigionamento?",
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero
+                            editingItem.Numero,
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere
+                            commessa?.IdCantiere,
                           );
                           setRighe(updated);
                           chiudiDrawer();
