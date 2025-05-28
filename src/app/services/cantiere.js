@@ -2,6 +2,24 @@ import axios from "axios";
 import { BASE_URL } from "./api";
 
 const CantiereService = {
+  fattureCommessa: async (data) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/cantieri/righe/contratto/fatture`,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
   contrattoCommessa: async (data) => {
     try {
       const response = await axios.post(

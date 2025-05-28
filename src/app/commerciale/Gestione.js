@@ -400,6 +400,77 @@ const CostiRicavi = ({ commessa }) => {
           </tr>
         </tbody>
       </table>
+
+      {openArchivio && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            width: "400px",
+            height: "100%",
+            backgroundColor: "white",
+            boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+            zIndex: 1000,
+            padding: "1rem",
+            overflowY: "auto",
+          }}
+        >
+          <button
+            onClick={() => setOpenArchivio(false)}
+            style={{
+              float: "right",
+              backgroundColor: "transparent",
+              border: "none",
+              fontSize: "1.2rem",
+              cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+          <h3>Archivio costi/ricavi</h3>
+          {/* Qui puoi mettere i contenuti dell’archivio */}
+          <div>
+            {documentiArchivio.length > 0 ? (
+              <ul>
+                {documentiArchivio.map((doc, idx) => (
+                  <li key={idx}>{doc.nome || "Documento"}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>Nessun documento disponibile.</p>
+            )}
+          </div>
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ textAlign: "right", fontSize: "0.85rem", width: "40%" }}>
+          <div
+            style={{
+              backgroundColor: "#e6f2e6",
+              padding: "0.4rem 0.6rem",
+              marginBottom: 4,
+            }}
+          >
+            <strong>Data aggiornamento</strong>:{" "}
+            <span style={{ float: "right" }}>10 giu. 2025</span>
+          </div>
+          <div
+            style={{
+              backgroundColor: "#e6f2e6",
+              padding: "0.4rem 0.6rem",
+              marginBottom: 4,
+            }}
+          >
+            <strong>Margine di commessa</strong>:{" "}
+            <span style={{ float: "right" }}>€ 20.000</span>
+          </div>
+          <div style={{ backgroundColor: "#e6f2e6", padding: "0.4rem 0.6rem" }}>
+            <strong>Margine %</strong>:{" "}
+            <span style={{ float: "right" }}>20 %</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1121,15 +1192,72 @@ const GestioneContratto = ({ commessa }) => {
   const [datiGenerali2, setDatiGenerali2] = useState({
     statoDinamico: "BLOCCATO",
   });
-  const [contratti, setContratti] = useState([]);
+  const [righeFatture, setRigheFatture] = useState([]);
 
-  const handleChange = (index, field, value) => {
-    const newContratti = [...contratti];
-    newContratti[index] = {
-      ...newContratti[index],
-      [field]: value,
+  const [contratti, setContratti] = useState([]);
+  const [datiContratti, setDatiContratti] = useState([]);
+  const [openArchivio, setOpenArchivio] = useState(false);
+  useEffect(() => {
+    const fetchFatture = async () => {
+      try {
+        const result = await CantiereService.fattureCommessa({
+          Codice: commessa?.IdCantiere,
+        });
+        // Genera righe base per ogni fattura ricevuta
+        const generate = result.map((fattura, idx) => ({
+          Lavoro: "",
+          Nodo: "",
+          Numero1: idx + 1,
+          Data1: "",
+          Importo1: "",
+          Numero2: "",
+          Data2: "",
+          Importo2: "",
+          SalNonFatturato: "",
+          ImportoTEMP: 0,
+          Id: idx + 1,
+          Importo: fattura.Costo || 0, // <-- questa riga è ESSENZIALE
+        }));
+
+        setRigheFatture(generate);
+      } catch (err) {
+        console.error("Errore nel fetch delle fatture:", err);
+      }
     };
-    setContratti(newContratti);
+
+    if (commessa?.IdCantiere) fetchFatture();
+  }, [commessa?.IdCantiere]);
+
+  const totaleImporto1 = righeFatture.reduce(
+    (acc, r) => acc + Number(r.Importo1 || 0),
+    0,
+  );
+  const totaleImporto2 = righeFatture.reduce(
+    (acc, r) => acc + Number(r.Importo2 || 0),
+    0,
+  );
+  const totaleSalNonFatturati = righeFatture.reduce(
+    (acc, r) => acc + Number(r.SalNonFatturato || 0),
+    0,
+  );
+
+  useEffect(() => {
+    const iniziali = contratti.map((c) => {
+      const costo = Number(c?.Costo || 0);
+      const quantita = Number(c?.Quantita || 1);
+      const produzioneTotale = costo * quantita;
+      return {
+        ...c,
+        produzioneTotale,
+        produzioneResidua: produzioneTotale,
+      };
+    });
+    setDatiContratti(iniziali);
+  }, [contratti]);
+  const handleChange = (index, campo, valore) => {
+    const nuovo = [...datiContratti];
+    nuovo[index][campo] = valore;
+    setDatiContratti(nuovo);
   };
 
   const aggiungiRiga = () => {
@@ -1190,6 +1318,21 @@ const GestioneContratto = ({ commessa }) => {
 
     fetchStato();
   }, [commessa?.IdCantiere]);
+
+  const handleRigaFatturaChange = (index, field, value) => {
+    const nuova = [...righeFatture];
+    nuova[index][field] = value;
+
+    // auto-match dell'importo se Lavoro selezionato
+    if (field === "Lavoro") {
+      const contratto = datiContratti.find((c) => c.Descrizione === value);
+      if (contratto) {
+        nuova[index].ImportoTEMP = contratto.Costo;
+      }
+    }
+
+    setRigheFatture(nuova);
+  };
 
   return (
     <div
@@ -1288,23 +1431,23 @@ const GestioneContratto = ({ commessa }) => {
       <table style={tableStyle}>
         <thead>
           <tr style={{ backgroundColor: "#ddf0e3" }}>
-            <th style={cellStyle}>Lavori</th>
+            <th style={{ ...cellStyle, minWidth: "130px" }}>Lavori</th>
+            <th style={{ ...cellStyle, minWidth: "130px" }}>Importo</th>
+            <th style={cellStyle}>Nodo</th>
+            <th style={cellStyle}>N°</th>
             <th style={cellStyle}>Data</th>
             <th style={cellStyle}>Importo</th>
-            <th style={cellStyle}>Produzione totale</th>
-            <th style={cellStyle}>Produzione residua</th>
+            <th style={cellStyle}>N°</th>
+            <th style={cellStyle}>Data</th>
+            <th style={cellStyle}>Importo</th>
+            <th style={cellStyle}>Sal non fatturati</th>
           </tr>
         </thead>
         <tbody>
-          {contratti.map((contratto, index) => {
-            const costo = Number(contratto?.Costo || 0);
-            const quantita = Number(contratto?.Quantita || 1);
-            const produzioneTotale = costo * quantita;
-            const produzioneResidua = produzioneTotale; // Puoi cambiare la logica se serve
-
+          {datiContratti.map((contratto, index) => {
             return (
               <tr key={index}>
-                <td style={cellStyle}>
+                <td style={{ ...cellStyle, minWidth: "130px" }}>
                   <input
                     type="text"
                     value={contratto?.Descrizione || ""}
@@ -1314,6 +1457,28 @@ const GestioneContratto = ({ commessa }) => {
                     style={{ width: "100%" }}
                   />
                 </td>
+
+                <td style={cellStyle}>
+                  €
+                  {Number(contratto?.Costo || 0).toLocaleString("it-IT", {
+                    minimumFractionDigits: 2,
+                  })}
+                </td>
+
+                <td style={cellStyle}>
+                  {/* Nodo (libero da inserire) */}
+                  <input
+                    type="text"
+                    value={contratto?.Nodo || ""}
+                    onChange={(e) =>
+                      handleChange(index, "Nodo", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
+
+                <td style={cellStyle}>{index + 1}</td>
+
                 <td style={cellStyle}>
                   <input
                     type="date"
@@ -1324,64 +1489,65 @@ const GestioneContratto = ({ commessa }) => {
                     style={{ width: "100%" }}
                   />
                 </td>
+
                 <td style={cellStyle}>
                   <input
                     type="number"
                     step="0.01"
-                    value={contratto?.Costo}
+                    value={contratto?.Importo1 || ""}
                     onChange={(e) =>
-                      handleChange(index, "Costo", e.target.value)
+                      handleChange(index, "Importo1", e.target.value)
                     }
                     style={{ width: "100%" }}
                   />
                 </td>
+
                 <td style={cellStyle}>
-                  €
-                  {produzioneTotale.toLocaleString("it-IT", {
-                    minimumFractionDigits: 2,
-                  })}
+                  <input
+                    type="number"
+                    value={contratto?.Numero2 || ""}
+                    onChange={(e) =>
+                      handleChange(index, "Numero2", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
                 </td>
+
                 <td style={cellStyle}>
-                  €
-                  {produzioneResidua.toLocaleString("it-IT", {
-                    minimumFractionDigits: 2,
-                  })}
+                  <input
+                    type="date"
+                    value={contratto?.Data2 || ""}
+                    onChange={(e) =>
+                      handleChange(index, "Data2", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
+
+                <td style={cellStyle}>
+                  <input
+                    type="number"
+                    value={contratto?.Importo2 || ""}
+                    onChange={(e) =>
+                      handleChange(index, "Importo2", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
+
+                <td style={cellStyle}>
+                  <input
+                    type="number"
+                    value={contratto?.SalNonFatturato || ""}
+                    onChange={(e) =>
+                      handleChange(index, "SalNonFatturato", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
                 </td>
               </tr>
             );
           })}
-
-          <tr>
-            <td style={cellStyle} colSpan="2">
-              TOTALI
-            </td>
-            <td style={cellStyle}>
-              €
-              {contratti
-                .reduce((tot, c) => tot + Number(c?.Costo || 0), 0)
-                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-            </td>
-            <td style={cellStyle}>
-              €
-              {contratti
-                .reduce(
-                  (tot, c) =>
-                    tot + Number(c?.Costo || 0) * Number(c?.Quantita || 1),
-                  0,
-                )
-                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-            </td>
-            <td style={cellStyle}>
-              €
-              {contratti
-                .reduce(
-                  (tot, c) =>
-                    tot + Number(c?.Costo || 0) * Number(c?.Quantita || 1),
-                  0,
-                )
-                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-            </td>
-          </tr>
         </tbody>
       </table>
 
@@ -1417,54 +1583,129 @@ const GestioneContratto = ({ commessa }) => {
           </tr>
         </thead>
         <tbody>
+          {righeFatture.map((r, index) => (
+            <tr key={index}>
+              <td style={cellStyle}>
+                <select
+                  value={r.Lavoro}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(index, "Lavoro", e.target.value)
+                  }
+                  style={{ width: "100%" }}
+                >
+                  <option value="">Seleziona</option>
+                  {datiContratti.map((c, i) => (
+                    <option key={i} value={c.Descrizione}>
+                      {c.Descrizione}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td style={cellStyle}>
+                €
+                {Number(r.ImportoTEMP || 0).toLocaleString("it-IT", {
+                  minimumFractionDigits: 2,
+                })}
+              </td>
+              <td style={cellStyle}>
+                <input
+                  type="text"
+                  value={r.Nodo}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(index, "Nodo", e.target.value)
+                  }
+                  style={{ width: "100%" }}
+                />
+              </td>
+              <td style={cellStyle}>{r.Numero1}</td>
+              <td style={cellStyle}>
+                <input
+                  type="date"
+                  value={r.Data1}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(index, "Data1", e.target.value)
+                  }
+                />
+              </td>
+              <td style={cellStyle}>
+                €
+                {Number(r.Importo || 0).toLocaleString("it-IT", {
+                  minimumFractionDigits: 2,
+                })}
+              </td>
+              <td style={cellStyle}>
+                <input
+                  type="number"
+                  value={r.Numero2}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(index, "Numero2", e.target.value)
+                  }
+                />
+              </td>
+              <td style={cellStyle}>
+                <input
+                  type="date"
+                  value={r.Data2}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(index, "Data2", e.target.value)
+                  }
+                />
+              </td>
+              <td style={cellStyle}>
+                <input
+                  type="number"
+                  value={r.Importo2}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(index, "Importo2", e.target.value)
+                  }
+                />
+              </td>
+              <td style={cellStyle}>
+                <input
+                  type="number"
+                  value={r.SalNonFatturato}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(
+                      index,
+                      "SalNonFatturato",
+                      e.target.value,
+                    )
+                  }
+                />
+              </td>
+            </tr>
+          ))}
+
           <tr>
-            <td style={cellStyle}>Contratto principale</td>
-            <td style={cellStyle}>€100.000</td>
-            <td style={cellStyle}>fsf</td>
-            <td style={cellStyle}>1</td>
-            <td style={cellStyle}>1 maggio 2025</td>
-            <td style={cellStyle}>€25.000</td>
-            <td style={cellStyle}>1</td>
-            <td style={cellStyle}>1 maggio 2025</td>
-            <td style={cellStyle}>€30.000</td>
-            <td style={cellStyle}>€5.000</td>
-          </tr>
-          <tr>
-            <td style={cellStyle}>Contratto principale</td>
-            <td style={cellStyle}>€100.000</td>
-            <td style={cellStyle}>tsfs</td>
-            <td style={cellStyle}>2</td>
-            <td style={cellStyle}>1 giugno 2025</td>
-            <td style={cellStyle}>€25.000</td>
-            <td style={cellStyle}>2</td>
-            <td style={cellStyle}>1 giugno 2025</td>
-            <td style={cellStyle}>€40.000</td>
-            <td style={cellStyle}>€15.000</td>
-          </tr>
-          <tr>
-            <td style={cellStyle}>Preventivo rifacimento tetto</td>
-            <td style={cellStyle}>€50.000</td>
-            <td style={cellStyle}>fsfsf</td>
-            <td style={cellStyle}>3</td>
-            <td style={cellStyle}>1 giugno 2025</td>
-            <td style={cellStyle}>€25.000</td>
-            <td style={cellStyle}>3</td>
-            <td style={cellStyle}>1 giugno 2025</td>
-            <td style={cellStyle}>€30.000</td>
-            <td style={cellStyle}>€5.000</td>
-          </tr>
-          <tr>
-            <td style={cellStyle} colSpan="2">
-              TOTALI
+            <td style={cellStyle} colSpan={5}>
+              <strong>TOTALI</strong>
+            </td>
+            <td style={cellStyle}>
+              <strong>
+                €
+                {totaleImporto1.toLocaleString("it-IT", {
+                  minimumFractionDigits: 2,
+                })}
+              </strong>
             </td>
             <td style={cellStyle}></td>
             <td style={cellStyle}></td>
-            <td style={cellStyle}></td>
-            <td style={cellStyle}>€75.000</td>
-            <td style={cellStyle}></td>
-            <td style={cellStyle}></td>
-            <td style={cellStyle}>€100.000</td>
-            <td style={cellStyle}>€25.000</td>
+            <td style={cellStyle}>
+              <strong>
+                €
+                {totaleImporto2.toLocaleString("it-IT", {
+                  minimumFractionDigits: 2,
+                })}
+              </strong>
+            </td>
+            <td style={cellStyle}>
+              <strong>
+                €
+                {totaleSalNonFatturati.toLocaleString("it-IT", {
+                  minimumFractionDigits: 2,
+                })}
+              </strong>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -1472,6 +1713,20 @@ const GestioneContratto = ({ commessa }) => {
   );
 };
 
+const documentiArchivio = [
+  {
+    nome: "CostiRicavi_Maggio2025.xlsx",
+    tipo: "excel",
+    data: "2025-05-10",
+    link: "/download/maggio2025.xlsx",
+  },
+  {
+    nome: "CostiRicavi_Aprile2025.pdf",
+    tipo: "pdf",
+    data: "2025-04-15",
+    link: "/download/aprile2025.pdf",
+  },
+];
 const CommessaTecnico = () => {
   const tabsOriginali = [
     "Dati commessa",
