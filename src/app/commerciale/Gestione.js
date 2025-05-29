@@ -151,7 +151,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
     );
 
     for (const nodo of datiExternal) {
@@ -205,7 +205,7 @@ const CostiRicavi = ({ commessa }) => {
     ...sezioni
       .filter((s) => s.nodo !== "R")
       .flatMap((s) => s.sotto)
-      .map((el) => Number(el.costo) || 0),
+      .map((el) => Number(el.costo) || 0)
   );
 
   return (
@@ -523,7 +523,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
 
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.indirizzo,
+        datiGenerali.indirizzo
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -661,7 +661,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      },
+      }
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -682,26 +682,18 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          indirizzo,
-        )}&format=json&limit=1`,
+          indirizzo
+        )}&format=json&limit=1`
       );
       const data = await res.json();
       if (data.length > 0) {
         const { lat, lon } = data[0];
-
-        // Fallback su una mappa satellite statica generica
-
-        // Proviamo a costruire un'immagine da Wikimedia Maps (stile standard, nessun token)
-
-        // Ma poiché il server di Wikimedia non genera immagini così direttamente,
-        // ci basiamo su OpenStreetMap tile via iframe o non usiamo più un'immagine vera, ma l'iframe mappa stesso.
-
         setZonaImageUrl(
           `https://www.openstreetmap.org/export/embed.html?bbox=${
             lon - 0.005
           },${lat - 0.005},${lon + 0.005},${
             lat + 0.005
-          }&layer=mapnik&marker=${lat},${lon}`,
+          }&layer=mapnik&marker=${lat},${lon}`
         );
       } else {
         setZonaImageUrl(null);
@@ -1188,7 +1180,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
   );
 };
 
-const GestioneContratto = ({ commessa }) => {
+const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   const [datiGenerali2, setDatiGenerali2] = useState({
     statoDinamico: "BLOCCATO",
   });
@@ -1198,12 +1190,12 @@ const GestioneContratto = ({ commessa }) => {
   const [datiContratti, setDatiContratti] = useState([]);
   const totaleImportiManuali = datiContratti.reduce(
     (sum, c) => sum + Number(c.CostoTemp2 || 0),
-    0,
+    0
   );
 
   const totaleProduzioneTotale = datiContratti.reduce(
     (sum, c) => sum + Number(c.produzioneTotale || 0),
-    0,
+    0
   );
 
   const produzioneNonFatturata =
@@ -1267,7 +1259,7 @@ const GestioneContratto = ({ commessa }) => {
   const righeConSalNonFatturato = righeFatture.map((r) => {
     const salNonFatturato = Math.max(
       Number(r.Importo2 || 0) - Number(r.Importo || 0),
-      0,
+      0
     );
     return { ...r, salNonFatturato };
   });
@@ -1353,14 +1345,10 @@ const GestioneContratto = ({ commessa }) => {
 
   const totaleImportiFatture = righeFatture.reduce(
     (sum, r) => sum + Number(r.Importo || 0),
-    0,
+    0
   );
   let residuoFatturare = totaleProduzioneTotale - totaleImportiFatture;
 
-  const percentualeResiduoFatturare =
-    totaleProduzioneTotale > 0
-      ? ((residuoFatturare / totaleProduzioneTotale) * 100).toFixed(2)
-      : "0.00";
   const percentualeFatturazione =
     totaleProduzioneTotale > 0
       ? (() => {
@@ -1380,17 +1368,44 @@ const GestioneContratto = ({ commessa }) => {
 
   const sommaImporto = righeFatture.reduce(
     (sum, r) => sum + parseFloatSafe(r.Importo),
-    0,
+    0
   );
   const sommaImporto2 = righeFatture.reduce(
     (sum, r) => sum + parseFloatSafe(r.Importo2),
-    0,
+    0
   );
 
   const avanzamentoPercentuale =
     sommaImporto > 0 ? (sommaImporto2 / sommaImporto) * 100 : 0;
   const avanzamentoTotale = sommaImporto2;
   const salDaFare = sommaImporto - sommaImporto2;
+
+  useEffect(() => {
+    const totaleImportiManuali = datiContratti.reduce(
+      (sum, c) => sum + Number(c.CostoTemp2 || 0),
+      0
+    );
+    const totaleProduzioneTotale = datiContratti.reduce(
+      (sum, c) => sum + Number(c.produzioneTotale || 0),
+      0
+    );
+    const produzioneResidua = datiContratti.reduce(
+      (sum, c) => sum + Number(c.produzioneResidua || 0),
+      0
+    );
+    const percentualeAvanzamento =
+      totaleProduzioneTotale > 0
+        ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
+        : "0.00";
+    if (onProduzioneUpdate) {
+      onProduzioneUpdate({
+        percentualeAvanzamento,
+        totaleProduzione: totaleImportiManuali,
+        produzioneResidua,
+      });
+    }
+  }, [datiContratti]);
+
   return (
     <div
       style={{
@@ -1704,7 +1719,7 @@ const GestioneContratto = ({ commessa }) => {
                       handleChange(
                         index,
                         "produzioneResidua",
-                        Number(e.target.value),
+                        Number(e.target.value)
                       )
                     }
                     style={{ width: "100%" }}
@@ -1885,7 +1900,7 @@ const GestioneContratto = ({ commessa }) => {
                     handleRigaFatturaChange(
                       i,
                       "Importo2",
-                      Number(e.target.value),
+                      Number(e.target.value)
                     )
                   }
                   style={{ width: "100%" }}
@@ -1955,7 +1970,11 @@ const CommessaTecnico = () => {
     "C.D.P.",
     "Cruscotto di commessa",
   ];
-
+  const [datiProduzione, setDatiProduzione] = useState({
+    percentualeAvanzamento: "0.00",
+    totaleProduzione: 0,
+    produzioneResidua: 0,
+  });
   const [allCommesse, setAllCommesse] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredOptions, setFilteredOptions] = useState([]);
@@ -1977,6 +1996,56 @@ const CommessaTecnico = () => {
     };
     fetchData();
   }, []);
+
+  const [contratti, setContratti] = useState([]);
+  const [datiContratti, setDatiContratti] = useState([]);
+
+  useEffect(() => {
+    if (!selectedCommessa?.IdCantiere) return;
+
+    CantiereService.contrattoCommessa({
+      Codice: selectedCommessa.IdCantiere,
+    }).then((result) => {
+      setContratti(result || []);
+
+      const iniziali = (result || []).map((c) => {
+        const costo = Number(c?.Costo || 0);
+        const quantita = Number(c?.Quantita || 1);
+        const produzioneTotale = costo * quantita;
+        return {
+          ...c,
+          produzioneTotale,
+          produzioneResidua: produzioneTotale,
+        };
+      });
+
+      setDatiContratti(iniziali);
+
+      // Calcolo produzione all’avvio
+      const totaleImportiManuali = iniziali.reduce(
+        (sum, c) => sum + Number(c.CostoTemp2 || 0),
+        0
+      );
+      const totaleProduzioneTotale = iniziali.reduce(
+        (sum, c) => sum + Number(c.produzioneTotale || 0),
+        0
+      );
+      const produzioneResidua = iniziali.reduce(
+        (sum, c) => sum + Number(c.produzioneResidua || 0),
+        0
+      );
+      const percentualeAvanzamento =
+        totaleProduzioneTotale > 0
+          ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
+          : "0.00";
+
+      setDatiProduzione({
+        percentualeAvanzamento,
+        totaleProduzione: totaleImportiManuali,
+        produzioneResidua,
+      });
+    });
+  }, [selectedCommessa?.IdCantiere]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2152,7 +2221,7 @@ const CommessaTecnico = () => {
                     setSelectedCommessa(commessa);
                     localStorage.setItem(
                       "ultimaCommessa",
-                      JSON.stringify(commessa),
+                      JSON.stringify(commessa)
                     ); // <-- salvataggio
                     setSearchTerm("");
                     setFilteredOptions([]);
@@ -2177,7 +2246,13 @@ const CommessaTecnico = () => {
           />
         )}
         {selectedTab === "Gestione contratto" && (
-          <GestioneContratto commessa={selectedCommessa} />
+          <GestioneContratto
+            commessa={selectedCommessa}
+            contratti={contratti}
+            datiContratti={datiContratti}
+            setDatiContratti={setDatiContratti}
+            onProduzioneUpdate={(dati) => setDatiProduzione(dati)}
+          />
         )}
         {selectedTab === "Costi / Ricavi" && (
           <CostiRicavi commessa={selectedCommessa} />
@@ -2187,14 +2262,24 @@ const CommessaTecnico = () => {
         )}
         {selectedTab === "C.D.P." && <CDP commessa={selectedCommessa} />}
         {selectedTab === "Cruscotto di commessa" && (
-          <CruscottoCommessa commessa={selectedCommessa} />
+          <CruscottoCommessa
+            commessa={selectedCommessa}
+            percentualeAvanzamento={datiProduzione.percentualeAvanzamento}
+            totaleProduzione={datiProduzione.totaleProduzione}
+            produzioneResidua={datiProduzione.produzioneResidua}
+          />
         )}
       </div>
     </div>
   );
 };
 
-const CruscottoCommessa = ({ commessa }) => {
+const CruscottoCommessa = ({
+  commessa,
+  percentualeAvanzamento,
+  totaleProduzione,
+  produzioneResidua,
+}) => {
   const [chartData, setChartData] = useState([]);
   const [marginePerc, setMarginePerc] = useState(0);
   const [margineVal, setMargineVal] = useState(0);
@@ -2230,12 +2315,12 @@ const CruscottoCommessa = ({ commessa }) => {
           setRigheFatture(generate);
           const totaleFatture = result.reduce(
             (acc, fattura) => acc + (fattura.Costo || 0),
-            0,
+            0
           );
           setFattureTotali(totaleFatture);
         })
         .catch((err) =>
-          console.error("Errore nel caricamento delle fatture:", err),
+          console.error("Errore nel caricamento delle fatture:", err)
         );
 
       CantiereService.contrattoCommessa({ Codice: commessa.IdCantiere })
@@ -2252,7 +2337,7 @@ const CruscottoCommessa = ({ commessa }) => {
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err),
+          console.error("Errore nel recupero dello stato cantiere:", err)
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.IdCantiere })
@@ -2325,37 +2410,21 @@ const CruscottoCommessa = ({ commessa }) => {
 
   const totaleImportiManuali = datiContratti.reduce(
     (sum, c) => sum + Number(c.CostoTemp2 || 0),
-    0,
+    0
   );
   const totaleProduzioneTotale = datiContratti.reduce(
     (sum, c) => sum + Number(c.produzioneTotale || 0),
-    0,
+    0
   );
-  const produzioneNonFatturata =
-    totaleProduzioneTotale -
-    righeFatture.reduce((sum, r) => sum + Number(r.Importo || 0), 0);
-  const percentualeAvanzamento =
-    totaleProduzioneTotale > 0
-      ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
-      : "0.00";
+
   const sommaImporto = righeFatture.reduce(
     (sum, r) => sum + parseFloatSafe(r.Importo),
-    0,
+    0
   );
   const sommaImporto2 = righeFatture.reduce(
     (sum, r) => sum + parseFloatSafe(r.Importo2),
-    0,
+    0
   );
-  const avanzamentoPercentuale =
-    sommaImporto > 0 ? (sommaImporto2 / sommaImporto) * 100 : 0;
-  const avanzamentoTotale = sommaImporto2;
-  const salDaFare = sommaImporto - sommaImporto2;
-  const residuoFatturare = totaleProduzioneTotale - sommaImporto;
-  const percentualeFatturazione =
-    totaleProduzioneTotale > 0
-      ? ((sommaImporto / totaleImportiManuali) * 100).toFixed(2)
-      : "0.00";
-  const salNonFatturati = sommaImporto2 - sommaImporto;
 
   return (
     <div style={{ padding: "1rem", backgroundColor: "white" }}>
@@ -2424,7 +2493,8 @@ const CruscottoCommessa = ({ commessa }) => {
             fontWeight: "bold",
           }}
         >
-          Margine %<span style={{ marginLeft: "1rem" }}>{marginePerc} %</span>
+          Margine %
+          <span style={{ marginLeft: "1rem" }}>{Math.ceil(marginePerc)} %</span>
         </div>
         <div
           style={{
@@ -2435,7 +2505,7 @@ const CruscottoCommessa = ({ commessa }) => {
         >
           Margine di commessa
           <span style={{ marginLeft: "1rem" }}>
-            € {margineVal.toLocaleString()}
+            € {Math.ceil(Math.abs(margineVal)).toLocaleString()}
           </span>
         </div>
       </div>
@@ -2457,7 +2527,7 @@ const CruscottoCommessa = ({ commessa }) => {
       <div
         style={{
           fontFamily: "Arial, sans-serif",
-          background: "#f5f5f5",
+
           padding: "1rem",
         }}
       >
@@ -2687,20 +2757,8 @@ const CruscottoCommessa = ({ commessa }) => {
             {dataAggiornamento}
           </span>
         </div>
-
-        <div style={{ display: "flex", marginBottom: "1rem" }}>
-          <div
-            style={{
-              width: "25%",
-              background: "#eee",
-              padding: "0.3rem",
-              textAlign: "right",
-              fontWeight: "bold",
-              border: "1px solid #ccc",
-            }}
-          >
-            Avanzamento commessa
-          </div>
+        <div style={{ display: "flex", width: "100%" }}>
+          {/* Avanzamento produzione */}
           <div
             style={{
               width: "50%",
@@ -2711,11 +2769,16 @@ const CruscottoCommessa = ({ commessa }) => {
               border: "1px solid #ccc",
             }}
           >
-            Avanzamento produzione: 75,90% € 113.8544
+            Avanzamento produzione: {percentualeAvanzamento}% €{" "}
+            {Number(totaleProduzione).toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
           </div>
+
+          {/* Lavori residui */}
           <div
             style={{
-              width: "25%",
+              width: "50%",
               background: "#eee",
               padding: "0.3rem",
               textAlign: "center",
@@ -2723,7 +2786,10 @@ const CruscottoCommessa = ({ commessa }) => {
               border: "1px solid #ccc",
             }}
           >
-            Lavori residui: 24,10% € 36.150
+            Lavori residui: €{" "}
+            {Number(produzioneResidua).toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
           </div>
         </div>
 
@@ -2752,8 +2818,6 @@ const CruscottoCommessa = ({ commessa }) => {
 const GraficoCostiMese = ({ chartData, dataAggiornamento }) => {
   return (
     <div style={{ width: "100%", height: 500 }}>
-      <h3>Andamento produzione</h3>
-      <p>Data aggiornamento: {dataAggiornamento}</p>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -3134,7 +3198,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -3449,15 +3513,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
