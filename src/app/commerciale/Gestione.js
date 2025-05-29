@@ -17,11 +17,11 @@ import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
 import dayjs from "dayjs";
-import CDPService from "../services/cdp"; // Assicurati che il file esista con metodi: crea, leggi, aggiorna, elimina
+import CDPService from "../services/cdp";
 import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/it";
-
+import { BarChart, Bar } from "recharts";
 moment.locale("it");
 
 const CustomInput = React.forwardRef(({ value, onClick }, ref) => (
@@ -217,7 +217,7 @@ const CostiRicavi = ({ commessa }) => {
             const stato = datiGenerali?.statoDinamico || "";
             if (stato === "CHIUSO") return "#d32f2f";
             if (stato === "APERTO") return "#388e3c";
-            return "#fbc02d"; // BLOCCATO o default
+            return "#fbc02d";
           })(),
           color: "white",
           padding: "0.3rem 1rem",
@@ -840,7 +840,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 const stato = datiGenerali2?.statoDinamico || "";
                 if (stato === "CHIUSO") return "#d32f2f";
                 if (stato === "APERTO") return "#388e3c";
-                return "#fbc02d"; // BLOCCATO o default
+                return "#fbc02d";
               })(),
               color: "white",
               padding: "0.3rem 1rem",
@@ -1196,7 +1196,6 @@ const GestioneContratto = ({ commessa }) => {
 
   const [contratti, setContratti] = useState([]);
   const [datiContratti, setDatiContratti] = useState([]);
-  const [openArchivio, setOpenArchivio] = useState(false);
   useEffect(() => {
     const fetchFatture = async () => {
       try {
@@ -1226,20 +1225,7 @@ const GestioneContratto = ({ commessa }) => {
     };
 
     if (commessa?.IdCantiere) fetchFatture();
-  }, [commessa?.IdCantiere]);
-
-  const totaleImporto1 = righeFatture.reduce(
-    (acc, r) => acc + Number(r.Importo1 || 0),
-    0,
-  );
-  const totaleImporto2 = righeFatture.reduce(
-    (acc, r) => acc + Number(r.Importo2 || 0),
-    0,
-  );
-  const totaleSalNonFatturati = righeFatture.reduce(
-    (acc, r) => acc + Number(r.SalNonFatturato || 0),
-    0,
-  );
+  }, [commessa.IdCantiere]);
 
   useEffect(() => {
     const iniziali = contratti.map((c) => {
@@ -1323,11 +1309,14 @@ const GestioneContratto = ({ commessa }) => {
     const nuova = [...righeFatture];
     nuova[index][field] = value;
 
-    // auto-match dell'importo se Lavoro selezionato
     if (field === "Lavoro") {
       const contratto = datiContratti.find((c) => c.Descrizione === value);
       if (contratto) {
         nuova[index].ImportoTEMP = contratto.Costo;
+        // Imposta anche la data corrente quando viene selezionato un lavoro
+        const oggi = new Date().toISOString().substring(0, 10);
+        nuova[index].Data1 = oggi;
+        nuova[index].Data2 = oggi;
       }
     }
 
@@ -1349,7 +1338,7 @@ const GestioneContratto = ({ commessa }) => {
             const stato = datiGenerali2?.statoDinamico || "";
             if (stato === "CHIUSO") return "#d32f2f";
             if (stato === "APERTO") return "#388e3c";
-            return "#fbc02d"; // BLOCCATO o default
+            return "#fbc02d";
           })(),
           color: "white",
           padding: "0.3rem 1rem",
@@ -1432,15 +1421,10 @@ const GestioneContratto = ({ commessa }) => {
         <thead>
           <tr style={{ backgroundColor: "#ddf0e3" }}>
             <th style={{ ...cellStyle, minWidth: "130px" }}>Lavori</th>
-            <th style={{ ...cellStyle, minWidth: "130px" }}>Importo</th>
-            <th style={cellStyle}>Nodo</th>
-            <th style={cellStyle}>N°</th>
-            <th style={cellStyle}>Data</th>
             <th style={cellStyle}>Importo</th>
-            <th style={cellStyle}>N°</th>
             <th style={cellStyle}>Data</th>
-            <th style={cellStyle}>Importo</th>
-            <th style={cellStyle}>Sal non fatturati</th>
+            <th style={cellStyle}>Produzione Totale</th>
+            <th style={cellStyle}>Produzione Residua</th>
           </tr>
         </thead>
         <tbody>
@@ -1464,21 +1448,6 @@ const GestioneContratto = ({ commessa }) => {
                     minimumFractionDigits: 2,
                   })}
                 </td>
-
-                <td style={cellStyle}>
-                  {/* Nodo (libero da inserire) */}
-                  <input
-                    type="text"
-                    value={contratto?.Nodo || ""}
-                    onChange={(e) =>
-                      handleChange(index, "Nodo", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-
-                <td style={cellStyle}>{index + 1}</td>
-
                 <td style={cellStyle}>
                   <input
                     type="date"
@@ -1489,62 +1458,8 @@ const GestioneContratto = ({ commessa }) => {
                     style={{ width: "100%" }}
                   />
                 </td>
-
-                <td style={cellStyle}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={contratto?.Importo1 || ""}
-                    onChange={(e) =>
-                      handleChange(index, "Importo1", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-
-                <td style={cellStyle}>
-                  <input
-                    type="number"
-                    value={contratto?.Numero2 || ""}
-                    onChange={(e) =>
-                      handleChange(index, "Numero2", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-
-                <td style={cellStyle}>
-                  <input
-                    type="date"
-                    value={contratto?.Data2 || ""}
-                    onChange={(e) =>
-                      handleChange(index, "Data2", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-
-                <td style={cellStyle}>
-                  <input
-                    type="number"
-                    value={contratto?.Importo2 || ""}
-                    onChange={(e) =>
-                      handleChange(index, "Importo2", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-
-                <td style={cellStyle}>
-                  <input
-                    type="number"
-                    value={contratto?.SalNonFatturato || ""}
-                    onChange={(e) =>
-                      handleChange(index, "SalNonFatturato", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
+                <td style={cellStyle}>€0</td>
+                <td style={cellStyle}>€0</td>
               </tr>
             );
           })}
@@ -1567,144 +1482,154 @@ const GestioneContratto = ({ commessa }) => {
       </button>
       <p></p>
       <br />
-      <table style={tableStyle}>
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontFamily: "Arial, sans-serif",
+          fontSize: "14px",
+          border: "1px solid #ccc",
+        }}
+      >
         <thead>
-          <tr style={{ backgroundColor: "#ddf0e3" }}>
-            <th style={cellStyle}>Lavori</th>
-            <th style={cellStyle}>Importo</th>
-            <th style={cellStyle}>Nodo</th>
-            <th style={cellStyle}>N°</th>
-            <th style={cellStyle}>Data</th>
-            <th style={cellStyle}>Importo</th>
-            <th style={cellStyle}>N°</th>
-            <th style={cellStyle}>Data</th>
-            <th style={cellStyle}>Importo</th>
-            <th style={cellStyle}>Sal non fatturati</th>
+          <tr style={{ backgroundColor: "#e6f0e6", textAlign: "center" }}>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Lavori</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
+              Importo
+            </th>
+            <th
+              colSpan="4"
+              style={{ padding: "8px", border: "1px solid #ccc" }}
+            >
+              FATTURA
+            </th>
+            <th
+              colSpan="3"
+              style={{ padding: "8px", border: "1px solid #ccc" }}
+            >
+              SAL
+            </th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
+              Sal non fatturati
+            </th>
+          </tr>
+          <tr style={{ backgroundColor: "#e6f0e6", textAlign: "center" }}>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}></th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}></th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Nodo</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>N°</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Data</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
+              Importo
+            </th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>N°</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Data</th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
+              Importo
+            </th>
+            <th style={{ padding: "8px", border: "1px solid #ccc" }}></th>
           </tr>
         </thead>
         <tbody>
-          {righeFatture.map((r, index) => (
-            <tr key={index}>
-              <td style={cellStyle}>
+          {righeFatture.map((r, i) => (
+            <tr key={i} style={{ textAlign: "center" }}>
+              <td
+                style={{
+                  padding: "8px",
+                  border: "1px solid #ccc",
+                  textAlign: "left",
+                }}
+              >
                 <select
                   value={r.Lavoro}
                   onChange={(e) =>
-                    handleRigaFatturaChange(index, "Lavoro", e.target.value)
+                    handleRigaFatturaChange(i, "Lavoro", e.target.value)
                   }
-                  style={{ width: "100%" }}
+                  style={{
+                    width: "100%",
+                    padding: "4px",
+                    backgroundColor: "#f5f5f5",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                  }}
                 >
                   <option value="">Seleziona</option>
-                  {datiContratti.map((c, i) => (
-                    <option key={i} value={c.Descrizione}>
-                      {c.Descrizione}
+                  {datiContratti.map((contratto, idx) => (
+                    <option key={idx} value={contratto.Descrizione}>
+                      {contratto.Descrizione}
                     </option>
                   ))}
                 </select>
               </td>
-              <td style={cellStyle}>
-                €
-                {Number(r.ImportoTEMP || 0).toLocaleString("it-IT", {
-                  minimumFractionDigits: 2,
-                })}
+
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                € {Number(r.ImportoTEMP || 0).toLocaleString("it-IT")}
               </td>
-              <td style={cellStyle}>
-                <input
-                  type="text"
-                  value={r.Nodo}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(index, "Nodo", e.target.value)
-                  }
-                  style={{ width: "100%" }}
-                />
+
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                {r.Nodo}
               </td>
-              <td style={cellStyle}>{r.Numero1}</td>
-              <td style={cellStyle}>
-                <input
-                  type="date"
-                  value={r.Data1}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(index, "Data1", e.target.value)
-                  }
-                />
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                {r.Numero1}
               </td>
-              <td style={cellStyle}>
-                €
-                {Number(r.Importo || 0).toLocaleString("it-IT", {
-                  minimumFractionDigits: 2,
-                })}
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                {new Date().toISOString().substring(0, 10)}
               </td>
-              <td style={cellStyle}>
-                <input
-                  type="number"
-                  value={r.Numero2}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(index, "Numero2", e.target.value)
-                  }
-                />
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                € {Number(r.Importo || 0).toLocaleString("it-IT")}
               </td>
-              <td style={cellStyle}>
-                <input
-                  type="date"
-                  value={r.Data2}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(index, "Data2", e.target.value)
-                  }
-                />
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                {r.Numero2}
               </td>
-              <td style={cellStyle}>
-                <input
-                  type="number"
-                  value={r.Importo2}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(index, "Importo2", e.target.value)
-                  }
-                />
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                {new Date().toISOString().substring(0, 10)}
               </td>
-              <td style={cellStyle}>
-                <input
-                  type="number"
-                  value={r.SalNonFatturato}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(
-                      index,
-                      "SalNonFatturato",
-                      e.target.value,
-                    )
-                  }
-                />
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                € {Number(r.Importo2 || 0).toLocaleString("it-IT")}
+              </td>
+              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+                € {Number(r.SalNonFatturato || 0).toLocaleString("it-IT")}
               </td>
             </tr>
           ))}
 
-          <tr>
-            <td style={cellStyle} colSpan={5}>
-              <strong>TOTALI</strong>
+          {/* Calcolo dei totali */}
+          <tr
+            style={{
+              backgroundColor: "#ddd",
+              fontWeight: "bold",
+              textAlign: "center",
+            }}
+          >
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}>TOTALI</td>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+              €{" "}
+              {righeFatture
+                .reduce((sum, r) => sum + Number(r.ImportoTEMP || 0), 0)
+                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </td>
-            <td style={cellStyle}>
-              <strong>
-                €
-                {totaleImporto1.toLocaleString("it-IT", {
-                  minimumFractionDigits: 2,
-                })}
-              </strong>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+              €{" "}
+              {righeFatture
+                .reduce((sum, r) => sum + Number(r.Importo || 0), 0)
+                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </td>
-            <td style={cellStyle}></td>
-            <td style={cellStyle}></td>
-            <td style={cellStyle}>
-              <strong>
-                €
-                {totaleImporto2.toLocaleString("it-IT", {
-                  minimumFractionDigits: 2,
-                })}
-              </strong>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+              €{" "}
+              {righeFatture
+                .reduce((sum, r) => sum + Number(r.Importo2 || 0), 0)
+                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </td>
-            <td style={cellStyle}>
-              <strong>
-                €
-                {totaleSalNonFatturati.toLocaleString("it-IT", {
-                  minimumFractionDigits: 2,
-                })}
-              </strong>
+            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+              €{" "}
+              {righeFatture
+                .reduce((sum, r) => sum + Number(r.SalNonFatturato || 0), 0)
+                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </td>
           </tr>
         </tbody>
@@ -1713,20 +1638,6 @@ const GestioneContratto = ({ commessa }) => {
   );
 };
 
-const documentiArchivio = [
-  {
-    nome: "CostiRicavi_Maggio2025.xlsx",
-    tipo: "excel",
-    data: "2025-05-10",
-    link: "/download/maggio2025.xlsx",
-  },
-  {
-    nome: "CostiRicavi_Aprile2025.pdf",
-    tipo: "pdf",
-    data: "2025-04-15",
-    link: "/download/aprile2025.pdf",
-  },
-];
 const CommessaTecnico = () => {
   const tabsOriginali = [
     "Dati commessa",
@@ -1793,6 +1704,17 @@ const CommessaTecnico = () => {
     }
   }, [searchTerm, allCommesse]);
 
+  useEffect(() => {
+    const ultima = localStorage.getItem("ultimaCommessa");
+    if (ultima) {
+      try {
+        const parsed = JSON.parse(ultima);
+        setSelectedCommessa(parsed);
+      } catch (err) {
+        console.error("Errore parsing commessa da localStorage:", err);
+      }
+    }
+  }, []);
   const handleComplete = (data) => {
     if (!isModalitaNuova) return;
 
@@ -1911,6 +1833,10 @@ const CommessaTecnico = () => {
                   key={commessa.IdCantiere}
                   onClick={() => {
                     setSelectedCommessa(commessa);
+                    localStorage.setItem(
+                      "ultimaCommessa",
+                      JSON.stringify(commessa),
+                    ); // <-- salvataggio
                     setSearchTerm("");
                     setFilteredOptions([]);
                   }}
@@ -1956,10 +1882,31 @@ const CruscottoCommessa = ({ commessa }) => {
   const [marginePerc, setMarginePerc] = useState(0);
   const [margineVal, setMargineVal] = useState(0);
   const [dataAggiornamento, setDataAggiornamento] = useState("");
+  const [fattureTotali, setFattureTotali] = useState(0);
+  const [costiTotali, setCostiTotali] = useState(0);
 
   const [datiGenerali, setDatiGenerali] = useState({
     statoDinamico: "BLOCCATO",
   });
+  useEffect(() => {
+    const fetchFatture = async () => {
+      try {
+        const result = await CantiereService.fattureCommessa({
+          Codice: commessa?.IdCantiere,
+        });
+
+        const totaleFatture = result.reduce(
+          (acc, fattura) => acc + (fattura.Costo || 0),
+          0,
+        );
+        setFattureTotali(totaleFatture);
+      } catch (err) {
+        console.error("Errore nel caricamento delle fatture:", err);
+      }
+    };
+
+    if (commessa?.IdCantiere) fetchFatture();
+  }, [commessa?.IdCantiere]);
 
   useEffect(() => {
     const fetchStato = async () => {
@@ -2021,6 +1968,7 @@ const CruscottoCommessa = ({ commessa }) => {
             ultimaData = mese;
           }
         }
+        setCostiTotali(totaleCosti);
 
         const chart = Object.values(datiPerMese).sort((a, b) =>
           a.month.localeCompare(b.month),
@@ -2057,7 +2005,7 @@ const CruscottoCommessa = ({ commessa }) => {
               const stato = datiGenerali.statoDinamico || "";
               if (stato === "CHIUSO") return "#d32f2f";
               if (stato === "APERTO") return "#388e3c";
-              return "#fbc02d"; // BLOCCATO o default
+              return "#fbc02d";
             })(),
             color: "white",
             padding: "0.3rem 1rem",
@@ -2140,10 +2088,367 @@ const CruscottoCommessa = ({ commessa }) => {
           <Line type="monotone" dataKey="ricavi" stroke="green" name="Ricavi" />
         </LineChart>
       </ResponsiveContainer>
+      <div
+        style={{
+          fontFamily: "Arial, sans-serif",
+          background: "#f5f5f5",
+          padding: "1rem",
+        }}
+      >
+        {/* GESTIONE FINANZIARIA */}
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: "bold",
+            fontSize: "1.2rem",
+            marginBottom: "1rem",
+          }}
+        >
+          Gestione finanziaria
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+          <span
+            style={{
+              background: "#ddd",
+              padding: "0.3rem 1rem",
+              borderRadius: 4,
+            }}
+          >
+            Data aggiornamento
+          </span>
+          <span
+            style={{
+              marginLeft: 10,
+              padding: "0.3rem 1rem",
+              border: "1px solid #ccc",
+              borderRadius: 4,
+            }}
+          >
+            {dataAggiornamento}
+          </span>
+        </div>
+
+        {/* Bars */}
+        {[
+          {
+            label: "Avanzamento commessa",
+            text: "Avanzamento produzione: 75,90%",
+            value: "€ 113.850",
+            barColor: "#b6dfc4",
+            rightLabel: "Produzione non salizzata",
+            rightValue: "€ 13.850",
+            rightBg: "#f5f5f5",
+          },
+          {
+            label: "Avanzamento SAL",
+            text: "Avanzamento SAL: 66,66%",
+            value: "€ 100.000",
+            barColor: "#b6dfc4",
+            rightLabel: "Sal non fatturati",
+            rightValue: "€ 25.000",
+            rightBg: "#f5f5f5",
+          },
+          {
+            label: "Avanzamento fatturazione",
+            text: "Avanzamento fatturazione: 50 %",
+            value: "€ 75.000",
+            barColor: "#b6dfc4",
+            rightLabel: "Produzione non fatturata",
+            rightValue: "€ 33.850",
+            rightBg: "#f6b6b6",
+          },
+        ].map((r, i) => (
+          <div key={i} style={{ display: "flex", marginBottom: "0.5rem" }}>
+            <div
+              style={{
+                width: "15%",
+                background: "#eee",
+                padding: "0.3rem",
+                textAlign: "right",
+                fontWeight: "bold",
+                border: "1px solid #ccc",
+              }}
+            >
+              {r.label}
+            </div>
+            <div
+              style={{
+                width: "55%",
+                background: r.barColor,
+                padding: "0.3rem",
+                textAlign: "center",
+                border: "1px solid #ccc",
+              }}
+            >
+              {r.text} <strong>{r.value}</strong>
+            </div>
+            <div
+              style={{
+                width: "15%",
+                background: r.rightBg,
+                padding: "0.3rem",
+                textAlign: "right",
+                border: "1px solid #ccc",
+              }}
+            >
+              {r.rightLabel}
+            </div>
+            <div
+              style={{
+                width: "15%",
+                background: "#fff",
+                padding: "0.3rem",
+                textAlign: "center",
+                fontWeight: "bold",
+                border: "1px solid #ccc",
+              }}
+            >
+              {r.rightValue}
+            </div>
+          </div>
+        ))}
+
+        {/* ESPOSIZIONE ROW */}
+        <div style={{ display: "flex", marginBottom: "1.5rem" }}>
+          <div
+            style={{
+              width: "15%",
+              background: "#eee",
+              padding: "0.3rem",
+              textAlign: "right",
+              fontWeight: "bold",
+              border: "1px solid #ccc",
+            }}
+          >
+            Esposizione
+          </div>
+          <div
+            style={{
+              width: "20%",
+              background: "#ffe8a1",
+              padding: "0.3rem",
+              textAlign: "center",
+              fontWeight: "bold",
+              border: "1px solid #ccc",
+            }}
+          >
+            € 23.850
+          </div>
+          <div
+            style={{
+              width: "15%",
+              background: "#eee",
+              padding: "0.3rem",
+              textAlign: "right",
+              border: "1px solid #ccc",
+            }}
+          >
+            Costi sostenuti
+          </div>
+          <div
+            style={{
+              width: "20%",
+              background: "#f6b6b6",
+              padding: "0.3rem",
+              textAlign: "center",
+              fontWeight: "bold",
+              border: "1px solid #ccc",
+            }}
+          >
+            €{" "}
+            {costiTotali.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+          </div>
+
+          <div
+            style={{
+              width: "15%",
+              background: "#eee",
+              padding: "0.3rem",
+              textAlign: "right",
+              border: "1px solid #ccc",
+            }}
+          >
+            Fatture emesse
+          </div>
+          <div
+            style={{
+              width: "15%",
+              background: "#d7f0d7",
+              padding: "0.3rem",
+              textAlign: "center",
+              fontWeight: "bold",
+              border: "1px solid #ccc",
+            }}
+          >
+            € {fattureTotali.toLocaleString("it-IT")}
+          </div>
+        </div>
+
+        {/* ANDAMENTO PRODUZIONE */}
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: "bold",
+            fontSize: "1.2rem",
+            marginBottom: "1rem",
+          }}
+        >
+          Andamento produzione
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+          <span
+            style={{
+              background: "#ddd",
+              padding: "0.3rem 1rem",
+              borderRadius: 4,
+            }}
+          >
+            Data aggiornamento
+          </span>
+          <span
+            style={{
+              marginLeft: 10,
+              padding: "0.3rem 1rem",
+              border: "1px solid #ccc",
+              borderRadius: 4,
+            }}
+          >
+            {dataAggiornamento}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", marginBottom: "1rem" }}>
+          <div
+            style={{
+              width: "25%",
+              background: "#eee",
+              padding: "0.3rem",
+              textAlign: "right",
+              fontWeight: "bold",
+              border: "1px solid #ccc",
+            }}
+          >
+            Avanzamento commessa
+          </div>
+          <div
+            style={{
+              width: "50%",
+              background: "#b6dfc4",
+              padding: "0.3rem",
+              textAlign: "center",
+              fontWeight: "bold",
+              border: "1px solid #ccc",
+            }}
+          >
+            Avanzamento produzione: 75,90% € 113.850
+          </div>
+          <div
+            style={{
+              width: "25%",
+              background: "#eee",
+              padding: "0.3rem",
+              textAlign: "center",
+              fontWeight: "bold",
+              border: "1px solid #ccc",
+            }}
+          >
+            Lavori residui: 24,10% € 36.150
+          </div>
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            borderTop: "1px solid #ccc",
+            paddingTop: "1rem",
+            textAlign: "center",
+            color: "gray",
+          }}
+        >
+          {/* Placeholder grafico */}
+          <div style={{ fontStyle: "italic" }}>
+            <GraficoCostiMese commessa={commessa} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
+const GraficoCostiMese = ({ commessa }) => {
+  const [chartData, setChartData] = useState([]);
+  const [dataAggiornamento, setDataAggiornamento] = useState("");
+
+  useEffect(() => {
+    const fetchGrafico = async () => {
+      try {
+        const dati = await CantiereService.graficoCommessa({
+          Codice: commessa.IdCantiere,
+        });
+
+        const datiPerMese = {};
+        let ultimaData = null;
+
+        for (const voce of dati) {
+          const mese = voce.MeseAnno;
+          if (!datiPerMese[mese]) {
+            datiPerMese[mese] = { month: mese, costi: 0 };
+          }
+
+          if (voce.Descrizione.toLowerCase() === "costi") {
+            datiPerMese[mese].costi += voce.CostoTotale;
+          }
+
+          if (!ultimaData || dayjs(mese) > dayjs(ultimaData)) {
+            ultimaData = mese;
+          }
+        }
+
+        const chart = Object.values(datiPerMese).sort((a, b) =>
+          a.month.localeCompare(b.month),
+        );
+
+        // Formatta i mesi tipo "gen-25", "feb-25", ecc.
+        const chartFormatted = chart.map((el) => ({
+          ...el,
+          label: dayjs(el.month).format("MMM-YY"),
+        }));
+
+        setChartData(chartFormatted);
+        setDataAggiornamento(dayjs(ultimaData).format("DD MMMM YYYY"));
+      } catch (error) {
+        console.error("Errore caricamento dati grafico:", error);
+      }
+    };
+
+    if (commessa?.IdCantiere) fetchGrafico();
+  }, [commessa]);
+
+  return (
+    <div style={{ width: "100%", height: 500 }}>
+      <h3>Andamento produzione</h3>
+      <p>Data aggiornamento: {dataAggiornamento}</p>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="label" />
+          <YAxis />
+          <Tooltip
+            formatter={(value) =>
+              new Intl.NumberFormat("it-IT", {
+                style: "currency",
+                currency: "EUR",
+              }).format(value)
+            }
+          />
+          <Bar dataKey="costi" fill="#90D19C" name="Costi mese" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 const CDP = ({ commessa }) => {
   const [righe, setRighe] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -2252,7 +2557,7 @@ const CDP = ({ commessa }) => {
               const stato = datiGenerali.statoDinamico || "";
               if (stato === "CHIUSO") return "#d32f2f";
               if (stato === "APERTO") return "#388e3c";
-              return "#fbc02d"; // BLOCCATO o default
+              return "#fbc02d";
             })(),
             color: "white",
             padding: "0.3rem 1rem",
@@ -2574,7 +2879,7 @@ const Approvvigionamenti = ({ commessa }) => {
               const stato = datiGenerali2?.statoDinamico || "";
               if (stato === "CHIUSO") return "#d32f2f";
               if (stato === "APERTO") return "#388e3c";
-              return "#fbc02d"; // BLOCCATO o default
+              return "#fbc02d";
             })(),
             color: "white",
             padding: "0.3rem 1rem",
