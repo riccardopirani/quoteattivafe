@@ -1196,6 +1196,25 @@ const GestioneContratto = ({ commessa }) => {
 
   const [contratti, setContratti] = useState([]);
   const [datiContratti, setDatiContratti] = useState([]);
+  const totaleImportiManuali = datiContratti.reduce(
+    (sum, c) => sum + Number(c.CostoTemp2 || 0),
+    0,
+  );
+
+  const totaleProduzioneTotale = datiContratti.reduce(
+    (sum, c) => sum + Number(c.produzioneTotale || 0),
+    0,
+  );
+
+  const produzioneNonFatturata =
+    totaleProduzioneTotale -
+    righeFatture.reduce((sum, r) => sum + Number(r.Importo || 0), 0);
+
+  const percentualeAvanzamento =
+    totaleProduzioneTotale > 0
+      ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
+      : "0.00";
+
   useEffect(() => {
     const fetchFatture = async () => {
       try {
@@ -1210,9 +1229,9 @@ const GestioneContratto = ({ commessa }) => {
           Data1: "",
           Importo1: "",
           Numero2: "",
+          CostoTemp2: "",
           Data2: "",
           Importo2: "",
-          SalNonFatturato: "",
           ImportoTEMP: 0,
           Id: idx + 1,
           Importo: fattura.Costo || 0, // <-- questa riga è ESSENZIALE
@@ -1245,7 +1264,13 @@ const GestioneContratto = ({ commessa }) => {
     nuovo[index][campo] = valore;
     setDatiContratti(nuovo);
   };
-
+  const righeConSalNonFatturato = righeFatture.map((r) => {
+    const salNonFatturato = Math.max(
+      Number(r.Importo2 || 0) - Number(r.Importo || 0),
+      0,
+    );
+    return { ...r, salNonFatturato };
+  });
   const aggiungiRiga = () => {
     setContratti([
       ...contratti,
@@ -1304,6 +1329,9 @@ const GestioneContratto = ({ commessa }) => {
 
     fetchStato();
   }, [commessa?.IdCantiere]);
+  const salNonFatturati =
+    righeFatture.reduce((sum, r) => sum + Number(r.Importo2 || 0), 0) -
+    righeFatture.reduce((sum, r) => sum + Number(r.Importo || 0), 0);
 
   const handleRigaFatturaChange = (index, field, value) => {
     const nuova = [...righeFatture];
@@ -1313,7 +1341,7 @@ const GestioneContratto = ({ commessa }) => {
       const contratto = datiContratti.find((c) => c.Descrizione === value);
       if (contratto) {
         nuova[index].ImportoTEMP = contratto.Costo;
-        // Imposta anche la data corrente quando viene selezionato un lavoro
+        nuova[index].CostoTemp2 = contratto.CostoTemp2; // <--- AGGIUNGI QUESTO
         const oggi = new Date().toISOString().substring(0, 10);
         nuova[index].Data1 = oggi;
         nuova[index].Data2 = oggi;
@@ -1323,6 +1351,46 @@ const GestioneContratto = ({ commessa }) => {
     setRigheFatture(nuova);
   };
 
+  const totaleImportiFatture = righeFatture.reduce(
+    (sum, r) => sum + Number(r.Importo || 0),
+    0,
+  );
+  let residuoFatturare = totaleProduzioneTotale - totaleImportiFatture;
+
+  const percentualeResiduoFatturare =
+    totaleProduzioneTotale > 0
+      ? ((residuoFatturare / totaleProduzioneTotale) * 100).toFixed(2)
+      : "0.00";
+  const percentualeFatturazione =
+    totaleProduzioneTotale > 0
+      ? (() => {
+          const result = (totaleImportiFatture / totaleImportiManuali) * 100;
+          if (!isFinite(result)) return "100.00"; // se infinito o NaN
+          return result.toFixed(2);
+        })()
+      : "0.00";
+
+  const parseFloatSafe = (val) => {
+    if (typeof val === "number") return val;
+    if (!val || typeof val !== "string") return 0;
+    const clean = val.replace(/\./g, "").replace(",", ".");
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const sommaImporto = righeFatture.reduce(
+    (sum, r) => sum + parseFloatSafe(r.Importo),
+    0,
+  );
+  const sommaImporto2 = righeFatture.reduce(
+    (sum, r) => sum + parseFloatSafe(r.Importo2),
+    0,
+  );
+
+  const avanzamentoPercentuale =
+    sommaImporto > 0 ? (sommaImporto2 / sommaImporto) * 100 : 0;
+  const avanzamentoTotale = sommaImporto2;
+  const salDaFare = sommaImporto - sommaImporto2;
   return (
     <div
       style={{
@@ -1356,73 +1424,233 @@ const GestioneContratto = ({ commessa }) => {
         {commessa?.Indirizzo || ""}
       </div>
 
-      <div style={{ marginBottom: "1rem" }}>
-        <div style={{ display: "flex", marginBottom: "0.5rem" }}>
-          <div style={{ flex: 1 }}>Avanzamento commessa</div>
+      <div style={{ marginBottom: "2rem", fontFamily: "Arial, sans-serif" }}>
+        {/* Avanzamento Commessa */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            borderRadius: "12px",
+            overflow: "hidden",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+            marginBottom: "1rem",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              backgroundColor: "#f9f9f9",
+              padding: "1rem",
+              fontWeight: "bold",
+              color: "#444",
+              borderRight: "1px solid #eee",
+            }}
+          >
+            Avanzamento commessa
+          </div>
           <div
             style={{
               flex: 5,
               background: "#4caf50",
-              color: "white",
+              color: "rgb(0, 0, 0)", // nero in RGB
               textAlign: "center",
+              padding: "1rem",
+              fontWeight: "600",
             }}
           >
-            Avanzamento produzione: 75,90% €113.850
+            Avanzamento produzione: {percentualeAvanzamento}% €{" "}
+            {totaleImportiManuali.toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
           </div>
-          <div style={{ flex: 2, background: "#c8e6c9" }}>
-            Lavori residui: 24,10% €36.150
+          <div
+            style={{
+              flex: 2,
+              background: "#c8e6c9",
+              padding: "1rem",
+              fontWeight: "600",
+              textAlign: "center",
+              color: "#2e7d32",
+            }}
+          >
+            Lavori residui: €{" "}
+            {datiContratti
+              .reduce((sum, c) => sum + Number(c.produzioneResidua || 0), 0)
+              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
           </div>
         </div>
-        <div style={{ display: "flex", marginBottom: "0.5rem" }}>
-          <div style={{ flex: 1 }}>Avanzamento SAL</div>
-          <div style={{ flex: 5, background: "#a5d6a7", textAlign: "center" }}>
-            Avanzamento SAL: 66,66% €100.000
+
+        {/* Avanzamento SAL */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            borderRadius: "12px",
+            overflow: "hidden",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+            marginBottom: "1rem",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              backgroundColor: "#f9f9f9",
+              padding: "1rem",
+              fontWeight: "bold",
+              color: "#444",
+              borderRight: "1px solid #eee",
+            }}
+          >
+            Avanzamento SAL
           </div>
-          <div style={{ flex: 2, background: "#ef9a9a" }}>
-            SAL da fare: 33,34% €50.000
+          <div
+            style={{
+              flex: 5,
+              background: "#a5d6a7",
+              textAlign: "center",
+              padding: "1rem",
+              fontWeight: "600",
+            }}
+          >
+            Avanzamento SAL: {avanzamentoPercentuale.toFixed(2)}% €
+            {avanzamentoTotale.toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
+          </div>
+          <div
+            style={{
+              flex: 2,
+              background: "#ef9a9a",
+              padding: "1rem",
+              fontWeight: "600",
+              textAlign: "center",
+              color: "#b71c1c",
+            }}
+          >
+            SAL da fare: €
+            {salDaFare.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
           </div>
         </div>
-        <div style={{ display: "flex", marginBottom: "0.5rem" }}>
-          <div style={{ flex: 1 }}>Avanzamento fatturazione</div>
-          <div style={{ flex: 5, background: "#81c784", textAlign: "center" }}>
-            Avanzamento fatturazione: 50% €75.000
+
+        {/* Avanzamento Fatturazione */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            borderRadius: "12px",
+            overflow: "hidden",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+            marginBottom: "1rem",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              backgroundColor: "#f9f9f9",
+              padding: "1rem",
+              fontWeight: "bold",
+              color: "#444",
+              borderRight: "1px solid #eee",
+            }}
+          >
+            Avanzamento fatturazione
           </div>
-          <div style={{ flex: 2, background: "#e0e0e0" }}>
-            Residuo da fatturare: 50% €75.000
+          <div
+            style={{
+              flex: 5,
+              background: "#81c784",
+              textAlign: "center",
+              padding: "1rem",
+              fontWeight: "600",
+            }}
+          >
+            Avanzamento fatturazione: {percentualeFatturazione}% €{" "}
+            {totaleImportiFatture.toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
+          </div>
+
+          <div
+            style={{
+              flex: 2,
+              background: "#e0e0e0",
+              padding: "1rem",
+              fontWeight: "600",
+              textAlign: "center",
+              color: "#424242",
+            }}
+          >
+            Residuo fatturare:
+            {residuoFatturare.toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
+          </div>
+        </div>
+
+        {/* Box sotto */}
+        <div style={{ display: "flex", gap: "1rem" }}>
+          <div
+            style={{
+              flex: 1,
+              background: "#ffcc80",
+              padding: "1rem",
+              textAlign: "center",
+              fontWeight: "bold",
+              fontSize: "1rem",
+              borderRadius: "12px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+              color: "#6d4c41",
+            }}
+          >
+            PRODUZIONE NON FATTURATA €{" "}
+            {produzioneNonFatturata.toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              background: "#f44336",
+              padding: "1rem",
+              textAlign: "center",
+              fontWeight: "bold",
+              fontSize: "1rem",
+              borderRadius: "12px",
+              color: "white",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+            }}
+          >
+            SAL NON FATTURATI €{" "}
+            {salNonFatturati.toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", marginBottom: "1rem" }}>
-        <div
-          style={{
-            flex: 1,
-            background: "#ffcc80",
-            padding: "0.5rem",
-            textAlign: "center",
-            fontWeight: "bold",
-          }}
-        >
-          PRODUZIONE NON FATTURATA €38.850
-        </div>
-        <div
-          style={{
-            flex: 1,
-            background: "#f44336",
-            color: "white",
-            padding: "0.5rem",
-            textAlign: "center",
-            fontWeight: "bold",
-          }}
-        >
-          SAL NON FATTURATI €25.000
-        </div>
-      </div>
+
       <table style={tableStyle}>
         <thead>
+          <tr>
+            <th
+              colSpan={5}
+              style={{
+                backgroundColor: "#ddf0e3", // verde
+                color: "rgb(0, 0, 0)", // nero in RGB
+                textAlign: "center",
+                fontWeight: "bold",
+                fontSize: "18px",
+                padding: "10px",
+              }}
+            >
+              Avanzamento Produzione
+            </th>
+          </tr>
           <tr style={{ backgroundColor: "#ddf0e3" }}>
             <th style={{ ...cellStyle, minWidth: "130px" }}>Lavori</th>
-            <th style={cellStyle}>Importo</th>
             <th style={cellStyle}>Data</th>
+            <th style={cellStyle}>Importo</th>
+
             <th style={cellStyle}>Produzione Totale</th>
             <th style={cellStyle}>Produzione Residua</th>
           </tr>
@@ -1441,13 +1669,6 @@ const GestioneContratto = ({ commessa }) => {
                     style={{ width: "100%" }}
                   />
                 </td>
-
-                <td style={cellStyle}>
-                  €
-                  {Number(contratto?.Costo || 0).toLocaleString("it-IT", {
-                    minimumFractionDigits: 2,
-                  })}
-                </td>
                 <td style={cellStyle}>
                   <input
                     type="date"
@@ -1458,12 +1679,69 @@ const GestioneContratto = ({ commessa }) => {
                     style={{ width: "100%" }}
                   />
                 </td>
-                <td style={cellStyle}>€0</td>
-                <td style={cellStyle}>€0</td>
+                <td style={cellStyle}>
+                  <input
+                    type="text"
+                    value={contratto?.CostoTemp2 || ""}
+                    onChange={(e) =>
+                      handleChange(index, "CostoTemp2", e.target.value)
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
+
+                <td style={cellStyle}>
+                  €
+                  {Number(contratto?.Costo || 0).toLocaleString("it-IT", {
+                    minimumFractionDigits: 2,
+                  })}
+                </td>
+                <td style={cellStyle}>
+                  <input
+                    type="number"
+                    value={contratto?.produzioneResidua || ""}
+                    onChange={(e) =>
+                      handleChange(
+                        index,
+                        "produzioneResidua",
+                        Number(e.target.value),
+                      )
+                    }
+                    style={{ width: "100%" }}
+                  />
+                </td>
               </tr>
             );
           })}
         </tbody>
+        <tr
+          style={{
+            backgroundColor: "#ddd",
+            fontWeight: "bold",
+            textAlign: "center",
+          }}
+        >
+          <td style={{ padding: "8px", border: "1px solid #ccc" }}>TOTALI</td>
+          <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+          <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+            €{" "}
+            {datiContratti
+              .reduce((sum, r) => sum + Number(r.CostoTemp2 || 0), 0)
+              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+          </td>
+          <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+            €{" "}
+            {datiContratti
+              .reduce((sum, r) => sum + Number(r.Costo || 0), 0)
+              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+          </td>
+          <td style={{ padding: "8px", border: "1px solid #ccc" }}>
+            €{" "}
+            {datiContratti
+              .reduce((sum, r) => sum + Number(r.produzioneResidua || 0), 0)
+              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+          </td>
+        </tr>
       </table>
 
       <button
@@ -1531,7 +1809,7 @@ const GestioneContratto = ({ commessa }) => {
           </tr>
         </thead>
         <tbody>
-          {righeFatture.map((r, i) => (
+          {righeConSalNonFatturato.map((r, i) => (
             <tr key={i} style={{ textAlign: "center" }}>
               <td
                 style={{
@@ -1563,7 +1841,7 @@ const GestioneContratto = ({ commessa }) => {
               </td>
 
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                € {Number(r.ImportoTEMP || 0).toLocaleString("it-IT")}
+                € {Number(r.CostoTemp2 || 0).toLocaleString("it-IT")}
               </td>
 
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
@@ -1573,27 +1851,55 @@ const GestioneContratto = ({ commessa }) => {
                 {r.Numero1}
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                {new Date().toISOString().substring(0, 10)}
+                {r.Data1 || ""}
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
                 € {Number(r.Importo || 0).toLocaleString("it-IT")}
               </td>
+
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                {r.Numero2}
+                <input
+                  type="text"
+                  value={r.Numero2 || ""}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(i, "Numero2", e.target.value)
+                  }
+                  style={{ width: "100%" }}
+                />
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                {new Date().toISOString().substring(0, 10)}
+                <input
+                  type="date"
+                  value={r.Data2 || ""}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(i, "Data2", e.target.value)
+                  }
+                  style={{ width: "100%" }}
+                />
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                € {Number(r.Importo2 || 0).toLocaleString("it-IT")}
+                <input
+                  type="number"
+                  value={r.Importo2 || ""}
+                  onChange={(e) =>
+                    handleRigaFatturaChange(
+                      i,
+                      "Importo2",
+                      Number(e.target.value),
+                    )
+                  }
+                  style={{ width: "100%" }}
+                />
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                € {Number(r.SalNonFatturato || 0).toLocaleString("it-IT")}
+                €{" "}
+                {(
+                  parseFloatSafe(r.Importo2) - parseFloatSafe(r.Importo)
+                ).toLocaleString("it-IT", { minimumFractionDigits: 2 })}
               </td>
             </tr>
           ))}
 
-          {/* Calcolo dei totali */}
           <tr
             style={{
               backgroundColor: "#ddd",
@@ -1605,20 +1911,17 @@ const GestioneContratto = ({ commessa }) => {
             <td style={{ padding: "8px", border: "1px solid #ccc" }}>
               €{" "}
               {righeFatture
-                .reduce((sum, r) => sum + Number(r.ImportoTEMP || 0), 0)
+                .reduce((sum, r) => sum + Number(r.CostoTemp2 || 0), 0)
                 .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+            <td colSpan={3}></td>
             <td style={{ padding: "8px", border: "1px solid #ccc" }}>
               €{" "}
               {righeFatture
                 .reduce((sum, r) => sum + Number(r.Importo || 0), 0)
                 .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
+            <td colSpan={2}></td>
             <td style={{ padding: "8px", border: "1px solid #ccc" }}>
               €{" "}
               {righeFatture
@@ -1628,7 +1931,12 @@ const GestioneContratto = ({ commessa }) => {
             <td style={{ padding: "8px", border: "1px solid #ccc" }}>
               €{" "}
               {righeFatture
-                .reduce((sum, r) => sum + Number(r.SalNonFatturato || 0), 0)
+                .reduce((sum, r) => {
+                  const importo2 = parseFloatSafe(r?.Importo2);
+                  const importo = parseFloatSafe(r?.Importo);
+                  const diff = importo2 - importo;
+                  return sum + (isNaN(diff) ? 0 : diff);
+                }, 0)
                 .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </td>
           </tr>
@@ -1787,25 +2095,34 @@ const CommessaTecnico = () => {
             marginBottom: "1rem",
           }}
         >
-          {tabsVisibili.map((label) => (
-            <div
-              key={label}
-              onClick={() => setSelectedTab(label)}
-              style={{
-                cursor: "pointer",
-                display: "table-cell",
-                textAlign: "center",
-                border: "1px solid gray",
-                backgroundColor: selectedTab === label ? "#e3ede5" : "#f5f5f5", // aggiornato
-                fontSize: "0.9rem",
-                padding: "0.4rem 0",
-                fontWeight: selectedTab === label ? "bold" : "normal",
-                color: "#333",
-              }}
-            >
-              {label}
-            </div>
-          ))}
+          {tabsVisibili.map((label) => {
+            const isDisabled = !selectedCommessa;
+            return (
+              <div
+                key={label}
+                onClick={() => {
+                  if (!isDisabled) setSelectedTab(label);
+                }}
+                style={{
+                  cursor: isDisabled ? "not-allowed" : "pointer",
+                  display: "table-cell",
+                  textAlign: "center",
+                  border: "1px solid gray",
+                  backgroundColor:
+                    selectedTab === label && !isDisabled
+                      ? "#e3ede5"
+                      : "#f5f5f5",
+                  fontSize: "0.9rem",
+                  padding: "0.4rem 0",
+                  fontWeight: selectedTab === label ? "bold" : "normal",
+                  color: isDisabled ? "#aaa" : "#333",
+                  pointerEvents: isDisabled ? "none" : "auto",
+                }}
+              >
+                {label}
+              </div>
+            );
+          })}
         </div>
         <div style={{ marginBottom: "1rem" }}>
           <input
@@ -1888,115 +2205,157 @@ const CruscottoCommessa = ({ commessa }) => {
   const [datiGenerali, setDatiGenerali] = useState({
     statoDinamico: "BLOCCATO",
   });
-  useEffect(() => {
-    const fetchFatture = async () => {
-      try {
-        const result = await CantiereService.fattureCommessa({
-          Codice: commessa?.IdCantiere,
-        });
+  const [contratti, setContratti] = useState([]);
+  const [datiContratti, setDatiContratti] = useState([]);
+  const [righeFatture, setRigheFatture] = useState([]);
 
-        const totaleFatture = result.reduce(
-          (acc, fattura) => acc + (fattura.Costo || 0),
-          0,
+  useEffect(() => {
+    if (commessa?.IdCantiere) {
+      CantiereService.fattureCommessa({ Codice: commessa.IdCantiere })
+        .then((result) => {
+          const generate = result.map((fattura, idx) => ({
+            Lavoro: "",
+            Nodo: "",
+            Numero1: idx + 1,
+            Data1: "",
+            Importo1: "",
+            Numero2: "",
+            CostoTemp2: "",
+            Data2: "",
+            Importo2: "",
+            ImportoTEMP: 0,
+            Id: idx + 1,
+            Importo: fattura.Costo || 0,
+          }));
+          setRigheFatture(generate);
+          const totaleFatture = result.reduce(
+            (acc, fattura) => acc + (fattura.Costo || 0),
+            0,
+          );
+          setFattureTotali(totaleFatture);
+        })
+        .catch((err) =>
+          console.error("Errore nel caricamento delle fatture:", err),
         );
-        setFattureTotali(totaleFatture);
-      } catch (err) {
-        console.error("Errore nel caricamento delle fatture:", err);
-      }
-    };
 
-    if (commessa?.IdCantiere) fetchFatture();
-  }, [commessa?.IdCantiere]);
+      CantiereService.contrattoCommessa({ Codice: commessa.IdCantiere })
+        .then((result) => setContratti(result || []))
+        .catch((err) => console.error("Errore nel fetch dei contratti:", err));
 
-  useEffect(() => {
-    const fetchStato = async () => {
-      if (commessa?.IdCantiere) {
-        try {
-          const result = await CantiereService.statoCommessa({
-            Codice: commessa.IdCantiere,
-          });
-
-          const statoGrezzo = result;
-          const statoPulito = statoGrezzo.trim().toUpperCase();
-
+      CantiereService.statoCommessa({ Codice: commessa.IdCantiere })
+        .then((result) => {
+          const statoPulito = result.trim().toUpperCase();
           let statoLabel = "BLOCCATO";
           if (statoPulito.includes("A")) statoLabel = "APERTO";
           else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
           else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+          setDatiGenerali({ statoDinamico: statoLabel });
+        })
+        .catch((err) =>
+          console.error("Errore nel recupero dello stato cantiere:", err),
+        );
 
-          setDatiGenerali((prev) => ({
-            ...prev,
-            statoDinamico: statoLabel,
-          }));
-        } catch (error) {
-          console.error("Errore nel recupero dello stato cantiere:", error);
-        }
-      }
-    };
+      CantiereService.graficoCommessa({ Codice: commessa.IdCantiere })
+        .then((dati) => {
+          const datiPerMese = {};
+          let totaleCosti = 0;
+          let totaleRicavi = 0;
+          let ultimaData = null;
 
-    fetchStato();
-  }, [commessa?.IdCantiere]);
+          for (const voce of dati) {
+            const mese = voce.MeseAnno;
+            if (!datiPerMese[mese]) {
+              datiPerMese[mese] = { month: mese, costi: 0, ricavi: 0 };
+            }
+
+            if (voce.Descrizione.toLowerCase() === "costi") {
+              datiPerMese[mese].costi += voce.CostoTotale;
+              totaleCosti += voce.CostoTotale;
+            } else if (voce.Descrizione.toLowerCase() === "ricavi") {
+              datiPerMese[mese].ricavi += voce.CostoTotale;
+              totaleRicavi += voce.CostoTotale;
+            }
+
+            if (!ultimaData || dayjs(mese).isAfter(dayjs(ultimaData))) {
+              ultimaData = mese;
+            }
+          }
+
+          const margine = totaleRicavi - totaleCosti;
+          const perc = totaleRicavi
+            ? ((margine / totaleRicavi) * 100).toFixed(2)
+            : 0;
+
+          setCostiTotali(totaleCosti);
+          setMargineVal(margine);
+          setMarginePerc(perc);
+          setDataAggiornamento(dayjs(ultimaData).format("DD MMM YYYY"));
+
+          const chart = Object.values(datiPerMese)
+            .sort((a, b) => a.month.localeCompare(b.month))
+            .map((el) => ({ ...el, label: dayjs(el.month).format("MMM-YY") }));
+
+          setChartData(chart);
+        })
+        .catch((err) => console.error("Errore caricamento dati grafico:", err));
+    }
+  }, [commessa]);
 
   useEffect(() => {
-    const fetchGrafico = async () => {
-      try {
-        const dati = await CantiereService.graficoCommessa({
-          Codice: commessa.IdCantiere,
-        });
+    const iniziali = contratti.map((c) => {
+      const costo = Number(c?.Costo || 0);
+      const quantita = Number(c?.Quantita || 1);
+      const produzioneTotale = costo * quantita;
+      return {
+        ...c,
+        produzioneTotale,
+        produzioneResidua: produzioneTotale,
+      };
+    });
+    setDatiContratti(iniziali);
+  }, [contratti]);
 
-        const datiPerMese = {};
+  const parseFloatSafe = (val) => {
+    if (typeof val === "number") return val;
+    if (!val || typeof val !== "string") return 0;
+    const clean = val.replace(/\./g, "").replace(",", ".");
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
-        let totaleCosti = 0;
-        let totaleRicavi = 0;
-        let ultimaData = null;
-
-        for (const voce of dati) {
-          const mese = voce.MeseAnno;
-          if (!datiPerMese[mese]) {
-            datiPerMese[mese] = { month: mese, costi: 0, ricavi: 0 };
-          }
-
-          if (voce.Descrizione.toLowerCase() === "costi") {
-            datiPerMese[mese].costi += voce.CostoTotale;
-            totaleCosti += voce.CostoTotale;
-          } else if (voce.Descrizione.toLowerCase() === "ricavi") {
-            datiPerMese[mese].ricavi += voce.CostoTotale;
-            totaleRicavi += voce.CostoTotale;
-          }
-
-          if (!ultimaData || dayjs(mese) > dayjs(ultimaData)) {
-            ultimaData = mese;
-          }
-        }
-        setCostiTotali(totaleCosti);
-
-        const chart = Object.values(datiPerMese).sort((a, b) =>
-          a.month.localeCompare(b.month),
-        );
-        setChartData(chart);
-
-        const margine = totaleRicavi - totaleCosti;
-        const perc = totaleRicavi
-          ? ((margine / totaleRicavi) * 100).toFixed(2)
-          : 0;
-
-        setMargineVal(margine);
-        setMarginePerc(perc);
-        setDataAggiornamento(dayjs(ultimaData).format("DD MMM YYYY"));
-
-        const chartFormatted = chart.map((el) => ({
-          ...el,
-          label: dayjs(el.month).format("MMM-YY"),
-        }));
-
-        setChartData(chartFormatted);
-      } catch (error) {
-        console.error("Errore caricamento dati grafico:", error);
-      }
-    };
-
-    if (commessa?.IdCantiere) fetchGrafico();
-  }, [commessa]);
+  const totaleImportiManuali = datiContratti.reduce(
+    (sum, c) => sum + Number(c.CostoTemp2 || 0),
+    0,
+  );
+  const totaleProduzioneTotale = datiContratti.reduce(
+    (sum, c) => sum + Number(c.produzioneTotale || 0),
+    0,
+  );
+  const produzioneNonFatturata =
+    totaleProduzioneTotale -
+    righeFatture.reduce((sum, r) => sum + Number(r.Importo || 0), 0);
+  const percentualeAvanzamento =
+    totaleProduzioneTotale > 0
+      ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
+      : "0.00";
+  const sommaImporto = righeFatture.reduce(
+    (sum, r) => sum + parseFloatSafe(r.Importo),
+    0,
+  );
+  const sommaImporto2 = righeFatture.reduce(
+    (sum, r) => sum + parseFloatSafe(r.Importo2),
+    0,
+  );
+  const avanzamentoPercentuale =
+    sommaImporto > 0 ? (sommaImporto2 / sommaImporto) * 100 : 0;
+  const avanzamentoTotale = sommaImporto2;
+  const salDaFare = sommaImporto - sommaImporto2;
+  const residuoFatturare = totaleProduzioneTotale - sommaImporto;
+  const percentualeFatturazione =
+    totaleProduzioneTotale > 0
+      ? ((sommaImporto / totaleImportiManuali) * 100).toFixed(2)
+      : "0.00";
+  const salNonFatturati = sommaImporto2 - sommaImporto;
 
   return (
     <div style={{ padding: "1rem", backgroundColor: "white" }}>
@@ -2240,7 +2599,10 @@ const CruscottoCommessa = ({ commessa }) => {
               border: "1px solid #ccc",
             }}
           >
-            € 23.850
+            €{" "}
+            {(costiTotali - fattureTotali).toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
           </div>
           <div
             style={{
@@ -2349,7 +2711,7 @@ const CruscottoCommessa = ({ commessa }) => {
               border: "1px solid #ccc",
             }}
           >
-            Avanzamento produzione: 75,90% € 113.850
+            Avanzamento produzione: 75,90% € 113.8544
           </div>
           <div
             style={{

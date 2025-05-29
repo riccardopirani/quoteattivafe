@@ -137,7 +137,9 @@ class Sidebar extends Component {
     if (sidebar) {
       sidebar.classList.remove("active");
     }
-    this.setState({ menuStates: {} });
+
+    // Rimuoviamo solo la classe "active" dal DOM, ma NON resettiamo menuStates
+    // Così i menu restano espansi come l'utente li aveva lasciati
   }
 
   isPathActive(path) {
