@@ -1983,6 +1983,13 @@ const CruscottoCommessa = ({ commessa }) => {
         setMargineVal(margine);
         setMarginePerc(perc);
         setDataAggiornamento(dayjs(ultimaData).format("DD MMM YYYY"));
+
+        const chartFormatted = chart.map((el) => ({
+          ...el,
+          label: dayjs(el.month).format("MMM-YY"),
+        }));
+
+        setChartData(chartFormatted);
       } catch (error) {
         console.error("Errore caricamento dati grafico:", error);
       }
@@ -2369,7 +2376,10 @@ const CruscottoCommessa = ({ commessa }) => {
         >
           {/* Placeholder grafico */}
           <div style={{ fontStyle: "italic" }}>
-            <GraficoCostiMese commessa={commessa} />
+            <GraficoCostiMese
+              chartData={chartData}
+              dataAggiornamento={dataAggiornamento}
+            />
           </div>
         </div>
       </div>
@@ -2377,55 +2387,7 @@ const CruscottoCommessa = ({ commessa }) => {
   );
 };
 
-const GraficoCostiMese = ({ commessa }) => {
-  const [chartData, setChartData] = useState([]);
-  const [dataAggiornamento, setDataAggiornamento] = useState("");
-
-  useEffect(() => {
-    const fetchGrafico = async () => {
-      try {
-        const dati = await CantiereService.graficoCommessa({
-          Codice: commessa.IdCantiere,
-        });
-
-        const datiPerMese = {};
-        let ultimaData = null;
-
-        for (const voce of dati) {
-          const mese = voce.MeseAnno;
-          if (!datiPerMese[mese]) {
-            datiPerMese[mese] = { month: mese, costi: 0 };
-          }
-
-          if (voce.Descrizione.toLowerCase() === "costi") {
-            datiPerMese[mese].costi += voce.CostoTotale;
-          }
-
-          if (!ultimaData || dayjs(mese) > dayjs(ultimaData)) {
-            ultimaData = mese;
-          }
-        }
-
-        const chart = Object.values(datiPerMese).sort((a, b) =>
-          a.month.localeCompare(b.month),
-        );
-
-        // Formatta i mesi tipo "gen-25", "feb-25", ecc.
-        const chartFormatted = chart.map((el) => ({
-          ...el,
-          label: dayjs(el.month).format("MMM-YY"),
-        }));
-
-        setChartData(chartFormatted);
-        setDataAggiornamento(dayjs(ultimaData).format("DD MMMM YYYY"));
-      } catch (error) {
-        console.error("Errore caricamento dati grafico:", error);
-      }
-    };
-
-    if (commessa?.IdCantiere) fetchGrafico();
-  }, [commessa]);
-
+const GraficoCostiMese = ({ chartData, dataAggiornamento }) => {
   return (
     <div style={{ width: "100%", height: 500 }}>
       <h3>Andamento produzione</h3>
@@ -2449,6 +2411,7 @@ const GraficoCostiMese = ({ commessa }) => {
     </div>
   );
 };
+
 const CDP = ({ commessa }) => {
   const [righe, setRighe] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
