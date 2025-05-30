@@ -1238,19 +1238,6 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
     if (commessa?.IdCantiere) fetchFatture();
   }, [commessa.IdCantiere]);
 
-  useEffect(() => {
-    const iniziali = contratti.map((c) => {
-      const costo = Number(c?.Costo || 0);
-      const quantita = Number(c?.Quantita || 1);
-      const produzioneTotale = costo * quantita;
-      return {
-        ...c,
-        produzioneTotale,
-        produzioneResidua: produzioneTotale,
-      };
-    });
-    setDatiContratti(iniziali);
-  }, [contratti]);
   const handleChange = (index, campo, valore) => {
     const nuovo = [...datiContratti];
     nuovo[index][campo] = valore;
@@ -1264,16 +1251,20 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
     return { ...r, salNonFatturato };
   });
   const aggiungiRiga = () => {
-    setContratti([
-      ...contratti,
-      {
-        Descrizione: "",
-        Data: new Date().toISOString().substring(0, 10), // formato YYYY-MM-DD
-        Costo: 0,
-        Quantita: 1,
-      },
-    ]);
+    const nuovoContratto = {
+      Descrizione: "",
+      Data: new Date().toISOString().substring(0, 10),
+      Costo: 0,
+      Quantita: 1,
+      produzioneTotale: 0,
+      produzioneResidua: 0,
+      CostoTemp2: 0,
+    };
+
+    setContratti((prev) => [...prev, nuovoContratto]);
+    setDatiContratti((prev) => [...prev, nuovoContratto]);
   };
+  useEffect(() => {}, [contratti]);
 
   useEffect(() => {
     console.log("Trigger fetchContratti, IdCantiere:", commessa?.IdCantiere);
