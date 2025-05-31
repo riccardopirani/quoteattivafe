@@ -9,6 +9,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { BASE_URL } from "../services/api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
@@ -22,24 +23,9 @@ import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/it";
 import { BarChart, Bar } from "recharts";
+import GestioneContratto from "./GestioneContratto.js";
 moment.locale("it");
 
-const CustomInput = React.forwardRef(({ value, onClick }, ref) => (
-  <button
-    type="button"
-    onClick={onClick}
-    ref={ref}
-    style={{
-      background: "none",
-      border: "none",
-      padding: 0,
-      fontSize: "0.85rem",
-      cursor: "pointer",
-    }}
-  >
-    {value}
-  </button>
-));
 const tableStyle = {
   borderCollapse: "collapse",
   width: "100%",
@@ -55,19 +41,19 @@ const cellStyle = {
 
 const CostiRicavi = ({ commessa }) => {
   const [openArchivio, setOpenArchivio] = useState(false);
-  const [sezioni, setSezioni] = useState([]);
+  const [righeValori, setRigheValori] = useState([]);
   const [documentiArchivio, setDocumentiArchivio] = useState([]);
   const [datiExternal, setDatiExternal] = useState([]);
   const [datiGenerali, setDatiGenerali] = useState({
     statoDinamico: "BLOCCATO",
   });
-
+  const [sezioni, setSezioni] = useState([]);
   useEffect(() => {
     const fetchStato = async () => {
       if (commessa?.IdCantiere) {
         try {
           const result = await CantiereService.statoCommessa({
-            Codice: commessa.IdCantiere,
+            Codice: commessa.NomeCantiere,
           });
 
           const statoGrezzo = result;
@@ -90,6 +76,33 @@ const CostiRicavi = ({ commessa }) => {
 
     fetchStato();
   }, [commessa?.IdCantiere]);
+  const aggiungiRigaValore = () => {
+    setRigheValori((prev) => [...prev, { tipo: "", valore: "", note: "" }]);
+  };
+  useEffect(() => {
+    const caricaCostiManuali = async () => {
+      if (!commessa?.IdCantiere) return;
+
+      try {
+        const tuttiCosti = await CantiereService.leggiCosti(
+          commessa.IdCantiere,
+        );
+
+        // Filtra quelli che sono "liberi" o non associati a nodi ARCA
+        const righeManuali = tuttiCosti.map((c) => ({
+          tipo: c.Nome,
+          valore: c.Importo,
+          note: c.Note || "",
+        }));
+
+        setRigheValori(righeManuali);
+      } catch (err) {
+        console.error("Errore nel caricamento dei costi manuali:", err);
+      }
+    };
+
+    caricaCostiManuali();
+  }, [commessa?.IdCantiere]);
 
   useEffect(() => {
     if (!commessa?.IdCantiere) return;
@@ -97,7 +110,7 @@ const CostiRicavi = ({ commessa }) => {
     const fetchData = async () => {
       try {
         const dati = await CantiereService.nodidettagli({
-          Codice: commessa.IdCantiere,
+          Codice: commessa.NomeCantiere,
         });
 
         const datiPuliti = dati.map((nodo) => ({
@@ -151,7 +164,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
     );
 
     for (const nodo of datiExternal) {
@@ -170,12 +183,6 @@ const CostiRicavi = ({ commessa }) => {
     const sezioniFinali = ["A", "E", "M", "I", "R"].map((k) => sezioniMap[k]);
     setSezioni(sezioniFinali);
   }, [datiExternal]);
-
-  const aggiungiRiga = (index) => {
-    const nuovo = [...sezioni];
-    nuovo[index].sotto.push({ codice: "", descrizione: "", costo: 0 });
-    setSezioni(nuovo);
-  };
 
   const contentRef = useRef();
 
@@ -205,8 +212,76 @@ const CostiRicavi = ({ commessa }) => {
     ...sezioni
       .filter((s) => s.nodo !== "R")
       .flatMap((s) => s.sotto)
-      .map((el) => Number(el.costo) || 0)
+      .map((el) => Number(el.costo) || 0),
   );
+  const salvaRigheValori = async () => {
+    if (!commessa?.IdCantiere) {
+      alert("Cantiere non selezionato.");
+      return;
+    }
+
+    const righeValide = righeValori.filter(
+      (r) => r.tipo && !isNaN(parseFloat(r.valore)),
+    );
+
+    if (righeValide.length === 0) {
+      alert("Nessuna riga valida da salvare.");
+      return;
+    }
+
+    let success = true;
+    for (const riga of righeValide) {
+      try {
+        await CantiereService.creaCosto({
+          IdCantiere: commessa.IdCantiere,
+          Nome: riga.tipo,
+          Note: riga.note || "",
+          Importo: parseFloat(riga.valore),
+        });
+      } catch (err) {
+        console.error("Errore creazione riga costo:", err);
+        alert("Errore durante il salvataggio di una riga.");
+        success = false;
+      }
+    }
+
+    if (success) {
+      alert("Costi salvati con successo!");
+    }
+  };
+
+  const aggiungiRiga = async (index) => {
+    const sezioneCorrente = sezioni[index];
+
+    if (!commessa?.IdCantiere || !sezioneCorrente?.nodo) return;
+
+    const nuovoNodo = {
+      IdCantiere: commessa.IdCantiere,
+      Nome: `${sezioneCorrente.titolo} - Riga manuale`,
+      Note: `Aggiunto da interfaccia - nodo ${sezioneCorrente.nodo}`,
+      Importo: 0.0,
+    };
+
+    try {
+      const result = await CantiereService.creaCosto(nuovoNodo);
+
+      if (result?.return === true || result === true) {
+        // Solo dopo creazione lato server, aggiorno localmente
+        const nuovo = [...sezioni];
+        nuovo[index].sotto.push({
+          codice: "",
+          descrizione: nuovoNodo.Nome,
+          costo: nuovoNodo.Importo,
+        });
+        setSezioni(nuovo);
+      } else {
+        alert("Errore durante la creazione della riga.");
+      }
+    } catch (error) {
+      console.error("Errore API creaCosto:", error);
+      alert("Errore durante la chiamata al server.");
+    }
+  };
 
   return (
     <div ref={contentRef} style={{ padding: "1rem", backgroundColor: "white" }}>
@@ -346,18 +421,20 @@ const CostiRicavi = ({ commessa }) => {
               })}
             </React.Fragment>
           ))}
+
+          <td style={{ fontWeight: "bold" }} colSpan={2}>
+            Totale Costi (esclusi Ricavi)
+          </td>
+
+          <td style={{ fontWeight: "bold" }}>
+            {maxCostoSenzaRicavi > 0
+              ? maxCostoSenzaRicavi.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })
+              : ""}
+          </td>
           <tr>
-            <td style={{ fontWeight: "bold" }} colSpan={2}>
-              Totale Costi (esclusi Ricavi)
-            </td>
-            <td style={{ fontWeight: "bold" }}>
-              {maxCostoSenzaRicavi > 0
-                ? maxCostoSenzaRicavi.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })
-                : ""}
-            </td>
             <td colSpan={11}>
               <div
                 style={{
@@ -372,6 +449,7 @@ const CostiRicavi = ({ commessa }) => {
                   style={{
                     padding: "0.5rem 1rem",
                     border: "1px solid black",
+                    marginLeft: "50px",
                     background: "white",
                     fontWeight: "bold",
                     minWidth: "200px",
@@ -400,7 +478,123 @@ const CostiRicavi = ({ commessa }) => {
           </tr>
         </tbody>
       </table>
+      <div style={{ marginTop: "2rem" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "1rem", // aumentato da 0.85rem
+            border: "1px solid #bbb",
+          }}
+        >
+          <thead>
+            <tr style={{ backgroundColor: "#e0e0e0" }}>
+              <th style={{ border: "1px solid #bbb", padding: "0.75rem" }}>
+                Tipo
+              </th>
+              <th style={{ border: "1px solid #bbb", padding: "0.75rem" }}>
+                Valore (€)
+              </th>
+              <th style={{ border: "1px solid #bbb", padding: "0.75rem" }}>
+                Note / Campo libero
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {righeValori.map((riga, index) => (
+              <tr key={index}>
+                <td style={{ border: "1px solid #bbb", padding: "0.75rem" }}>
+                  <select
+                    value={riga.tipo}
+                    onChange={(e) => {
+                      const nuovo = [...righeValori];
+                      nuovo[index].tipo = e.target.value;
+                      setRigheValori(nuovo);
+                    }}
+                    style={{
+                      width: "100%",
+                      fontSize: "1rem",
+                      padding: "0.4rem",
+                    }}
+                  >
+                    <option value="">-- Seleziona --</option>
+                    <option value="SIL">SIL</option>
+                    <option value="SAL">SAL</option>
+                    <option value="C.P">C.P</option>
+                  </select>
+                </td>
+                <td style={{ border: "1px solid #bbb", padding: "0.75rem" }}>
+                  <input
+                    type="number"
+                    value={riga.valore}
+                    onChange={(e) => {
+                      const nuovo = [...righeValori];
+                      nuovo[index].valore = e.target.value;
+                      setRigheValori(nuovo);
+                    }}
+                    placeholder="0.00"
+                    style={{
+                      width: "100%",
+                      fontSize: "1rem",
+                      padding: "0.4rem",
+                    }}
+                  />
+                </td>
+                <td style={{ border: "1px solid #bbb", padding: "0.75rem" }}>
+                  <input
+                    type="text"
+                    value={riga.note}
+                    onChange={(e) => {
+                      const nuovo = [...righeValori];
+                      nuovo[index].note = e.target.value;
+                      setRigheValori(nuovo);
+                    }}
+                    placeholder="Inserisci note..."
+                    style={{
+                      width: "100%",
+                      fontSize: "1rem",
+                      padding: "0.4rem",
+                    }}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
+        <div style={{ marginTop: "1rem", textAlign: "right" }}>
+          <button
+            onClick={aggiungiRigaValore}
+            style={{
+              padding: "0.6rem 1.2rem",
+              backgroundColor: "#e0f7fa",
+              border: "1px solid #0097a7",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontWeight: "bold",
+              fontSize: "1rem",
+            }}
+          >
+            + Aggiungi riga
+          </button>
+        </div>
+      </div>
+
+      <br></br>
+      <button
+        onClick={salvaRigheValori}
+        style={{
+          marginTop: "1rem",
+          padding: "0.4rem 1rem",
+          backgroundColor: "#d0f0c0",
+          border: "1px solid #008000",
+          borderRadius: 4,
+          cursor: "pointer",
+          fontWeight: "bold",
+        }}
+      >
+        💾 Salva righe
+      </button>
       {openArchivio && (
         <div
           style={{
@@ -429,7 +623,7 @@ const CostiRicavi = ({ commessa }) => {
             ✕
           </button>
           <h3>Archivio costi/ricavi</h3>
-          {/* Qui puoi mettere i contenuti dell’archivio */}
+
           <div>
             {documentiArchivio.length > 0 ? (
               <ul>
@@ -481,86 +675,9 @@ const DatiCommessa = ({ onComplete, commessa }) => {
   const [dataFine, setDataFine] = useState(new Date());
   const [mappaUrl, setMappaUrl] = useState(null);
   const [zonaImageUrl, setZonaImageUrl] = useState(null);
-  const [datiGenerali2, setDatiGenerali2] = useState({
-    statoDinamico: "BLOCCATO",
-  });
-
-  useEffect(() => {
-    const fetchStato = async () => {
-      if (commessa?.IdCantiere) {
-        try {
-          const result = await CantiereService.statoCommessa({
-            Codice: commessa.IdCantiere,
-          });
-
-          const statoGrezzo = result;
-          const statoPulito = statoGrezzo.trim().toUpperCase();
-
-          let statoLabel = "BLOCCATO";
-          if (statoPulito.includes("A")) statoLabel = "APERTO";
-          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
-          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
-
-          setDatiGenerali2((prev) => ({
-            ...prev,
-            statoDinamico: statoLabel,
-          }));
-        } catch (error) {
-          console.error("Errore nel recupero dello stato cantiere:", error);
-        }
-      }
-    };
-
-    fetchStato();
-  }, [commessa?.IdCantiere]);
-
-  const creaClienteECantiereECommessa = async () => {
-    try {
-      const clienteRes = await CantiereService.creaCliente({
-        RagioneSociale: datiGenerali.cliente,
-      });
-      const idCliente = clienteRes.return;
-
-      const cantiereRes = await CantiereService.creaCantiere(
-        idCliente,
-        datiGenerali.indirizzo
-      );
-      const idCantiere = cantiereRes[0]?.IdCantiere;
-
-      const nuovaCommessa = {
-        IdCantiere: idCantiere,
-        Codice: datiGenerali.codice, // se necessario
-        RagioneSociale: datiGenerali.cliente, // aggiunto
-        TipoLavori: datiGenerali.tipoLavori,
-        TipoAppalto: datiGenerali.tipoAppalto,
-        RespUfficio: datiGenerali.respUfficio,
-        RespCantiere: datiGenerali.respCantiere,
-        Contratto: datiGenerali.contratto,
-        CentroCosto: datiGenerali.centroCosto,
-        Gant: datiGenerali.gant,
-        Condivisione: datiGenerali.condivisione,
-        Sicurezza: datiGenerali.sicurezza,
-        Foto: datiGenerali.foto,
-        AnagraficaCliente: datiGenerali.anagraficaCliente,
-        AnagraficaProgettista: datiGenerali.anagraficaProgettista,
-        DataInizio: dataInizio.toISOString(),
-        DataFine: dataFine.toISOString(),
-      };
-
-      const commessaRes = await CantiereService.aggiornaCantiere(nuovaCommessa);
-      console.log("Commessa creata:", commessaRes);
-
-      if (typeof onComplete === "function") {
-        onComplete({
-          codice: commessaRes.codice,
-          indirizzo: datiGenerali.indirizzo,
-        });
-      }
-    } catch (error) {
-      console.error("Errore durante la creazione della commessa:", error);
-    }
-  };
-
+  const [users, setUsers] = useState([]);
+  const [error, setError] = useState(null);
+  const prevCantiereId = useRef(null);
   const [datiGenerali, setDatiGenerali] = useState({
     codice: "",
     cliente: "",
@@ -575,25 +692,173 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     condivisione: "",
     sicurezza: "",
     foto: "",
-    anagraficaCliente: ["", "", "", "", "", ""], // Nome, Telefono, Mail, Nome D.I., Tel D.I., Mail D.I.
-    anagraficaProgettista: ["", "", "", "", "", ""], // Nome, Telefono, Mail, Nome CSE, Tel CSE, Mail CSE
+    AnagraficaCliente_Nome: "",
+    AnagraficaCliente_Telefono: "",
+    AnagraficaCliente_Email: "",
+    AnagraficaDI_Nome: "",
+    AnagraficaDI_Telefono: "",
+    AnagraficaDI_Email: "",
+    AnagraficaProgettista_Nome: "",
+    AnagraficaProgettista_Telefono: "",
+    AnagraficaProgettista_Email: "",
+    AnagraficaCSE_Nome: "",
+    AnagraficaCSE_Telefono: "",
+    AnagraficaCSE_Email: "",
+  });
+
+  const [datiGenerali2, setDatiGenerali2] = useState({
+    statoDinamico: "APERTO",
   });
 
   useEffect(() => {
-    if (commessa) {
-      setDatiGenerali((prev) => ({
-        ...prev,
-        codice: commessa.IdCantiere?.toString() || "",
-        cliente: commessa.RagioneSociale || "",
-        indirizzo: commessa.Indirizzo || "",
-        tipoLavori: commessa.TipoLavori || "",
-        tipoAppalto: commessa.TipoAppalto || "",
-        respUfficio: commessa.RespUfficio || "",
-        respCantiere: commessa.RespCantiere || "",
-      }));
+    if (datiGenerali.indirizzo && typeof datiGenerali.indirizzo === "string") {
+      const encodedAddress = encodeURIComponent(datiGenerali.indirizzo);
+      const url = `https://www.google.com/maps?q=${encodedAddress}&output=embed`;
+      setMappaUrl(url);
+    }
+  }, [datiGenerali.indirizzo]);
+
+  useEffect(() => {
+    const caricaCommessa = async () => {
+      let id = new URLSearchParams(window.location.search).get("codice");
+      if (!id) {
+        const saved = localStorage.getItem("ultimaCommessa");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            id = parsed?.IdCantiere;
+          } catch (e) {
+            console.warn("Errore parsing localStorage:", e);
+          }
+        }
+      }
+
+      if (id && !commessa) {
+        try {
+          const result = await CantiereService.caricaCommessa(id);
+          commessa = result;
+          localStorage.setItem("ultimaCommessa", JSON.stringify(result));
+        } catch (err) {
+          console.error("Errore nel caricamento della commessa:", err);
+        }
+      }
+    };
+
+    caricaCommessa();
+  }, []);
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (commessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: commessa.NomeCantiere,
+          });
+          const statoPulito = result.trim().toUpperCase();
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+          setDatiGenerali2((prev) => ({ ...prev, statoDinamico: statoLabel }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+    fetchStato();
+  }, [commessa?.IdCantiere]);
+
+  useEffect(() => {
+    if (!commessa?.IdCantiere) return;
+
+    const aggiornaDate = async () => {
+      try {
+        await CantiereService.aggiornaCantiere({
+          IdCantiere: commessa.IdCantiere,
+          Stato: datiGenerali2?.statoDinamico ?? "BLOCCATO",
+          DescrizioneEstesa: "",
+          StatoFatturazione: 0,
+          NomeCantiere: datiGenerali.codice,
+          CommessaCliente: datiGenerali.codice,
+          IndirizzoCantiere: datiGenerali.indirizzo,
+          TipoLavori: datiGenerali.tipoLavori,
+          TipoAppalto: datiGenerali.tipoAppalto,
+          ResponsabileUfficio: datiGenerali.respUfficio,
+          ResponsabileCantiere: datiGenerali.respCantiere,
+          LinkCartellaContratto: datiGenerali.contratto,
+          LinkCentroDiCosto: datiGenerali.centroCosto,
+          LinkGantt: datiGenerali.gant,
+          LinkCartellaCondivisione: datiGenerali.condivisione,
+          LinkCartellaSicurezza: datiGenerali.sicurezza,
+          LinkCartellaFoto: datiGenerali.foto,
+          DataInizio: dataInizio.toISOString(),
+          DataFine: dataFine.toISOString(),
+          AnagraficaCliente_Nome: datiGenerali.AnagraficaCliente_Nome,
+          AnagraficaCliente_Telefono: datiGenerali.AnagraficaCliente_Telefono,
+          AnagraficaCliente_Email: datiGenerali.AnagraficaCliente_Email,
+          AnagraficaDI_Nome: datiGenerali.AnagraficaDI_Nome,
+          AnagraficaDI_Telefono: datiGenerali.AnagraficaDI_Telefono,
+          AnagraficaDI_Email: datiGenerali.AnagraficaDI_Email,
+          AnagraficaProgettista_Nome: datiGenerali.AnagraficaProgettista_Nome,
+          AnagraficaProgettista_Telefono:
+            datiGenerali.AnagraficaProgettista_Telefono,
+          AnagraficaProgettista_Email: datiGenerali.AnagraficaProgettista_Email,
+          AnagraficaCSE_Nome: datiGenerali.AnagraficaCSE_Nome,
+          AnagraficaCSE_Telefono: datiGenerali.AnagraficaCSE_Telefono,
+          AnagraficaCSE_Email: datiGenerali.AnagraficaCSE_Email,
+        });
+      } catch (error) {
+        console.error("Errore aggiornamento date:", error);
+      }
+    };
+
+    aggiornaDate();
+  }, [dataInizio, dataFine]);
+  useEffect(() => {
+    if (commessa && commessa.IdCantiere) {
+      // Cambiamento reale di commessa?
+      const commessaChanged = commessa.IdCantiere !== prevCantiereId.current;
+      prevCantiereId.current = commessa.IdCantiere;
+
+      if (commessaChanged) {
+        console.log(commessa);
+        // Aggiorno stato solo se è una nuova commessa
+        setDatiGenerali({
+          codice: commessa.NomeCantiere?.toString() || "",
+          cliente: commessa.RagioneSociale || "",
+          indirizzo: commessa.Indirizzo || "",
+          tipoLavori: commessa.TipoLavori || "",
+          tipoAppalto: commessa.TipoAppalto || "",
+          respUfficio: commessa.ResponsabileUfficio || "",
+          respCantiere: commessa.ResponsabileCantiere || "",
+          contratto: commessa.LinkCartellaContratto || "",
+          centroCosto: commessa.LinkCentroDiCosto || "",
+          gant: commessa.LinkGantt || "",
+          condivisione: commessa.LinkCartellaCondivisione || "",
+          sicurezza: commessa.LinkCartellaSicurezza || "",
+          foto: commessa.LinkCartellaFoto || "",
+          AnagraficaCliente_Nome: commessa.AnagraficaCliente_Nome || "",
+          AnagraficaCliente_Telefono: commessa.AnagraficaCliente_Telefono || "",
+          AnagraficaCliente_Email: commessa.AnagraficaCliente_Email || "",
+          AnagraficaDI_Nome: commessa.AnagraficaDI_Nome || "",
+          AnagraficaDI_Telefono: commessa.AnagraficaDI_Telefono || "",
+          AnagraficaDI_Email: commessa.AnagraficaDI_Email || "",
+          AnagraficaProgettista_Nome: commessa.AnagraficaProgettista_Nome || "",
+          AnagraficaProgettista_Telefono:
+            commessa.AnagraficaProgettista_Telefono || "",
+          AnagraficaProgettista_Email:
+            commessa.AnagraficaProgettista_Email || "",
+          AnagraficaCSE_Nome: commessa.AnagraficaCSE_Nome || "",
+          AnagraficaCSE_Telefono: commessa.AnagraficaCSE_Telefono || "",
+          AnagraficaCSE_Email: commessa.AnagraficaCSE_Email || "",
+        });
+
+        if (commessa.DataInizio) setDataInizio(new Date(commessa.DataInizio));
+        if (commessa.DataFine) setDataFine(new Date(commessa.DataFine));
+        fetchUsers(commessa.RespUfficio, commessa.RespCantiere);
+      }
     }
   }, [commessa]);
-
   const handleChange = (field) => async (e) => {
     const value = e.target.value ?? "";
     const nuovo = { ...datiGenerali, [field]: value };
@@ -602,129 +867,74 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     if (commessa && commessa.IdCantiere) {
       await CantiereService.aggiornaCantiere({
         IdCantiere: commessa.IdCantiere,
-        Codice: nuovo.codice,
-        RagioneSociale: nuovo.cliente,
+        Stato: datiGenerali2?.statoDinamico ?? "BLOCCATO",
+        DescrizioneEstesa: "",
+        StatoFatturazione: 0,
+        NomeCantiere: nuovo.codice,
+        CommessaCliente: nuovo.codice,
+        IndirizzoCantiere: nuovo.indirizzo,
         TipoLavori: nuovo.tipoLavori,
         TipoAppalto: nuovo.tipoAppalto,
-        RespUfficio: nuovo.respUfficio,
-        RespCantiere: nuovo.respCantiere,
-        Contratto: nuovo.contratto,
-        CentroCosto: nuovo.centroCosto,
-        Gant: nuovo.gant,
-        Condivisione: nuovo.condivisione,
-        Sicurezza: nuovo.sicurezza,
-        Foto: nuovo.foto,
-        AnagraficaCliente: nuovo.anagraficaCliente,
-        AnagraficaProgettista: nuovo.anagraficaProgettista,
+        ResponsabileUfficio: nuovo.respUfficio,
+        ResponsabileCantiere: nuovo.respCantiere,
+        LinkCartellaContratto: nuovo.contratto,
+        LinkCentroDiCosto: nuovo.centroCosto,
+        LinkGantt: nuovo.gant,
+        LinkCartellaCondivisione: nuovo.condivisione,
+        LinkCartellaSicurezza: nuovo.sicurezza,
+        LinkCartellaFoto: nuovo.foto,
         DataInizio: dataInizio.toISOString(),
         DataFine: dataFine.toISOString(),
+        AnagraficaCliente_Nome: nuovo.AnagraficaCliente_Nome,
+        AnagraficaCliente_Telefono: nuovo.AnagraficaCliente_Telefono,
+        AnagraficaCliente_Email: nuovo.AnagraficaCliente_Email,
+        AnagraficaDI_Nome: nuovo.AnagraficaDI_Nome,
+        AnagraficaDI_Telefono: nuovo.AnagraficaDI_Telefono,
+        AnagraficaDI_Email: nuovo.AnagraficaDI_Email,
+        AnagraficaProgettista_Nome: nuovo.AnagraficaProgettista_Nome,
+        AnagraficaProgettista_Telefono: nuovo.AnagraficaProgettista_Telefono,
+        AnagraficaProgettista_Email: nuovo.AnagraficaProgettista_Email,
+        AnagraficaCSE_Nome: nuovo.AnagraficaCSE_Nome,
+        AnagraficaCSE_Telefono: nuovo.AnagraficaCSE_Telefono,
+        AnagraficaCSE_Email: nuovo.AnagraficaCSE_Email,
       });
     }
   };
 
-  const handleArrayChange = (field, index) => async (e) => {
-    const newArr = [...datiGenerali[field]];
-    newArr[index] = e.target.value;
-    const nuovo = { ...datiGenerali, [field]: newArr };
-    setDatiGenerali(nuovo);
-
-    if (commessa && commessa.IdCantiere) {
-      await CantiereService.aggiornaCantiere({
-        IdCantiere: commessa.IdCantiere,
-        Codice: nuovo.codice,
-        RagioneSociale: nuovo.cliente,
-        TipoLavori: nuovo.tipoLavori,
-        TipoAppalto: nuovo.tipoAppalto,
-        RespUfficio: nuovo.respUfficio,
-        DescrizioneEstesa: nuovo.indirizzo, // ← incluso sempre
-        RespCantiere: nuovo.respCantiere,
-        Contratto: nuovo.contratto,
-        CentroCosto: nuovo.centroCosto,
-        Gant: nuovo.gant,
-        Condivisione: nuovo.condivisione,
-        Sicurezza: nuovo.sicurezza,
-        Foto: nuovo.foto,
-        AnagraficaCliente: nuovo.anagraficaCliente,
-        AnagraficaProgettista: nuovo.anagraficaProgettista,
-        DataInizio: dataInizio.toISOString(),
-        DataFine: dataFine.toISOString(),
-      });
-    }
-  };
-
-  const aggiornaMappaDaIndirizzo = async (indirizzo) => {
-    const encoded = encodeURIComponent(indirizzo);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
-      {
-        headers: {
-          "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
-          "Accept-Language": "it",
-        },
-      }
-    );
-    const data = await res.json();
-    if (data.length > 0) {
-      const { lat, lon } = data[0];
-      const delta = 0.002;
-      const left = parseFloat(lon) - delta;
-      const right = parseFloat(lon) + delta;
-      const top = parseFloat(lat) + delta;
-      const bottom = parseFloat(lat) - delta;
-      const url = `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik&marker=${lat},${lon}`;
-      setMappaUrl(url);
-    }
-  };
-
-  const aggiornaImmagineZona = async (indirizzo) => {
-    if (!indirizzo) return setZonaImageUrl(null);
-
+  const fetchUsers = async (respUfficio, respCantiere) => {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          indirizzo
-        )}&format=json&limit=1`
-      );
+      const res = await fetch(`${BASE_URL}/RisorseUmane/CaricaRisorse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
       const data = await res.json();
-      if (data.length > 0) {
-        const { lat, lon } = data[0];
-        setZonaImageUrl(
-          `https://www.openstreetmap.org/export/embed.html?bbox=${
-            lon - 0.005
-          },${lat - 0.005},${lon + 0.005},${
-            lat + 0.005
-          }&layer=mapnik&marker=${lat},${lon}`
-        );
-      } else {
-        setZonaImageUrl(null);
+      const nomiEsistenti = new Set(data.map((u) => u.Nome));
+
+      if (respUfficio && !nomiEsistenti.has(respUfficio)) {
+        data.unshift({
+          IdUtente: "ufficio-selezionato",
+          Nome: respUfficio,
+        });
       }
-    } catch (err) {
-      console.error("Errore caricamento immagine della zona:", err);
-      setZonaImageUrl(null);
+
+      if (respCantiere && !nomiEsistenti.has(respCantiere)) {
+        data.unshift({
+          IdUtente: "cantiere-selezionato",
+          Nome: respCantiere,
+        });
+      }
+
+      setUsers(data);
+    } catch (error) {
+      console.error("Errore caricamento utenti:", error);
+      setError("Errore caricamento utenti.");
     }
   };
 
-  useEffect(() => {
-    const indirizzo = datiGenerali.indirizzo.trim();
-    if (indirizzo !== "") {
-      aggiornaMappaDaIndirizzo(indirizzo);
-      aggiornaImmagineZona(indirizzo);
-    } else {
-      setMappaUrl(null);
-      setZonaImageUrl(null);
-    }
-  }, [datiGenerali.indirizzo]);
-
-  useEffect(() => {
-    const { codice, indirizzo } = datiGenerali;
-    if (codice && indirizzo && !triggered) {
-      setTriggered(true);
-      if (typeof onComplete === "function") {
-        onComplete({ codice, indirizzo });
-      }
-    }
-  }, [datiGenerali, triggered, onComplete]);
-
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidPhone = (phone) => /^\+?\d{7,15}$/.test(phone);
   return (
     <>
       <div
@@ -771,8 +981,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
               <DatePicker
                 selected={dataInizio}
                 onChange={setDataInizio}
-                dateFormat="dd MMMM yyyy"
-                customInput={<CustomInput />}
+                dateFormat="dd/MM/yyyy"
               />
             </div>
           </div>
@@ -790,7 +999,6 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 backgroundColor: "#e6f0e6",
                 padding: "0.5rem 1rem",
                 fontWeight: "bold",
-
                 fontSize: "0.85rem",
                 whiteSpace: "nowrap",
               }}
@@ -801,48 +1009,30 @@ const DatiCommessa = ({ onComplete, commessa }) => {
               <DatePicker
                 selected={dataFine}
                 onChange={setDataFine}
-                dateFormat="dd MMMM yyyy"
-                customInput={<CustomInput />}
+                dateFormat="dd/MM/yyyy"
+                // opzionale: customInput={<CustomInput />}
               />
             </div>
           </div>
         </div>
-        {new URLSearchParams(window.location.search).get("modalita") ===
-        "nuova" ? (
-          <button
-            style={{
-              float: "right",
-              backgroundColor: "#fbc02d", // giallo come BLOCCATO
-              color: "white",
-              padding: "0.3rem 1rem",
-              fontWeight: "bold",
-              borderRadius: 4,
-              border: "none",
-              cursor: "pointer",
-            }}
-            onClick={() => creaClienteECantiereECommessa()}
-          >
-            Genera Commessa
-          </button>
-        ) : (
-          <span
-            style={{
-              float: "right",
-              backgroundColor: (() => {
-                const stato = datiGenerali2?.statoDinamico || "";
-                if (stato === "CHIUSO") return "#d32f2f";
-                if (stato === "APERTO") return "#388e3c";
-                return "#fbc02d";
-              })(),
-              color: "white",
-              padding: "0.3rem 1rem",
-              fontWeight: "bold",
-              borderRadius: 4,
-            }}
-          >
-            {datiGenerali2?.statoDinamico || "BLOCCATO"}
-          </span>
-        )}
+
+        <span
+          style={{
+            float: "right",
+            backgroundColor: (() => {
+              const stato = datiGenerali2?.statoDinamico || "";
+              if (stato === "CHIUSO") return "#d32f2f";
+              if (stato === "APERTO") return "#388e3c";
+              return "#fbc02d";
+            })(),
+            color: "white",
+            padding: "0.3rem 1rem",
+            fontWeight: "bold",
+            borderRadius: 4,
+          }}
+        >
+          {datiGenerali2?.statoDinamico || "BLOCCATO"}
+        </span>
       </div>
 
       <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
@@ -854,7 +1044,6 @@ const DatiCommessa = ({ onComplete, commessa }) => {
               marginBottom: "1rem",
             }}
           >
-            {/* Colonna 1: DATI GENERALI */}
             <div style={{ flex: 1 }}>
               <table
                 style={{
@@ -899,13 +1088,117 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                         {label}
                       </td>
                       <td style={cellStyle}>
-                        <input
-                          type="text"
-                          value={datiGenerali[key] ?? ""}
-                          onChange={handleChange(key)}
-                          placeholder={`Inserisci ${label}`}
-                          style={{ width: "100%", border: "none" }}
-                        />
+                        {label === "Resp. Ufficio" ? (
+                          <>
+                            {datiGenerali.respUfficio && (
+                              <div
+                                style={{
+                                  marginBottom: "0.4rem",
+                                  fontStyle: "italic",
+                                  color: "#555",
+                                }}
+                              >
+                                Attuale: {datiGenerali.respUfficio}
+                              </div>
+                            )}
+                            <select
+                              value={datiGenerali.respUfficio}
+                              onChange={async (e) => {
+                                const selected = e.target.value;
+                                setDatiGenerali((prev) => ({
+                                  ...prev,
+                                  respUfficio: selected,
+                                }));
+                                await handleChange("respUfficio")({
+                                  target: { value: selected },
+                                });
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "0.6rem 1rem",
+                                fontSize: "1rem",
+                                border: "1px solid #ccc",
+                                borderRadius: "8px",
+                                appearance: "none",
+                                backgroundColor: "#fff",
+                                backgroundImage:
+                                  "url(\"data:image/svg+xml;utf8,<svg fill='%23666' height='10' viewBox='0 0 10 6' width='10' xmlns='http://www.w3.org/2000/svg'><path d='M0 0l5 6 5-6z'/></svg>\")",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "right 1rem center",
+                                backgroundSize: "12px",
+                                color: "#333",
+                                transition: "all 0.3s ease",
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                              }}
+                            >
+                              <option value="">Seleziona responsabile</option>
+                              {users.map((user) => (
+                                <option key={user.IdUtente} value={user.Nome}>
+                                  {user.Nome}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        ) : label === "Resp. Cantiere" ? (
+                          <>
+                            {datiGenerali.respCantiere && (
+                              <div
+                                style={{
+                                  marginBottom: "0.4rem",
+                                  fontStyle: "italic",
+                                  color: "#555",
+                                }}
+                              >
+                                Attuale: {datiGenerali.respCantiere}
+                              </div>
+                            )}
+                            <select
+                              value={datiGenerali.respCantiere}
+                              onChange={async (e) => {
+                                const selected = e.target.value;
+                                setDatiGenerali((prev) => ({
+                                  ...prev,
+                                  respCantiere: selected,
+                                }));
+                                await handleChange("respCantiere")({
+                                  target: { value: selected },
+                                });
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "0.6rem 1rem",
+                                fontSize: "1rem",
+                                border: "1px solid #ccc",
+                                borderRadius: "8px",
+                                appearance: "none",
+                                backgroundColor: "#fff",
+                                backgroundImage:
+                                  "url(\"data:image/svg+xml;utf8,<svg fill='%23666' height='10' viewBox='0 0 10 6' width='10' xmlns='http://www.w3.org/2000/svg'><path d='M0 0l5 6 5-6z'/></svg>\")",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "right 1rem center",
+                                backgroundSize: "12px",
+                                color: "#333",
+                                transition: "all 0.3s ease",
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                              }}
+                            >
+                              <option value="">Seleziona responsabile</option>
+                              {users.map((user) => (
+                                <option key={user.IdUtente} value={user.Nome}>
+                                  {user.Nome}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        ) : (
+                          <input
+                            type="text"
+                            value={datiGenerali[key] ?? ""}
+                            onChange={handleChange(key)}
+                            placeholder={`Inserisci ${label}`}
+                            style={{ width: "100%", border: "none" }}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -992,6 +1285,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
               </tr>
             </thead>
             <tbody>
+              {/* Cliente & D.I. */}
               <tr>
                 <td
                   rowSpan="3"
@@ -1006,8 +1300,8 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaCliente[0]}
-                    onChange={handleArrayChange("anagraficaCliente", 0)}
+                    value={datiGenerali.AnagraficaCliente_Nome}
+                    onChange={handleChange("AnagraficaCliente_Nome")}
                     placeholder="Nome"
                     style={{ width: "100%", border: "none" }}
                   />
@@ -1025,8 +1319,8 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaCliente[3]}
-                    onChange={handleArrayChange("anagraficaCliente", 3)}
+                    value={datiGenerali.AnagraficaDI_Nome}
+                    onChange={handleChange("AnagraficaDI_Nome")}
                     placeholder="Nome"
                     style={{ width: "100%", border: "none" }}
                   />
@@ -1036,19 +1330,31 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaCliente[1]}
-                    onChange={handleArrayChange("anagraficaCliente", 1)}
+                    value={datiGenerali.AnagraficaCliente_Telefono}
+                    onChange={handleChange("AnagraficaCliente_Telefono")}
                     placeholder="Telefono"
-                    style={{ width: "100%", border: "none" }}
+                    style={{
+                      width: "100%",
+                      border: isValidPhone(
+                        datiGenerali.AnagraficaCliente_Telefono,
+                      )
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaCliente[4]}
-                    onChange={handleArrayChange("anagraficaCliente", 4)}
+                    value={datiGenerali.AnagraficaDI_Telefono}
+                    onChange={handleChange("AnagraficaDI_Telefono")}
                     placeholder="Telefono"
-                    style={{ width: "100%", border: "none" }}
+                    style={{
+                      width: "100%",
+                      border: isValidPhone(datiGenerali.AnagraficaDI_Telefono)
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
               </tr>
@@ -1056,23 +1362,34 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaCliente[2]}
-                    onChange={handleArrayChange("anagraficaCliente", 2)}
-                    placeholder="Mail"
-                    style={{ width: "100%", border: "none" }}
+                    value={datiGenerali.AnagraficaCliente_Email}
+                    onChange={handleChange("AnagraficaCliente_Email")}
+                    placeholder="Email"
+                    style={{
+                      width: "100%",
+                      border: isValidEmail(datiGenerali.AnagraficaCliente_Email)
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaCliente[5]}
-                    onChange={handleArrayChange("anagraficaCliente", 5)}
-                    placeholder="Mail"
-                    style={{ width: "100%", border: "none" }}
+                    value={datiGenerali.AnagraficaDI_Email}
+                    onChange={handleChange("AnagraficaDI_Email")}
+                    placeholder="Email"
+                    style={{
+                      width: "100%",
+                      border: isValidEmail(datiGenerali.AnagraficaDI_Email)
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
               </tr>
 
+              {/* Progettista & C.S.E. */}
               <tr>
                 <td
                   rowSpan="3"
@@ -1087,8 +1404,8 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaProgettista[0]}
-                    onChange={handleArrayChange("anagraficaProgettista", 0)}
+                    value={datiGenerali.AnagraficaProgettista_Nome}
+                    onChange={handleChange("AnagraficaProgettista_Nome")}
                     placeholder="Nome"
                     style={{ width: "100%", border: "none" }}
                   />
@@ -1101,13 +1418,13 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     fontWeight: "bold",
                   }}
                 >
-                  C.s.e.
+                  C.S.E.
                 </td>
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaProgettista[3]}
-                    onChange={handleArrayChange("anagraficaProgettista", 3)}
+                    value={datiGenerali.AnagraficaCSE_Nome}
+                    onChange={handleChange("AnagraficaCSE_Nome")}
                     placeholder="Nome"
                     style={{ width: "100%", border: "none" }}
                   />
@@ -1117,19 +1434,31 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaProgettista[1]}
-                    onChange={handleArrayChange("anagraficaProgettista", 1)}
+                    value={datiGenerali.AnagraficaProgettista_Telefono}
+                    onChange={handleChange("AnagraficaProgettista_Telefono")}
                     placeholder="Telefono"
-                    style={{ width: "100%", border: "none" }}
+                    style={{
+                      width: "100%",
+                      border: isValidPhone(
+                        datiGenerali.AnagraficaProgettista_Telefono,
+                      )
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaProgettista[4]}
-                    onChange={handleArrayChange("anagraficaProgettista", 4)}
+                    value={datiGenerali.AnagraficaCSE_Telefono}
+                    onChange={handleChange("AnagraficaCSE_Telefono")}
                     placeholder="Telefono"
-                    style={{ width: "100%", border: "none" }}
+                    style={{
+                      width: "100%",
+                      border: isValidPhone(datiGenerali.AnagraficaCSE_Telefono)
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
               </tr>
@@ -1137,19 +1466,31 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaProgettista[2]}
-                    onChange={handleArrayChange("anagraficaProgettista", 2)}
-                    placeholder="Mail"
-                    style={{ width: "100%", border: "none" }}
+                    value={datiGenerali.AnagraficaProgettista_Email}
+                    onChange={handleChange("AnagraficaProgettista_Email")}
+                    placeholder="Email"
+                    style={{
+                      width: "100%",
+                      border: isValidEmail(
+                        datiGenerali.AnagraficaProgettista_Email,
+                      )
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
                 <td style={cellStyle}>
                   <input
                     type="text"
-                    value={datiGenerali.anagraficaProgettista[5]}
-                    onChange={handleArrayChange("anagraficaProgettista", 5)}
-                    placeholder="Mail"
-                    style={{ width: "100%", border: "none" }}
+                    value={datiGenerali.AnagraficaCSE_Email}
+                    onChange={handleChange("AnagraficaCSE_Email")}
+                    placeholder="Email"
+                    style={{
+                      width: "100%",
+                      border: isValidEmail(datiGenerali.AnagraficaCSE_Email)
+                        ? "none"
+                        : "1px solid red",
+                    }}
                   />
                 </td>
               </tr>
@@ -1180,778 +1521,6 @@ const DatiCommessa = ({ onComplete, commessa }) => {
   );
 };
 
-const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
-  const [datiGenerali2, setDatiGenerali2] = useState({
-    statoDinamico: "BLOCCATO",
-  });
-  const [righeFatture, setRigheFatture] = useState([]);
-
-  const [contratti, setContratti] = useState([]);
-  const [datiContratti, setDatiContratti] = useState([]);
-  const totaleImportiManuali = datiContratti.reduce(
-    (sum, c) => sum + Number(c.CostoTemp2 || 0),
-    0
-  );
-
-  const totaleProduzioneTotale = datiContratti.reduce(
-    (sum, c) => sum + Number(c.produzioneTotale || 0),
-    0
-  );
-
-  const produzioneNonFatturata =
-    totaleProduzioneTotale -
-    righeFatture.reduce((sum, r) => sum + Number(r.Importo || 0), 0);
-
-  const percentualeAvanzamento =
-    totaleProduzioneTotale > 0
-      ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
-      : "0.00";
-
-  useEffect(() => {
-    const fetchFatture = async () => {
-      try {
-        const result = await CantiereService.fattureCommessa({
-          Codice: commessa?.IdCantiere,
-        });
-        // Genera righe base per ogni fattura ricevuta
-        const generate = result.map((fattura, idx) => ({
-          Lavoro: "",
-          Nodo: "",
-          Numero1: idx + 1,
-          Data1: "",
-          Importo1: "",
-          Numero2: "",
-          CostoTemp2: "",
-          Data2: "",
-          Importo2: "",
-          ImportoTEMP: 0,
-          Id: idx + 1,
-          Importo: fattura.Costo || 0, // <-- questa riga è ESSENZIALE
-        }));
-
-        setRigheFatture(generate);
-      } catch (err) {
-        console.error("Errore nel fetch delle fatture:", err);
-      }
-    };
-
-    if (commessa?.IdCantiere) fetchFatture();
-  }, [commessa.IdCantiere]);
-
-  const handleChange = (index, campo, valore) => {
-    const nuovo = [...datiContratti];
-    nuovo[index][campo] = valore;
-    setDatiContratti(nuovo);
-  };
-  const righeConSalNonFatturato = righeFatture.map((r) => {
-    const salNonFatturato = Math.max(
-      Number(r.Importo2 || 0) - Number(r.Importo || 0),
-      0
-    );
-    return { ...r, salNonFatturato };
-  });
-  const aggiungiRiga = () => {
-    const nuovoContratto = {
-      Descrizione: "",
-      Data: new Date().toISOString().substring(0, 10),
-      Costo: 0,
-      Quantita: 1,
-      produzioneTotale: 0,
-      produzioneResidua: 0,
-      CostoTemp2: 0,
-    };
-
-    setContratti((prev) => [...prev, nuovoContratto]);
-    setDatiContratti((prev) => [...prev, nuovoContratto]);
-  };
-  useEffect(() => {}, [contratti]);
-
-  useEffect(() => {
-    console.log("Trigger fetchContratti, IdCantiere:", commessa?.IdCantiere);
-    if (commessa?.IdCantiere) {
-      const fetch = async () => {
-        try {
-          const result = await CantiereService.contrattoCommessa({
-            Codice: commessa.IdCantiere,
-          });
-          console.log("Contratti ricevuti:", result);
-          setContratti(result || []);
-        } catch (err) {
-          console.error("Errore nel fetch dei contratti:", err);
-        }
-      };
-      fetch();
-    }
-  }, [commessa?.IdCantiere]);
-
-  useEffect(() => {
-    const fetchStato = async () => {
-      if (commessa?.IdCantiere) {
-        try {
-          const result = await CantiereService.statoCommessa({
-            Codice: commessa.IdCantiere,
-          });
-
-          const statoGrezzo = result;
-          const statoPulito = statoGrezzo.trim().toUpperCase();
-
-          let statoLabel = "BLOCCATO";
-          if (statoPulito.includes("A")) statoLabel = "APERTO";
-          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
-          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
-
-          setDatiGenerali2((prev) => ({
-            ...prev,
-            statoDinamico: statoLabel,
-          }));
-        } catch (error) {
-          console.error("Errore nel recupero dello stato cantiere:", error);
-        }
-      }
-    };
-
-    fetchStato();
-  }, [commessa?.IdCantiere]);
-  const salNonFatturati =
-    righeFatture.reduce((sum, r) => sum + Number(r.Importo2 || 0), 0) -
-    righeFatture.reduce((sum, r) => sum + Number(r.Importo || 0), 0);
-
-  const handleRigaFatturaChange = (index, field, value) => {
-    const nuova = [...righeFatture];
-    nuova[index][field] = value;
-
-    if (field === "Lavoro") {
-      const contratto = datiContratti.find((c) => c.Descrizione === value);
-      if (contratto) {
-        nuova[index].ImportoTEMP = contratto.Costo;
-        nuova[index].CostoTemp2 = contratto.CostoTemp2; // <--- AGGIUNGI QUESTO
-        const oggi = new Date().toISOString().substring(0, 10);
-        nuova[index].Data1 = oggi;
-        nuova[index].Data2 = oggi;
-      }
-    }
-
-    setRigheFatture(nuova);
-  };
-
-  const totaleImportiFatture = righeFatture.reduce(
-    (sum, r) => sum + Number(r.Importo || 0),
-    0
-  );
-  let residuoFatturare = totaleProduzioneTotale - totaleImportiFatture;
-
-  const percentualeFatturazione =
-    totaleProduzioneTotale > 0
-      ? (() => {
-          const result = (totaleImportiFatture / totaleImportiManuali) * 100;
-          if (!isFinite(result)) return "100.00"; // se infinito o NaN
-          return result.toFixed(2);
-        })()
-      : "0.00";
-
-  const parseFloatSafe = (val) => {
-    if (typeof val === "number") return val;
-    if (!val || typeof val !== "string") return 0;
-    const clean = val.replace(/\./g, "").replace(",", ".");
-    const parsed = parseFloat(clean);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
-  const sommaImporto = righeFatture.reduce(
-    (sum, r) => sum + parseFloatSafe(r.Importo),
-    0
-  );
-  const sommaImporto2 = righeFatture.reduce(
-    (sum, r) => sum + parseFloatSafe(r.Importo2),
-    0
-  );
-
-  const avanzamentoPercentuale =
-    sommaImporto > 0 ? (sommaImporto2 / sommaImporto) * 100 : 0;
-  const avanzamentoTotale = sommaImporto2;
-  const salDaFare = sommaImporto - sommaImporto2;
-
-  useEffect(() => {
-    const totaleImportiManuali = datiContratti.reduce(
-      (sum, c) => sum + Number(c.CostoTemp2 || 0),
-      0
-    );
-    const totaleProduzioneTotale = datiContratti.reduce(
-      (sum, c) => sum + Number(c.produzioneTotale || 0),
-      0
-    );
-    const produzioneResidua = datiContratti.reduce(
-      (sum, c) => sum + Number(c.produzioneResidua || 0),
-      0
-    );
-    const percentualeAvanzamento =
-      totaleProduzioneTotale > 0
-        ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
-        : "0.00";
-    if (onProduzioneUpdate) {
-      onProduzioneUpdate({
-        percentualeAvanzamento,
-        totaleProduzione: totaleImportiManuali,
-        produzioneResidua,
-      });
-    }
-  }, [datiContratti]);
-
-  return (
-    <div
-      style={{
-        padding: "1rem",
-        backgroundColor: "white",
-        border: "1px solid #ccc",
-      }}
-    >
-      <span
-        style={{
-          float: "right",
-          backgroundColor: (() => {
-            const stato = datiGenerali2?.statoDinamico || "";
-            if (stato === "CHIUSO") return "#d32f2f";
-            if (stato === "APERTO") return "#388e3c";
-            return "#fbc02d";
-          })(),
-          color: "white",
-          padding: "0.3rem 1rem",
-          fontWeight: "bold",
-          borderRadius: 4,
-        }}
-      >
-        {datiGenerali2?.statoDinamico || "BLOCCATO"}
-      </span>
-      <br></br>
-      <div
-        style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
-      >
-        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
-        {commessa?.Indirizzo || ""}
-      </div>
-
-      <div style={{ marginBottom: "2rem", fontFamily: "Arial, sans-serif" }}>
-        {/* Avanzamento Commessa */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            borderRadius: "12px",
-            overflow: "hidden",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-            marginBottom: "1rem",
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              backgroundColor: "#f9f9f9",
-              padding: "1rem",
-              fontWeight: "bold",
-              color: "#444",
-              borderRight: "1px solid #eee",
-            }}
-          >
-            Avanzamento commessa
-          </div>
-          <div
-            style={{
-              flex: 5,
-              background: "#4caf50",
-              color: "rgb(0, 0, 0)", // nero in RGB
-              textAlign: "center",
-              padding: "1rem",
-              fontWeight: "600",
-            }}
-          >
-            Avanzamento produzione: {percentualeAvanzamento}% €{" "}
-            {totaleImportiManuali.toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-          <div
-            style={{
-              flex: 2,
-              background: "#c8e6c9",
-              padding: "1rem",
-              fontWeight: "600",
-              textAlign: "center",
-              color: "#2e7d32",
-            }}
-          >
-            Lavori residui: €{" "}
-            {datiContratti
-              .reduce((sum, c) => sum + Number(c.produzioneResidua || 0), 0)
-              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-          </div>
-        </div>
-
-        {/* Avanzamento SAL */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            borderRadius: "12px",
-            overflow: "hidden",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-            marginBottom: "1rem",
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              backgroundColor: "#f9f9f9",
-              padding: "1rem",
-              fontWeight: "bold",
-              color: "#444",
-              borderRight: "1px solid #eee",
-            }}
-          >
-            Avanzamento SAL
-          </div>
-          <div
-            style={{
-              flex: 5,
-              background: "#a5d6a7",
-              textAlign: "center",
-              padding: "1rem",
-              fontWeight: "600",
-            }}
-          >
-            Avanzamento SAL: {avanzamentoPercentuale.toFixed(2)}% €
-            {avanzamentoTotale.toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-          <div
-            style={{
-              flex: 2,
-              background: "#ef9a9a",
-              padding: "1rem",
-              fontWeight: "600",
-              textAlign: "center",
-              color: "#b71c1c",
-            }}
-          >
-            SAL da fare: €
-            {salDaFare.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-          </div>
-        </div>
-
-        {/* Avanzamento Fatturazione */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            borderRadius: "12px",
-            overflow: "hidden",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-            marginBottom: "1rem",
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              backgroundColor: "#f9f9f9",
-              padding: "1rem",
-              fontWeight: "bold",
-              color: "#444",
-              borderRight: "1px solid #eee",
-            }}
-          >
-            Avanzamento fatturazione
-          </div>
-          <div
-            style={{
-              flex: 5,
-              background: "#81c784",
-              textAlign: "center",
-              padding: "1rem",
-              fontWeight: "600",
-            }}
-          >
-            Avanzamento fatturazione: {percentualeFatturazione}% €{" "}
-            {totaleImportiFatture.toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-
-          <div
-            style={{
-              flex: 2,
-              background: "#e0e0e0",
-              padding: "1rem",
-              fontWeight: "600",
-              textAlign: "center",
-              color: "#424242",
-            }}
-          >
-            Residuo fatturare:
-            {residuoFatturare.toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-        </div>
-
-        {/* Box sotto */}
-        <div style={{ display: "flex", gap: "1rem" }}>
-          <div
-            style={{
-              flex: 1,
-              background: "#ffcc80",
-              padding: "1rem",
-              textAlign: "center",
-              fontWeight: "bold",
-              fontSize: "1rem",
-              borderRadius: "12px",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-              color: "#6d4c41",
-            }}
-          >
-            PRODUZIONE NON FATTURATA €{" "}
-            {produzioneNonFatturata.toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-
-          <div
-            style={{
-              flex: 1,
-              background: "#f44336",
-              padding: "1rem",
-              textAlign: "center",
-              fontWeight: "bold",
-              fontSize: "1rem",
-              borderRadius: "12px",
-              color: "white",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-            }}
-          >
-            SAL NON FATTURATI €{" "}
-            {salNonFatturati.toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-        </div>
-      </div>
-
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th
-              colSpan={5}
-              style={{
-                backgroundColor: "#ddf0e3", // verde
-                color: "rgb(0, 0, 0)", // nero in RGB
-                textAlign: "center",
-                fontWeight: "bold",
-                fontSize: "18px",
-                padding: "10px",
-              }}
-            >
-              Avanzamento Produzione
-            </th>
-          </tr>
-          <tr style={{ backgroundColor: "#ddf0e3" }}>
-            <th style={{ ...cellStyle, minWidth: "130px" }}>Lavori</th>
-            <th style={cellStyle}>Data</th>
-            <th style={cellStyle}>Importo</th>
-
-            <th style={cellStyle}>Produzione Totale</th>
-            <th style={cellStyle}>Produzione Residua</th>
-          </tr>
-        </thead>
-        <tbody>
-          {datiContratti.map((contratto, index) => {
-            return (
-              <tr key={index}>
-                <td style={{ ...cellStyle, minWidth: "130px" }}>
-                  <input
-                    type="text"
-                    value={contratto?.Descrizione || ""}
-                    onChange={(e) =>
-                      handleChange(index, "Descrizione", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-                <td style={cellStyle}>
-                  <input
-                    type="date"
-                    value={contratto?.Data?.substring(0, 10) || ""}
-                    onChange={(e) =>
-                      handleChange(index, "Data", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-                <td style={cellStyle}>
-                  <input
-                    type="text"
-                    value={contratto?.CostoTemp2 || ""}
-                    onChange={(e) =>
-                      handleChange(index, "CostoTemp2", e.target.value)
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-
-                <td style={cellStyle}>
-                  €
-                  {Number(contratto?.Costo || 0).toLocaleString("it-IT", {
-                    minimumFractionDigits: 2,
-                  })}
-                </td>
-                <td style={cellStyle}>
-                  <input
-                    type="number"
-                    value={contratto?.produzioneResidua || ""}
-                    onChange={(e) =>
-                      handleChange(
-                        index,
-                        "produzioneResidua",
-                        Number(e.target.value)
-                      )
-                    }
-                    style={{ width: "100%" }}
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tr
-          style={{
-            backgroundColor: "#ddd",
-            fontWeight: "bold",
-            textAlign: "center",
-          }}
-        >
-          <td style={{ padding: "8px", border: "1px solid #ccc" }}>TOTALI</td>
-          <td style={{ padding: "8px", border: "1px solid #ccc" }}></td>
-          <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-            €{" "}
-            {datiContratti
-              .reduce((sum, r) => sum + Number(r.CostoTemp2 || 0), 0)
-              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-          </td>
-          <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-            €{" "}
-            {datiContratti
-              .reduce((sum, r) => sum + Number(r.Costo || 0), 0)
-              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-          </td>
-          <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-            €{" "}
-            {datiContratti
-              .reduce((sum, r) => sum + Number(r.produzioneResidua || 0), 0)
-              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-          </td>
-        </tr>
-      </table>
-
-      <button
-        onClick={aggiungiRiga}
-        style={{
-          marginTop: "1rem",
-          padding: "0.5rem 1rem",
-          backgroundColor: "#4caf50",
-          color: "white",
-          border: "none",
-          borderRadius: 4,
-          cursor: "pointer",
-        }}
-      >
-        + Aggiungi Riga
-      </button>
-      <p></p>
-      <br />
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontFamily: "Arial, sans-serif",
-          fontSize: "14px",
-          border: "1px solid #ccc",
-        }}
-      >
-        <thead>
-          <tr style={{ backgroundColor: "#e6f0e6", textAlign: "center" }}>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Lavori</th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
-              Importo
-            </th>
-            <th
-              colSpan="4"
-              style={{ padding: "8px", border: "1px solid #ccc" }}
-            >
-              FATTURA
-            </th>
-            <th
-              colSpan="3"
-              style={{ padding: "8px", border: "1px solid #ccc" }}
-            >
-              SAL
-            </th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
-              Sal non fatturati
-            </th>
-          </tr>
-          <tr style={{ backgroundColor: "#e6f0e6", textAlign: "center" }}>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}></th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}></th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Nodo</th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>N°</th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Data</th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
-              Importo
-            </th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>N°</th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>Data</th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}>
-              Importo
-            </th>
-            <th style={{ padding: "8px", border: "1px solid #ccc" }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {righeConSalNonFatturato.map((r, i) => (
-            <tr key={i} style={{ textAlign: "center" }}>
-              <td
-                style={{
-                  padding: "8px",
-                  border: "1px solid #ccc",
-                  textAlign: "left",
-                }}
-              >
-                <select
-                  value={r.Lavoro}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(i, "Lavoro", e.target.value)
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "4px",
-                    backgroundColor: "#f5f5f5",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                  }}
-                >
-                  <option value="">Seleziona</option>
-                  {datiContratti.map((contratto, idx) => (
-                    <option key={idx} value={contratto.Descrizione}>
-                      {contratto.Descrizione}
-                    </option>
-                  ))}
-                </select>
-              </td>
-
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                € {Number(r.CostoTemp2 || 0).toLocaleString("it-IT")}
-              </td>
-
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                {r.Nodo}
-              </td>
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                {r.Numero1}
-              </td>
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                {r.Data1 || ""}
-              </td>
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                € {Number(r.Importo || 0).toLocaleString("it-IT")}
-              </td>
-
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                <input
-                  type="text"
-                  value={r.Numero2 || ""}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(i, "Numero2", e.target.value)
-                  }
-                  style={{ width: "100%" }}
-                />
-              </td>
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                <input
-                  type="date"
-                  value={r.Data2 || ""}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(i, "Data2", e.target.value)
-                  }
-                  style={{ width: "100%" }}
-                />
-              </td>
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                <input
-                  type="number"
-                  value={r.Importo2 || ""}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(
-                      i,
-                      "Importo2",
-                      Number(e.target.value)
-                    )
-                  }
-                  style={{ width: "100%" }}
-                />
-              </td>
-              <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                €{" "}
-                {(
-                  parseFloatSafe(r.Importo2) - parseFloatSafe(r.Importo)
-                ).toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-              </td>
-            </tr>
-          ))}
-
-          <tr
-            style={{
-              backgroundColor: "#ddd",
-              fontWeight: "bold",
-              textAlign: "center",
-            }}
-          >
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}>TOTALI</td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-              €{" "}
-              {righeFatture
-                .reduce((sum, r) => sum + Number(r.CostoTemp2 || 0), 0)
-                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-            </td>
-            <td colSpan={3}></td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-              €{" "}
-              {righeFatture
-                .reduce((sum, r) => sum + Number(r.Importo || 0), 0)
-                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-            </td>
-            <td colSpan={2}></td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-              €{" "}
-              {righeFatture
-                .reduce((sum, r) => sum + Number(r.Importo2 || 0), 0)
-                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-            </td>
-            <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-              €{" "}
-              {righeFatture
-                .reduce((sum, r) => {
-                  const importo2 = parseFloatSafe(r?.Importo2);
-                  const importo = parseFloatSafe(r?.Importo);
-                  const diff = importo2 - importo;
-                  return sum + (isNaN(diff) ? 0 : diff);
-                }, 0)
-                .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
 const CommessaTecnico = () => {
   const tabsOriginali = [
     "Dati commessa",
@@ -1961,6 +1530,11 @@ const CommessaTecnico = () => {
     "C.D.P.",
     "Cruscotto di commessa",
   ];
+
+  const [parametriIniziali, setParametriIniziali] = useState(null);
+  const [hasLoadedCommessaIniziale, setHasLoadedCommessaIniziale] =
+    useState(false);
+
   const [datiProduzione, setDatiProduzione] = useState({
     percentualeAvanzamento: "0.00",
     totaleProduzione: 0,
@@ -1975,11 +1549,13 @@ const CommessaTecnico = () => {
   const [selectedTab, setSelectedTab] = useState("Dati commessa");
 
   const [datiCommessa, setDatiCommessa] = useState(null);
+  const [contratti, setContratti] = useState([]);
+  const [datiContratti, setDatiContratti] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const dati = await CantiereService.ricercaCantieriArca({});
+        const dati = await CantiereService.ricercaCantieri({});
         setAllCommesse(dati);
       } catch (err) {
         console.error("Errore nel caricamento commesse:", err);
@@ -1988,12 +1564,29 @@ const CommessaTecnico = () => {
     fetchData();
   }, []);
 
-  const [contratti, setContratti] = useState([]);
-  const [datiContratti, setDatiContratti] = useState([]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const isNuova = params.get("modalita") === "nuova";
+    const codice = params.get("codice");
+
+    if (isNuova && codice) {
+      setParametriIniziali({ isNuova, codice });
+    }
+  }, []);
 
   useEffect(() => {
     if (!selectedCommessa?.IdCantiere) return;
 
+    // Reset degli stati relativi alla commessa precedente
+    setDatiContratti([]);
+    setContratti([]);
+    setDatiProduzione({
+      percentualeAvanzamento: "0.00",
+      totaleProduzione: 0,
+      produzioneResidua: 0,
+    });
+
+    // Ricarico contratti e produco calcoli
     CantiereService.contrattoCommessa({
       Codice: selectedCommessa.IdCantiere,
     }).then((result) => {
@@ -2012,19 +1605,19 @@ const CommessaTecnico = () => {
 
       setDatiContratti(iniziali);
 
-      // Calcolo produzione all’avvio
       const totaleImportiManuali = iniziali.reduce(
         (sum, c) => sum + Number(c.CostoTemp2 || 0),
-        0
+        0,
       );
       const totaleProduzioneTotale = iniziali.reduce(
         (sum, c) => sum + Number(c.produzioneTotale || 0),
-        0
+        0,
       );
       const produzioneResidua = iniziali.reduce(
         (sum, c) => sum + Number(c.produzioneResidua || 0),
-        0
+        0,
       );
+
       const percentualeAvanzamento =
         totaleProduzioneTotale > 0
           ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
@@ -2037,52 +1630,24 @@ const CommessaTecnico = () => {
       });
     });
   }, [selectedCommessa?.IdCantiere]);
-
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("modalita") === "nuova") {
-      Swal.fire({
-        title: "Nuova commessa!",
-        text: "Stai creando una nuova commessa, inserisci i campi necessari, indirizzo cantiere",
-        icon: "success",
-        confirmButtonText: "OK",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          console.log("Alert chiuso con OK");
+    const timer = setTimeout(async () => {
+      if (searchTerm.trim().length >= 2) {
+        try {
+          const risultati = await CantiereService.ricercaCantieri({});
+          setFilteredOptions(risultati || []);
+        } catch (err) {
+          console.error("Errore nella ricerca delle commesse:", err);
+          setFilteredOptions([]);
         }
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (searchTerm.length > 1) {
-      const filtered = allCommesse.filter((c) => {
-        const term = searchTerm.toLowerCase();
-        return (
-          (c.IdCantiere &&
-            c.IdCantiere.toString().toLowerCase().includes(term)) ||
-          (c.Codice && c.Codice.toLowerCase().includes(term)) ||
-          (c.RagioneSociale && c.RagioneSociale.toLowerCase().includes(term)) ||
-          (c.Indirizzo && c.Indirizzo.toLowerCase().includes(term))
-        );
-      });
-      setFilteredOptions(filtered.slice(0, 10));
-    } else {
-      setFilteredOptions([]);
-    }
-  }, [searchTerm, allCommesse]);
-
-  useEffect(() => {
-    const ultima = localStorage.getItem("ultimaCommessa");
-    if (ultima) {
-      try {
-        const parsed = JSON.parse(ultima);
-        setSelectedCommessa(parsed);
-      } catch (err) {
-        console.error("Errore parsing commessa da localStorage:", err);
+      } else {
+        setFilteredOptions([]);
       }
-    }
-  }, []);
+    }, 300); // debounce 300ms
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const handleComplete = (data) => {
     if (!isModalitaNuova) return;
 
@@ -2138,15 +1703,15 @@ const CommessaTecnico = () => {
               bottom: 0,
               left: "50%",
               transform: "translateX(-50%)",
-              width: "180px", // solo sotto il testo
+              width: "180px",
               height: "3px",
-              backgroundColor: "#999", // più scuro
+              backgroundColor: "#999",
               borderRadius: 2,
             }}
           />
         </div>
 
-        <br></br>
+        <br />
         <div
           style={{
             display: "table",
@@ -2184,60 +1749,63 @@ const CommessaTecnico = () => {
             );
           })}
         </div>
-        <div style={{ marginBottom: "1rem" }}>
-          <input
-            type="text"
-            placeholder="Filtra per codice, cliente o indirizzo..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+
+        <input
+          type="text"
+          placeholder="Filtra per codice, cliente o indirizzo..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "0.5rem",
+            border: "1px solid #ccc",
+          }}
+        />
+        {filteredOptions.length > 0 && (
+          <div
             style={{
-              width: "100%",
-              padding: "0.5rem",
               border: "1px solid #ccc",
+              backgroundColor: "#fff",
+              maxHeight: "200px",
+              overflowY: "auto",
             }}
-          />
-          {filteredOptions.length > 0 && (
-            <div
-              style={{
-                border: "1px solid #ccc",
-                backgroundColor: "#fff",
-                maxHeight: "200px",
-                overflowY: "auto",
-              }}
-            >
-              {filteredOptions.map((commessa) => (
-                <div
-                  key={commessa.IdCantiere}
-                  onClick={() => {
-                    setSelectedCommessa(commessa);
-                    localStorage.setItem(
-                      "ultimaCommessa",
-                      JSON.stringify(commessa)
-                    ); // <-- salvataggio
-                    setSearchTerm("");
-                    setFilteredOptions([]);
-                  }}
-                  style={{
-                    padding: "0.5rem",
-                    cursor: "pointer",
-                    borderBottom: "1px solid #eee",
-                  }}
-                >
-                  <strong>{commessa.IdCantiere}</strong> -{" "}
-                  {commessa.RagioneSociale} ({commessa.Indirizzo})
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          >
+            {filteredOptions.map((commessa) => (
+              <div
+                key={commessa.IdCantiere}
+                onClick={() => {
+                  setSelectedCommessa(commessa);
+                  localStorage.setItem(
+                    "ultimaCommessa",
+                    JSON.stringify(commessa),
+                  );
+                  setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
+                  setFilteredOptions([]);
+                }}
+                style={{
+                  padding: "0.5rem",
+                  cursor: "pointer",
+                  borderBottom: "1px solid #eee",
+                }}
+              >
+                <strong>{commessa.NomeCantiere}</strong> -{" "}
+                {commessa.RagioneSociale}
+                {commessa.Indirizzo && ` (${commessa.Indirizzo})`}
+              </div>
+            ))}
+          </div>
+        )}
+
         {selectedTab === "Dati commessa" && (
           <DatiCommessa
+            key={selectedCommessa?.IdCantiere} // <-- AGGIUNTO
             commessa={selectedCommessa}
             onComplete={handleComplete}
           />
         )}
         {selectedTab === "Gestione contratto" && (
           <GestioneContratto
+            key={selectedCommessa?.IdCantiere}
             commessa={selectedCommessa}
             contratti={contratti}
             datiContratti={datiContratti}
@@ -2245,21 +1813,35 @@ const CommessaTecnico = () => {
             onProduzioneUpdate={(dati) => setDatiProduzione(dati)}
           />
         )}
+
         {selectedTab === "Costi / Ricavi" && (
-          <CostiRicavi commessa={selectedCommessa} />
-        )}
-        {selectedTab === "Approvvigionamenti" && (
-          <Approvvigionamenti commessa={selectedCommessa} />
-        )}
-        {selectedTab === "C.D.P." && <CDP commessa={selectedCommessa} />}
-        {selectedTab === "Cruscotto di commessa" && (
-          <CruscottoCommessa
+          <CostiRicavi
+            key={selectedCommessa?.IdCantiere}
             commessa={selectedCommessa}
-            percentualeAvanzamento={datiProduzione.percentualeAvanzamento}
-            totaleProduzione={datiProduzione.totaleProduzione}
-            produzioneResidua={datiProduzione.produzioneResidua}
           />
         )}
+
+        {selectedTab === "Approvvigionamenti" && (
+          <Approvvigionamenti
+            key={selectedCommessa?.IdCantiere}
+            commessa={selectedCommessa}
+          />
+        )}
+
+        {selectedTab === "C.D.P." && (
+          <CDP key={selectedCommessa?.IdCantiere} commessa={selectedCommessa} />
+        )}
+
+        {selectedTab === "Cruscotto di commessa" &&
+          selectedCommessa != null && (
+            <CruscottoCommessa
+              key={selectedCommessa?.IdCantiere}
+              commessa={selectedCommessa}
+              percentualeAvanzamento={datiProduzione.percentualeAvanzamento}
+              totaleProduzione={datiProduzione.totaleProduzione}
+              produzioneResidua={datiProduzione.produzioneResidua}
+            />
+          )}
       </div>
     </div>
   );
@@ -2287,33 +1869,6 @@ const CruscottoCommessa = ({
 
   useEffect(() => {
     if (commessa?.IdCantiere) {
-      CantiereService.fattureCommessa({ Codice: commessa.IdCantiere })
-        .then((result) => {
-          const generate = result.map((fattura, idx) => ({
-            Lavoro: "",
-            Nodo: "",
-            Numero1: idx + 1,
-            Data1: "",
-            Importo1: "",
-            Numero2: "",
-            CostoTemp2: "",
-            Data2: "",
-            Importo2: "",
-            ImportoTEMP: 0,
-            Id: idx + 1,
-            Importo: fattura.Costo || 0,
-          }));
-          setRigheFatture(generate);
-          const totaleFatture = result.reduce(
-            (acc, fattura) => acc + (fattura.Costo || 0),
-            0
-          );
-          setFattureTotali(totaleFatture);
-        })
-        .catch((err) =>
-          console.error("Errore nel caricamento delle fatture:", err)
-        );
-
       CantiereService.contrattoCommessa({ Codice: commessa.IdCantiere })
         .then((result) => setContratti(result || []))
         .catch((err) => console.error("Errore nel fetch dei contratti:", err));
@@ -2328,7 +1883,7 @@ const CruscottoCommessa = ({
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err)
+          console.error("Errore nel recupero dello stato cantiere:", err),
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.IdCantiere })
@@ -2389,6 +1944,31 @@ const CruscottoCommessa = ({
       };
     });
     setDatiContratti(iniziali);
+    const fetchStato = async () => {
+      if (!commessa?.NomeCantiere) return;
+
+      try {
+        const result = await CantiereService.statoCommessa({
+          Codice: commessa.NomeCantiere,
+        });
+
+        const statoPulito = result?.trim().toUpperCase();
+        let statoLabel = "BLOCCATO";
+
+        if (statoPulito.includes("A")) statoLabel = "APERTO";
+        else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+        else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+        setDatiGenerali((prev) => ({
+          ...prev,
+          statoDinamico: statoLabel,
+        }));
+      } catch (error) {
+        console.error("Errore nel recupero dello stato cantiere:", error);
+      }
+    };
+
+    fetchStato();
   }, [contratti]);
 
   const parseFloatSafe = (val) => {
@@ -2399,30 +1979,12 @@ const CruscottoCommessa = ({
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  const totaleImportiManuali = datiContratti.reduce(
-    (sum, c) => sum + Number(c.CostoTemp2 || 0),
-    0
-  );
-  const totaleProduzioneTotale = datiContratti.reduce(
-    (sum, c) => sum + Number(c.produzioneTotale || 0),
-    0
-  );
-
-  const sommaImporto = righeFatture.reduce(
-    (sum, r) => sum + parseFloatSafe(r.Importo),
-    0
-  );
-  const sommaImporto2 = righeFatture.reduce(
-    (sum, r) => sum + parseFloatSafe(r.Importo2),
-    0
-  );
-
   return (
     <div style={{ padding: "1rem", backgroundColor: "white" }}>
       <div
         style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
       >
-        Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+        Cod. {commessa?.NomeCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
         {commessa?.Indirizzo || ""}
         <span
           style={{
@@ -2715,7 +2277,6 @@ const CruscottoCommessa = ({
           </div>
         </div>
 
-        {/* ANDAMENTO PRODUZIONE */}
         <div
           style={{
             textAlign: "center",
@@ -2749,7 +2310,6 @@ const CruscottoCommessa = ({
           </span>
         </div>
         <div style={{ display: "flex", width: "100%" }}>
-          {/* Avanzamento produzione */}
           <div
             style={{
               width: "50%",
@@ -2766,7 +2326,6 @@ const CruscottoCommessa = ({
             })}
           </div>
 
-          {/* Lavori residui */}
           <div
             style={{
               width: "50%",
@@ -2793,7 +2352,6 @@ const CruscottoCommessa = ({
             color: "gray",
           }}
         >
-          {/* Placeholder grafico */}
           <div style={{ fontStyle: "italic" }}>
             <GraficoCostiMese
               chartData={chartData}
@@ -2806,7 +2364,7 @@ const CruscottoCommessa = ({
   );
 };
 
-const GraficoCostiMese = ({ chartData, dataAggiornamento }) => {
+const GraficoCostiMese = ({ chartData }) => {
   return (
     <div style={{ width: "100%", height: 500 }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -2843,7 +2401,7 @@ const CDP = ({ commessa }) => {
       if (commessa?.IdCantiere) {
         try {
           const result = await CantiereService.statoCommessa({
-            Codice: commessa.IdCantiere,
+            Codice: commessa.NomeCantiere,
           });
 
           const statoGrezzo = result;
@@ -2927,7 +2485,7 @@ const CDP = ({ commessa }) => {
         <div
           style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
         >
-          Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+          Cod. {commessa?.NomeCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
           {commessa?.Indirizzo || ""}
         </div>
         <span
@@ -3160,7 +2718,7 @@ const Approvvigionamenti = ({ commessa }) => {
       if (commessa?.IdCantiere) {
         try {
           const result = await CantiereService.statoCommessa({
-            Codice: commessa.IdCantiere,
+            Codice: commessa.NomeCantiere,
           });
 
           const statoGrezzo = result;
@@ -3189,7 +2747,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err)
+          console.error("Errore nel caricamento approvvigionamenti:", err),
         );
     }
   }, [commessa?.IdCantiere]);
@@ -3248,7 +2806,7 @@ const Approvvigionamenti = ({ commessa }) => {
         <div
           style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
         >
-          Cod. {commessa?.IdCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
+          Cod. {commessa?.NomeCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
           {commessa?.Indirizzo || ""}
         </div>
 
@@ -3504,15 +3062,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?"
+                          "Sei sicuro di voler eliminare questo approvvigionamento?",
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero
+                            editingItem.Numero,
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere
+                            commessa?.IdCantiere,
                           );
                           setRighe(updated);
                           chiudiDrawer();

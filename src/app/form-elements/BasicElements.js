@@ -75,9 +75,9 @@ const TabelleCantieri = () => {
         const gestione = dati.map((c) => {
           const parsedDate = parseData(c.DataCreazioneCantiere);
           return {
-            cod: c.IdCantiere,
+            cod: c.NomeCantiere,
             commessa: c.Indirizzo || "-",
-            respUfficio: c.RespUfficio || "-",
+            ResponsabileUfficio: c.ResponsabileUfficio || "-",
             costi60gg:
               parseFloat((c.CostiUltimi60gg || "0").replace(/[^\d.-]/g, "")) ||
               0,
@@ -89,9 +89,9 @@ const TabelleCantieri = () => {
         gestione.sort((a, b) => b.dataObj - a.dataObj);
 
         const esposizione = dati.map((c) => ({
-          cod: c.IdCantiere,
+          cod: c.NomeCantiere,
           commessa: c.Indirizzo || "-",
-          respUfficio: c.RespUfficio || "-",
+          ResponsabileUfficio: c.ResponsabileUfficio || "-",
           costiSostenuti:
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
@@ -173,8 +173,9 @@ const TabelleCantieri = () => {
             {tabellaGestione.slice(0, visibleRowsGestione).map((r, idx) => (
               <tr key={idx}>
                 <td style={cellStyle}>{r.cod}</td>
+
                 <td style={cellStyle}>{r.commessa}</td>
-                <td style={cellStyle}>{r.respUfficio}</td>
+                <td style={cellStyle}>{r.ResponsabileUfficio}</td>
                 <td style={cellStyle}>€ {r.costi60gg.toFixed(2)}</td>
                 <td
                   style={{
@@ -211,7 +212,7 @@ const TabelleCantieri = () => {
             <tr>
               {[
                 "Cod.",
-                "Commessa",
+                "Indirizzo",
                 "Resp. Ufficio",
                 "Costi sostenuti",
                 "Esposizione",
@@ -229,7 +230,7 @@ const TabelleCantieri = () => {
                 <tr key={idx}>
                   <td style={cellStyle}>{r.cod}</td>
                   <td style={cellStyle}>{r.commessa}</td>
-                  <td style={cellStyle}>{r.respUfficio}</td>
+                  <td style={cellStyle}>{r.ResponsabileUfficio}</td>
                   <td style={cellStyle}>€ {r.costiSostenuti.toFixed(2)}</td>
                   <td
                     style={{
@@ -261,11 +262,13 @@ const TabelleCantieri = () => {
 function DashboardTabsPanoramica() {
   const [commesse, setCommesse] = useState([]);
   const [filteredCommesse, setFilteredCommesse] = useState([]);
+  const [commessaSelezionata, setCommessaSelezionata] = useState(null);
+
   const [filters, setFilters] = useState({
     codice: "",
     indirizzo: "",
     stato: "",
-    respUfficio: "",
+    ResponsabileUfficio: "",
   });
   const [activeTab, setActiveTab] = useState("Panoramica");
   const [commessaOption, setCommessaOption] = useState("");
@@ -273,11 +276,47 @@ function DashboardTabsPanoramica() {
   const [summaryCards, setSummaryCards] = useState([]);
   const [tabellaGestione, setTabellaGestione] = useState([]);
   const [tabellaEsposizione, setTabellaEsposizione] = useState([]);
+  const [allCommesse, setAllCommesse] = useState([]);
+  const [filtroCodice, setFiltroCodice] = useState("");
+  const [filtroRagioneSociale, setFiltroRagioneSociale] = useState("");
+  const [commesseFiltrate, setCommesseFiltrate] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const dati = await CantiereService.ricercaCantieriArca({});
+        setAllCommesse(dati);
+        setCommesseFiltrate(dati); // inizializza con tutti
+      } catch (err) {
+        console.error("Errore nel caricamento commesse:", err);
+      }
+    };
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    const filtrate = allCommesse.filter((c) => {
+      const matchNomeCantiere =
+        filtroCodice === "" ||
+        (c.NomeCantiere || "")
+          .toLowerCase()
+          .includes(filtroCodice.toLowerCase());
+      const matchRagioneSociale =
+        filtroRagioneSociale === "" ||
+        (c.RagioneSociale || "")
+          .toLowerCase()
+          .includes(filtroRagioneSociale.toLowerCase());
+
+      return matchNomeCantiere && matchRagioneSociale;
+    });
+    setCommesseFiltrate(filtrate);
+  }, [filtroCodice, filtroRagioneSociale, allCommesse]);
 
   useEffect(() => {
     const fetchCommesse = async () => {
       try {
         const dati = await CantiereService.ricercaCantieri({});
+        console.log("Dati cantieri:", dati);
 
         // Funzione parsing data
         const parseData = (str) => {
@@ -285,14 +324,13 @@ function DashboardTabsPanoramica() {
           const [dd, mm, yyyy] = str.split("/");
           return new Date(`${yyyy}-${mm}-${dd}`);
         };
-
-        // Dati tabella 1
         const gestione = dati.map((c) => {
           const parsedDate = parseData(c.DataCreazioneCantiere);
           return {
-            cod: c.IdCantiere,
+            cod: c.NomeCantiere,
+            NomeCantiere: c.NomeCantiere,
             commessa: c.Indirizzo || "-",
-            respUfficio: c.RespUfficio || "-",
+            ResponsabileUfficio: c.ResponsabileUfficio || "-",
             costi60gg:
               parseFloat((c.CostiUltimi60gg || "0").replace(/[^\d.-]/g, "")) ||
               0,
@@ -301,14 +339,13 @@ function DashboardTabsPanoramica() {
           };
         });
 
-        // Ordina per data discendente (più recente in alto)
         gestione.sort((a, b) => b.dataObj - a.dataObj);
 
-        // Dati tabella 2
         const esposizione = dati.map((c) => ({
-          cod: c.IdCantiere,
+          cod: c.NomeCantiere,
+          NomeCantiere: c.NomeCantiere,
           commessa: c.Indirizzo || "-",
-          respUfficio: c.RespUfficio || "-",
+          ResponsabileUfficio: c.ResponsabileUfficio || "-",
           costiSostenuti:
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
@@ -338,24 +375,31 @@ function DashboardTabsPanoramica() {
   };
 
   useEffect(() => {
-    const filtra = commesse.filter((c) => {
-      return (
-        (filters.codice === "" ||
-          c.IdCantiere.toString().includes(filters.codice)) &&
-        (filters.indirizzo === "" ||
-          (c.Indirizzo || "")
-            .toLowerCase()
-            .includes(filters.indirizzo.toLowerCase())) &&
-        (filters.stato === "" ||
-          (c.StatoCantiere || "")
-            .toLowerCase()
-            .includes(filters.stato.toLowerCase())) &&
-        (filters.respUfficio === "" ||
-          (c.RespUfficio || "")
-            .toLowerCase()
-            .includes(filters.respUfficio.toLowerCase()))
-      );
-    });
+    const filtra = commesse
+      .filter((c) => {
+        return (
+          (filters.codice === "" ||
+            c.IdCantiere.toString().includes(filters.codice)) &&
+          (filters.indirizzo === "" ||
+            (c.Indirizzo || "")
+              .toLowerCase()
+              .includes(filters.indirizzo.toLowerCase())) &&
+          (filters.stato === "" ||
+            (c.StatoCantiere || "")
+              .toLowerCase()
+              .includes(filters.stato.toLowerCase())) &&
+          (filters.ResponsabileUfficio === "" ||
+            (c.ResponsabileUfficio || "")
+              .toLowerCase()
+              .includes(filters.ResponsabileUfficio.toLowerCase()))
+        );
+      })
+      .sort((a, b) => {
+        const dataA = new Date(a.DataCreazioneCantiere);
+        const dataB = new Date(b.DataCreazioneCantiere);
+        return dataB - dataA; // più recente prima
+      });
+
     setFilteredCommesse(filtra);
   }, [filters, commesse]);
 
@@ -373,12 +417,14 @@ function DashboardTabsPanoramica() {
         dati.forEach((c) => {
           console.log("Cantiere:", c);
           const stato = (c.StatoCantiere || "").toLowerCase();
+          const statoNormalizzato = (stato || "").toLowerCase();
 
-          if (stato.includes("chiuso")) {
+          if (statoNormalizzato.includes("chiuso")) {
             chiuse++;
           } else if (
-            stato === "incorso" ||
-            stato.includes("lavoro terminato")
+            statoNormalizzato === "incorso" ||
+            statoNormalizzato.includes("lavoro terminato") ||
+            statoNormalizzato.includes("aperto")
           ) {
             aperte++;
           } else {
@@ -480,7 +526,7 @@ function DashboardTabsPanoramica() {
           marginiValidi.length
         ).toFixed(1)
       : "0";
-  // ✅ ORA PUOI DEFINIRE dashboardCards
+
   const dashboardCards = [
     { label: "Commesse gestite", value: filteredCommesse.length },
     {
@@ -514,37 +560,224 @@ function DashboardTabsPanoramica() {
     setCommessaOption(value);
     if (value === "nuova") {
       setIsDrawerOpen(false);
-      window.location.href = "/gestione/commesse?modalita=nuova";
+
+      window.location.href =
+        "/demo/star-admin-free/react/template/demo_1/preview/gestione/commesse";
     }
   };
+  const creaClienteECantiereECommessa = async () => {
+    if (!commessaSelezionata) return;
 
+    const datiGenerali = {
+      cliente: commessaSelezionata.RagioneSociale,
+      indirizzo: commessaSelezionata.Indirizzo,
+      codice: commessaSelezionata.NomeCantiere,
+      tipoLavori: "", // eventualmente personalizza
+      tipoAppalto: "",
+      ResponsabileUfficio: "",
+      respCantiere: "",
+      contratto: "",
+      centroCosto: "",
+      gant: "",
+      condivisione: "",
+      sicurezza: "",
+      foto: "",
+      anagraficaCliente: "",
+      anagraficaProgettista: "",
+    };
+
+    const dataInizio = new Date(); // o derivata da UI
+    const dataFine = new Date(); // o derivata da UI
+
+    try {
+      const clienteRes = await CantiereService.creaCliente({
+        RagioneSociale: datiGenerali.cliente,
+      });
+      const idCliente = clienteRes.return;
+      const cantiereRes = await CantiereService.creaCantiere(
+        idCliente,
+        datiGenerali.codice, // <-- questo è il codice della commessa selezionata
+      );
+      const idCantiere = cantiereRes[0]?.IdCantiere;
+
+      const nuovaCommessa = {
+        IdCantiere: idCantiere,
+        Codice: datiGenerali.codice,
+        RagioneSociale: datiGenerali.cliente,
+        TipoLavori: datiGenerali.tipoLavori,
+        TipoAppalto: datiGenerali.tipoAppalto,
+        ResponsabileUfficio: datiGenerali.ResponsabileUfficio,
+        RespCantiere: datiGenerali.respCantiere,
+        Contratto: datiGenerali.contratto,
+        CentroCosto: datiGenerali.centroCosto,
+        Gant: datiGenerali.gant,
+        Condivisione: datiGenerali.condivisione,
+        Sicurezza: datiGenerali.sicurezza,
+        Foto: datiGenerali.foto,
+        AnagraficaCliente: datiGenerali.anagraficaCliente,
+        AnagraficaProgettista: datiGenerali.anagraficaProgettista,
+        DataInizio: dataInizio.toISOString(),
+        DataFine: dataFine.toISOString(),
+      };
+
+      const commessaRes = await CantiereService.aggiornaCantiere(nuovaCommessa);
+      console.log("Commessa creata:", commessaRes);
+
+      if (idCantiere) {
+        window.location.href =
+          "/demo/star-admin-free/react/template/demo_1/preview/gestione/commesse";
+      } else {
+        console.warn("ID cantiere non presente nella risposta:", commessaRes);
+        setIsDrawerOpen(false); // fallback
+      }
+      setIsDrawerOpen(false);
+    } catch (error) {
+      console.error("Errore durante la creazione della commessa:", error);
+    }
+  };
+  const normalize = (str) =>
+    str
+      ?.toString()
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
   const renderDrawer = () => (
     <Drawer
-      title="Crea Commessa"
+      title="Aggancia a Commessa Esistente"
       placement="right"
       closable
       onClose={() => setIsDrawerOpen(false)}
       open={isDrawerOpen}
+      width={800}
+      style={{ fontFamily: "Arial, sans-serif" }}
     >
       <Select
-        style={{ width: "100%" }}
+        style={{ width: "100%", marginBottom: 20 }}
         placeholder="Seleziona un'opzione"
         onChange={handleCommessaSelection}
       >
         <Option value="aggancia">Aggancia a commessa esistente</Option>
-        <Option value="nuova">Nuova commessa</Option>
+        {/*<Option value="nuova">Nuova commessa</Option>*/}
       </Select>
 
       {commessaOption === "aggancia" && (
-        <div style={{ marginTop: 20 }}>
-          <Input placeholder="Filtro per Codice" style={{ marginBottom: 10 }} />
-          <Input placeholder="Filtro per Ragione Sociale" />
-        </div>
-      )}
+        <>
+          {/* Filtri */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            <Input
+              placeholder="Filtra per Codice"
+              value={filtroCodice}
+              onChange={(e) => setFiltroCodice(e.target.value)}
+              style={{ flex: 1 }}
+            />
 
-      <div style={{ marginTop: 20, textAlign: "right" }}>
-        <Button onClick={() => setIsDrawerOpen(false)}>Chiudi</Button>
-      </div>
+            <Input
+              placeholder="Filtra per Ragione Sociale"
+              value={filtroRagioneSociale}
+              onChange={(e) => setFiltroRagioneSociale(e.target.value)}
+              style={{ flex: 2 }}
+            />
+          </div>
+
+          {/* Tabella risultati */}
+          <div style={{ overflowY: "auto", maxHeight: 450 }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                backgroundColor: "#f9fdf9",
+                borderRadius: 10,
+                boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+              }}
+            >
+              <thead style={{ backgroundColor: "#dbe8dc" }}>
+                <tr>
+                  <th style={cellDrawerStyle}></th>
+                  <th style={cellDrawerStyle}>Codice</th>
+                  <th style={cellDrawerStyle}>Nodo RIF</th>
+                  <th style={cellDrawerStyle}>Ragione Sociale</th>
+                  <th style={cellDrawerStyle}>Indirizzo</th>
+                  <th style={cellDrawerStyle}>Città</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commesseFiltrate
+                  .filter(
+                    (row) =>
+                      !commesse.some(
+                        (c) =>
+                          normalize(c.NomeCantiere) ===
+                          normalize(row.NomeCantiere),
+                      ),
+                  )
+                  .map((row, idx) => {
+                    const isChecked =
+                      commessaSelezionata &&
+                      commessaSelezionata.CodiceProgetto === row.CodiceProgetto;
+                    return (
+                      <tr
+                        key={idx}
+                        style={{
+                          backgroundColor: idx % 2 === 0 ? "#fff" : "#f4f8f4",
+                          borderBottom: "1px solid #eee",
+                        }}
+                      >
+                        <td style={cellDrawerStyle}>
+                          <input
+                            type="radio"
+                            name="commessaRadio" // questo garantisce una sola selezione
+                            checked={isChecked}
+                            onChange={() => setCommessaSelezionata(row)}
+                          />
+                        </td>
+                        <td style={cellDrawerStyle}>{row.NomeCantiere}</td>
+                        <td style={cellDrawerStyle}>{row.NodoRIF}</td>
+                        <td style={cellDrawerStyle}>{row.RagioneSociale}</td>
+                        <td style={cellDrawerStyle}>{row.Indirizzo}</td>
+                        <td style={cellDrawerStyle}>{row.Citta}</td>
+                      </tr>
+                    );
+                  })}
+                {commesseFiltrate.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      style={{ padding: 20, textAlign: "center" }}
+                    >
+                      Nessuna commessa trovata.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Azioni */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 30,
+            }}
+          >
+            <Button onClick={() => setIsDrawerOpen(false)}>Chiudi</Button>
+
+            <Button
+              type="primary"
+              disabled={!commessaSelezionata}
+              onClick={creaClienteECantiereECommessa}
+              style={{
+                backgroundColor: "#2e7d32",
+                border: "none",
+                fontWeight: "bold",
+              }}
+            >
+              Genera Commessa
+            </Button>
+          </div>
+        </>
+      )}
     </Drawer>
   );
 
@@ -650,9 +883,9 @@ function DashboardTabsPanoramica() {
           />
           <Input
             placeholder="Filtra Resp. Ufficio"
-            value={filters.respUfficio}
+            value={filters.ResponsabileUfficio}
             onChange={(e) =>
-              setFilters({ ...filters, respUfficio: e.target.value })
+              setFilters({ ...filters, ResponsabileUfficio: e.target.value })
             }
             style={{ width: 200 }}
           />
@@ -711,10 +944,15 @@ function DashboardTabsPanoramica() {
             <tbody>
               {filteredCommesse.map((c, i) => (
                 <tr key={i}>
-                  <td style={cellStyle}>{c.IdCantiere}</td>
+                  <td style={cellStyle}>{c.NomeCantiere}</td>
                   <td style={cellStyle}>{c.Indirizzo}</td>
-                  <td style={cellStyle}>{c.RespUfficio || "-"}</td>
-                  <td style={cellStyle}>{c.StatoCantiere}</td>
+                  <td style={cellStyle}>{c.ResponsabileUfficio || "-"}</td>
+                  <td style={cellStyle}>
+                    {!c.StatoCantiere ||
+                    c.StatoCantiere.toLowerCase() === "incorso"
+                      ? "APERTA"
+                      : c.StatoCantiere}
+                  </td>
                   <td style={cellStyle}>€ 0</td>
                   <td style={cellStyle}>€ 0</td>
                   <td style={cellStyle}>0%</td>
@@ -722,7 +960,13 @@ function DashboardTabsPanoramica() {
                   <td style={cellStyle}>0</td>
                   <td style={cellStyle}>€ 0</td>
                   <td style={cellStyle}>0%</td>
-                  <td style={cellStyle}>{c.DataCreazioneCantiere}</td>
+                  <td style={cellStyle}>
+                    {c.DataCreazioneCantiere
+                      ? new Date(c.DataCreazioneCantiere).toLocaleDateString(
+                          "it-IT",
+                        )
+                      : ""}
+                  </td>
                 </tr>
               ))}
               <tr style={{ backgroundColor: "#eaf4ea", fontWeight: "bold" }}>
@@ -773,5 +1017,12 @@ function DashboardTabsPanoramica() {
     </div>
   );
 }
+const cellDrawerStyle = {
+  padding: "10px 8px",
+  fontSize: "14px",
+  color: "#333",
+  textAlign: "left",
+  verticalAlign: "top",
+};
 
 export default DashboardTabsPanoramica;

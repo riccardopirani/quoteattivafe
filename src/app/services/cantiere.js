@@ -2,24 +2,6 @@ import axios from "axios";
 import { BASE_URL } from "./api";
 
 const CantiereService = {
-  fattureCommessa: async (data) => {
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/cantieri/righe/contratto/fatture`,
-        data,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      return response.data;
-    } catch (error) {
-      console.error("Errore inserimento documento:", error);
-      throw error;
-    }
-  },
   contrattoCommessa: async (data) => {
     try {
       const response = await axios.post(
@@ -224,6 +206,75 @@ const CantiereService = {
       return response.data;
     } catch (error) {
       console.error("Errore aggiornamento cantiere:", error);
+      throw error;
+    }
+  },
+  // 🔹 COSTI COMMESSA
+
+  creaCosto: async (costoData) => {
+    try {
+      const response = await axios.post(`${BASE_URL}/costi/crea`, costoData, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Errore creazione costo:", error);
+      throw error;
+    }
+  },
+
+  leggiCosti: async (idCantiere) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/costi/leggi`,
+        { IdCantiere: idCantiere },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Errore lettura costi:", error);
+      throw error;
+    }
+  },
+
+  aggiornaCosto: async (id, costoData) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/costi/aggiorna`,
+        { Id: id, ...costoData },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Errore aggiornamento costo:", error);
+      throw error;
+    }
+  },
+
+  eliminaCosto: async (id) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/costi/elimina`,
+        { Id: id },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Errore eliminazione costo:", error);
       throw error;
     }
   },

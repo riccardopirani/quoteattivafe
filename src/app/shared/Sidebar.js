@@ -35,10 +35,7 @@ const permessiPersonalizzati = [
     label: "Sicurezza",
     key: "AccessoPreventivi",
     route: "/form-elements",
-    subMenu: [
-      { label: "Dashboard", to: "/tecnico/dashboard" },
-      { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
-    ],
+    subMenu: [],
     menuKey: "sicurezzaMenuOpen",
     icon: "mdi mdi-table-large",
   },
@@ -46,7 +43,7 @@ const permessiPersonalizzati = [
     label: "Gestione",
     key: "AccessoArticoli",
     route: "/form-elements",
-    subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
+    subMenu: [],
     menuKey: "gestioneMenuOpen",
     icon: "mdi mdi-account-box-outline",
   },
@@ -57,6 +54,14 @@ const permessiPersonalizzati = [
     subMenu: [],
     menuKey: "amministrazioneMenuOpen",
     icon: "mdi mdi-chart-line",
+  },
+  {
+    label: "Anagrafica",
+    key: "AccessoArticoli",
+    route: "/form-elements",
+    subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
+    menuKey: "gestioneMenuOpen",
+    icon: "mdi mdi-account-box-outline",
   },
 ];
 

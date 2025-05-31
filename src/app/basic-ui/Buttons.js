@@ -230,12 +230,7 @@ function Buttons() {
     const data = await res.json();
     if (data.length > 0) {
       const { lat, lon } = data[0];
-      const delta = 0.002;
-      const left = parseFloat(lon) - delta;
-      const right = parseFloat(lon) + delta;
-      const top = parseFloat(lat) + delta;
-      const bottom = parseFloat(lat) - delta;
-      const url = `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik&marker=${lat},${lon}`;
+      const url = `https://www.google.com/maps?q=${lat},${lon}&output=embed`;
       setMappaUrl(url);
     }
   };
@@ -605,14 +600,18 @@ function Buttons() {
           {mappaUrl ? (
             <iframe
               title="Mappa indirizzo"
-              key={mappaUrl} // forza il rerender
+              key={mappaUrl}
               width="100%"
               height="300"
               frameBorder="0"
-              style={{ border: 0 }}
+              style={{
+                border: 0,
+                pointerEvents: "none", // <-- qui la modifica
+                zIndex: 1,
+              }}
               src={mappaUrl}
               allowFullScreen
-            ></iframe>
+            />
           ) : (
             <div
               style={{ textAlign: "center", padding: "20px", color: "#888" }}
