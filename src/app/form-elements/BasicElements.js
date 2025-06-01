@@ -96,7 +96,7 @@ const TabelleCantieri = () => {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
             ) || 0,
         }));
 
@@ -240,8 +240,8 @@ const TabelleCantieri = () => {
                         r.esposizione > 0
                           ? "red"
                           : r.esposizione === 0
-                            ? "#ff9800"
-                            : "#2e7d32",
+                          ? "#ff9800"
+                          : "#2e7d32",
                     }}
                   >
                     €{" "}
@@ -350,7 +350,7 @@ function DashboardTabsPanoramica() {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
             ) || 0,
         }));
 
@@ -375,7 +375,8 @@ function DashboardTabsPanoramica() {
   };
 
   useEffect(() => {
-    const filtra = commesse
+    // Filtro iniziale (senza StatoCantiere aggiornato)
+    const filtrate = commesse
       .filter((c) => {
         return (
           (filters.codice === "" ||
@@ -384,10 +385,6 @@ function DashboardTabsPanoramica() {
             (c.Indirizzo || "")
               .toLowerCase()
               .includes(filters.indirizzo.toLowerCase())) &&
-          (filters.stato === "" ||
-            (c.StatoCantiere || "")
-              .toLowerCase()
-              .includes(filters.stato.toLowerCase())) &&
           (filters.ResponsabileUfficio === "" ||
             (c.ResponsabileUfficio || "")
               .toLowerCase()
@@ -397,10 +394,62 @@ function DashboardTabsPanoramica() {
       .sort((a, b) => {
         const dataA = new Date(a.DataCreazioneCantiere);
         const dataB = new Date(b.DataCreazioneCantiere);
-        return dataB - dataA; // più recente prima
+        return dataB - dataA;
       });
 
-    setFilteredCommesse(filtra);
+    setFilteredCommesse(filtrate);
+
+    // Aggiorna in background lo StatoCantiere
+    const aggiornaStati = async () => {
+      const aggiornate = await Promise.all(
+        commesse.map(async (c) => {
+          try {
+            const result = await CantiereService.statoCommessa({
+              Codice: c.NomeCantiere,
+            });
+            const statoPulito = result.trim().toUpperCase();
+            let statoLabel = "BLOCCATO";
+            if (statoPulito.includes("A")) statoLabel = "APERTO";
+            else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+            else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+            return { ...c, StatoCantiere: statoLabel };
+          } catch (e) {
+            console.error("Errore aggiornamento stato:", e);
+            return c;
+          }
+        })
+      );
+
+      const filtrateAgg = aggiornate
+        .filter((c) => {
+          return (
+            (filters.codice === "" ||
+              c.IdCantiere.toString().includes(filters.codice)) &&
+            (filters.indirizzo === "" ||
+              (c.Indirizzo || "")
+                .toLowerCase()
+                .includes(filters.indirizzo.toLowerCase())) &&
+            (filters.stato === "" ||
+              (c.StatoCantiere || "")
+                .toLowerCase()
+                .includes(filters.stato.toLowerCase())) &&
+            (filters.ResponsabileUfficio === "" ||
+              (c.ResponsabileUfficio || "")
+                .toLowerCase()
+                .includes(filters.ResponsabileUfficio.toLowerCase()))
+          );
+        })
+        .sort((a, b) => {
+          const dataA = new Date(a.DataCreazioneCantiere);
+          const dataB = new Date(b.DataCreazioneCantiere);
+          return dataB - dataA;
+        });
+
+      setFilteredCommesse(filtrateAgg);
+    };
+
+    aggiornaStati();
   }, [filters, commesse]);
 
   useEffect(() => {
@@ -463,22 +512,20 @@ function DashboardTabsPanoramica() {
     fetchCommesse();
   }, []);
 
-  // FUNZIONE UTILITY
   const getEuroValue = (str) =>
     parseFloat((str || "0").replace(/[^\d.-]/g, "")) || 0;
 
   const now = new Date();
   const MILLISECONDS_IN_30_DAYS = 30 * 24 * 60 * 60 * 1000;
 
-  // 🔢 CALCOLI PRIMA DI dashboardCards
   const totaleSal = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.SalDaFatturare),
-    0,
+    0
   );
 
   const totaleSil = filteredCommesse.reduce(
     (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
-    0,
+    0
   );
 
   const commesseDaAggiornare = filteredCommesse.filter((c) => {
@@ -507,12 +554,12 @@ function DashboardTabsPanoramica() {
   });
   const totaleCosti30gg = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.Costi30gg),
-    0,
+    0
   );
 
   const totaleLavoriAFinire = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.LavoriAFinire),
-    0,
+    0
   );
 
   const marginiValidi = filteredCommesse
@@ -596,7 +643,7 @@ function DashboardTabsPanoramica() {
       const idCliente = clienteRes.return;
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.codice, // <-- questo è il codice della commessa selezionata
+        datiGenerali.codice // <-- questo è il codice della commessa selezionata
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -708,8 +755,8 @@ function DashboardTabsPanoramica() {
                       !commesse.some(
                         (c) =>
                           normalize(c.NomeCantiere) ===
-                          normalize(row.NomeCantiere),
-                      ),
+                          normalize(row.NomeCantiere)
+                      )
                   )
                   .map((row, idx) => {
                     const isChecked =
@@ -963,7 +1010,7 @@ function DashboardTabsPanoramica() {
                   <td style={cellStyle}>
                     {c.DataCreazioneCantiere
                       ? new Date(c.DataCreazioneCantiere).toLocaleDateString(
-                          "it-IT",
+                          "it-IT"
                         )
                       : ""}
                   </td>
