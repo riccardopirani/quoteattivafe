@@ -96,7 +96,7 @@ const TabelleCantieri = () => {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
             ) || 0,
         }));
 
@@ -110,7 +110,6 @@ const TabelleCantieri = () => {
     fetchCommesse();
   }, []);
 
-  // Infinite scroll listener
   useEffect(() => {
     const handleScroll = () => {
       const nearBottom =
@@ -192,7 +191,6 @@ const TabelleCantieri = () => {
         </table>
       </div>
 
-      {/* Tabella destra */}
       <div style={{ width: "50%" }}>
         <table
           style={{
@@ -240,8 +238,8 @@ const TabelleCantieri = () => {
                         r.esposizione > 0
                           ? "red"
                           : r.esposizione === 0
-                          ? "#ff9800"
-                          : "#2e7d32",
+                            ? "#ff9800"
+                            : "#2e7d32",
                     }}
                   >
                     €{" "}
@@ -286,7 +284,7 @@ function DashboardTabsPanoramica() {
       try {
         const dati = await CantiereService.ricercaCantieriArca({});
         setAllCommesse(dati);
-        setCommesseFiltrate(dati); // inizializza con tutti
+        setCommesseFiltrate(dati);
       } catch (err) {
         console.error("Errore nel caricamento commesse:", err);
       }
@@ -316,9 +314,7 @@ function DashboardTabsPanoramica() {
     const fetchCommesse = async () => {
       try {
         const dati = await CantiereService.ricercaCantieri({});
-        console.log("Dati cantieri:", dati);
 
-        // Funzione parsing data
         const parseData = (str) => {
           if (!str) return new Date(0);
           const [dd, mm, yyyy] = str.split("/");
@@ -350,7 +346,7 @@ function DashboardTabsPanoramica() {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
             ) || 0,
         }));
 
@@ -418,7 +414,7 @@ function DashboardTabsPanoramica() {
             console.error("Errore aggiornamento stato:", e);
             return c;
           }
-        })
+        }),
       );
 
       const filtrateAgg = aggiornate
@@ -520,12 +516,12 @@ function DashboardTabsPanoramica() {
 
   const totaleSal = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.SalDaFatturare),
-    0
+    0,
   );
 
   const totaleSil = filteredCommesse.reduce(
     (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
-    0
+    0,
   );
 
   const commesseDaAggiornare = filteredCommesse.filter((c) => {
@@ -554,12 +550,12 @@ function DashboardTabsPanoramica() {
   });
   const totaleCosti30gg = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.Costi30gg),
-    0
+    0,
   );
 
   const totaleLavoriAFinire = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.LavoriAFinire),
-    0
+    0,
   );
 
   const marginiValidi = filteredCommesse
@@ -643,7 +639,7 @@ function DashboardTabsPanoramica() {
       const idCliente = clienteRes.return;
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.codice // <-- questo è il codice della commessa selezionata
+        datiGenerali.codice, // <-- questo è il codice della commessa selezionata
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -755,8 +751,8 @@ function DashboardTabsPanoramica() {
                       !commesse.some(
                         (c) =>
                           normalize(c.NomeCantiere) ===
-                          normalize(row.NomeCantiere)
-                      )
+                          normalize(row.NomeCantiere),
+                      ),
                   )
                   .map((row, idx) => {
                     const isChecked =
@@ -1010,7 +1006,7 @@ function DashboardTabsPanoramica() {
                   <td style={cellStyle}>
                     {c.DataCreazioneCantiere
                       ? new Date(c.DataCreazioneCantiere).toLocaleDateString(
-                          "it-IT"
+                          "it-IT",
                         )
                       : ""}
                   </td>

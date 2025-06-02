@@ -85,7 +85,7 @@ const CostiRicavi = ({ commessa }) => {
 
       try {
         const tuttiCosti = await CantiereService.leggiCosti(
-          commessa.IdCantiere
+          commessa.IdCantiere,
         );
 
         // Filtra quelli che sono "liberi" o non associati a nodi ARCA
@@ -164,7 +164,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
     );
 
     for (const nodo of datiExternal) {
@@ -212,7 +212,7 @@ const CostiRicavi = ({ commessa }) => {
     ...sezioni
       .filter((s) => s.nodo !== "R")
       .flatMap((s) => s.sotto)
-      .map((el) => Number(el.costo) || 0)
+      .map((el) => Number(el.costo) || 0),
   );
   const salvaRigheValori = async () => {
     if (!commessa?.IdCantiere) {
@@ -221,7 +221,7 @@ const CostiRicavi = ({ commessa }) => {
     }
 
     const righeValide = righeValori.filter(
-      (r) => r.tipo && !isNaN(parseFloat(r.valore))
+      (r) => r.tipo && !isNaN(parseFloat(r.valore)),
     );
 
     if (righeValide.length === 0) {
@@ -1336,7 +1336,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaCliente_Telefono
+                        datiGenerali.AnagraficaCliente_Telefono,
                       )
                         ? "none"
                         : "1px solid red",
@@ -1440,7 +1440,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaProgettista_Telefono
+                        datiGenerali.AnagraficaProgettista_Telefono,
                       )
                         ? "none"
                         : "1px solid red",
@@ -1472,7 +1472,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidEmail(
-                        datiGenerali.AnagraficaProgettista_Email
+                        datiGenerali.AnagraficaProgettista_Email,
                       )
                         ? "none"
                         : "1px solid red",
@@ -1584,50 +1584,6 @@ const CommessaTecnico = () => {
       percentualeAvanzamento: "0.00",
       totaleProduzione: 0,
       produzioneResidua: 0,
-    });
-
-    // Ricarico contratti e produco calcoli
-    CantiereService.contrattoCommessa({
-      Codice: selectedCommessa.IdCantiere,
-    }).then((result) => {
-      setContratti(result || []);
-
-      const iniziali = (result || []).map((c) => {
-        const costo = Number(c?.Costo || 0);
-        const quantita = Number(c?.Quantita || 1);
-        const produzioneTotale = costo * quantita;
-        return {
-          ...c,
-          produzioneTotale,
-          produzioneResidua: produzioneTotale,
-        };
-      });
-
-      setDatiContratti(iniziali);
-
-      const totaleImportiManuali = iniziali.reduce(
-        (sum, c) => sum + Number(c.CostoTemp2 || 0),
-        0
-      );
-      const totaleProduzioneTotale = iniziali.reduce(
-        (sum, c) => sum + Number(c.produzioneTotale || 0),
-        0
-      );
-      const produzioneResidua = iniziali.reduce(
-        (sum, c) => sum + Number(c.produzioneResidua || 0),
-        0
-      );
-
-      const percentualeAvanzamento =
-        totaleProduzioneTotale > 0
-          ? ((totaleImportiManuali / totaleProduzioneTotale) * 100).toFixed(2)
-          : "0.00";
-
-      setDatiProduzione({
-        percentualeAvanzamento,
-        totaleProduzione: totaleImportiManuali,
-        produzioneResidua,
-      });
     });
   }, [selectedCommessa?.IdCantiere]);
   useEffect(() => {
@@ -1777,7 +1733,7 @@ const CommessaTecnico = () => {
                   setSelectedCommessa(commessa);
                   localStorage.setItem(
                     "ultimaCommessa",
-                    JSON.stringify(commessa)
+                    JSON.stringify(commessa),
                   );
                   setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                   setFilteredOptions([]);
@@ -1869,10 +1825,6 @@ const CruscottoCommessa = ({
 
   useEffect(() => {
     if (commessa?.IdCantiere) {
-      CantiereService.contrattoCommessa({ Codice: commessa.NomeCantiere })
-        .then((result) => setContratti(result || []))
-        .catch((err) => console.error("Errore nel fetch dei contratti:", err));
-
       CantiereService.statoCommessa({ Codice: commessa.NomeCantiere })
         .then((result) => {
           const statoPulito = result.trim().toUpperCase();
@@ -1883,7 +1835,7 @@ const CruscottoCommessa = ({
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err)
+          console.error("Errore nel recupero dello stato cantiere:", err),
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.NomeCantiere })
@@ -2747,7 +2699,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err)
+          console.error("Errore nel caricamento approvvigionamenti:", err),
         );
     }
   }, [commessa?.IdCantiere]);
@@ -3062,15 +3014,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?"
+                          "Sei sicuro di voler eliminare questo approvvigionamento?",
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero
+                            editingItem.Numero,
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere
+                            commessa?.IdCantiere,
                           );
                           setRighe(updated);
                           chiudiDrawer();
