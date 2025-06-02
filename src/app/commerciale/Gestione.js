@@ -676,8 +676,10 @@ const DatiCommessa = ({ onComplete, commessa }) => {
   const [mappaUrl, setMappaUrl] = useState(null);
   const [zonaImageUrl, setZonaImageUrl] = useState(null);
   const [users, setUsers] = useState([]);
-  const [error, setError] = useState(null);
   const prevCantiereId = useRef(null);
+  const inizializzato = useRef(false);
+  const [error, setError] = useState(null);
+  const skipDateUpdate = useRef(true);
   const [datiGenerali, setDatiGenerali] = useState({
     codice: "",
     cliente: "",
@@ -768,95 +770,44 @@ const DatiCommessa = ({ onComplete, commessa }) => {
     fetchStato();
   }, [commessa?.IdCantiere]);
 
+  useEffect(() => {}, [dataInizio, dataFine]);
   useEffect(() => {
-    if (!commessa?.IdCantiere) return;
+    if (commessa && commessa.IdCantiere && !inizializzato.current) {
+      setDatiGenerali({
+        codice: commessa.NomeCantiere || "",
+        cliente: commessa.RagioneSociale || "",
+        indirizzo: commessa.Indirizzo || "",
+        tipoLavori: commessa.TipoLavori || "",
+        tipoAppalto: commessa.TipoAppalto || "",
+        respUfficio: commessa.ResponsabileUfficio || "",
+        respCantiere: commessa.ResponsabileCantiere || "",
+        contratto: commessa.LinkCartellaContratto || "",
+        centroCosto: commessa.LinkCentroDiCosto || "",
+        gant: commessa.LinkGantt || "",
+        condivisione: commessa.LinkCartellaCondivisione || "",
+        sicurezza: commessa.LinkCartellaSicurezza || "",
+        foto: commessa.LinkCartellaFoto || "",
+        AnagraficaCliente_Nome: commessa.AnagraficaCliente_Nome || "",
+        AnagraficaCliente_Telefono: commessa.AnagraficaCliente_Telefono || "",
+        AnagraficaCliente_Email: commessa.AnagraficaCliente_Email || "",
+        AnagraficaDI_Nome: commessa.AnagraficaDI_Nome || "",
+        AnagraficaDI_Telefono: commessa.AnagraficaDI_Telefono || "",
+        AnagraficaDI_Email: commessa.AnagraficaDI_Email || "",
+        AnagraficaProgettista_Nome: commessa.AnagraficaProgettista_Nome || "",
+        AnagraficaProgettista_Telefono:
+          commessa.AnagraficaProgettista_Telefono || "",
+        AnagraficaProgettista_Email: commessa.AnagraficaProgettista_Email || "",
+        AnagraficaCSE_Nome: commessa.AnagraficaCSE_Nome || "",
+        AnagraficaCSE_Telefono: commessa.AnagraficaCSE_Telefono || "",
+        AnagraficaCSE_Email: commessa.AnagraficaCSE_Email || "",
+      });
 
-    const aggiornaDate = async () => {
-      try {
-        await CantiereService.aggiornaCantiere({
-          IdCantiere: commessa.IdCantiere,
-          Stato: datiGenerali2?.statoDinamico ?? "BLOCCATO",
-          DescrizioneEstesa: "",
-          StatoFatturazione: 0,
-          NomeCantiere: datiGenerali.codice,
-          CommessaCliente: datiGenerali.codice,
-          IndirizzoCantiere: datiGenerali.indirizzo,
-          TipoLavori: datiGenerali.tipoLavori,
-          TipoAppalto: datiGenerali.tipoAppalto,
-          ResponsabileUfficio: datiGenerali.respUfficio,
-          ResponsabileCantiere: datiGenerali.respCantiere,
-          LinkCartellaContratto: datiGenerali.contratto,
-          LinkCentroDiCosto: datiGenerali.centroCosto,
-          LinkGantt: datiGenerali.gant,
-          LinkCartellaCondivisione: datiGenerali.condivisione,
-          LinkCartellaSicurezza: datiGenerali.sicurezza,
-          LinkCartellaFoto: datiGenerali.foto,
-          DataInizio: dataInizio.toISOString(),
-          DataFine: dataFine.toISOString(),
-          AnagraficaCliente_Nome: datiGenerali.AnagraficaCliente_Nome,
-          AnagraficaCliente_Telefono: datiGenerali.AnagraficaCliente_Telefono,
-          AnagraficaCliente_Email: datiGenerali.AnagraficaCliente_Email,
-          AnagraficaDI_Nome: datiGenerali.AnagraficaDI_Nome,
-          AnagraficaDI_Telefono: datiGenerali.AnagraficaDI_Telefono,
-          AnagraficaDI_Email: datiGenerali.AnagraficaDI_Email,
-          AnagraficaProgettista_Nome: datiGenerali.AnagraficaProgettista_Nome,
-          AnagraficaProgettista_Telefono:
-            datiGenerali.AnagraficaProgettista_Telefono,
-          AnagraficaProgettista_Email: datiGenerali.AnagraficaProgettista_Email,
-          AnagraficaCSE_Nome: datiGenerali.AnagraficaCSE_Nome,
-          AnagraficaCSE_Telefono: datiGenerali.AnagraficaCSE_Telefono,
-          AnagraficaCSE_Email: datiGenerali.AnagraficaCSE_Email,
-        });
-      } catch (error) {
-        console.error("Errore aggiornamento date:", error);
-      }
-    };
-
-    aggiornaDate();
-  }, [dataInizio, dataFine]);
-  useEffect(() => {
-    if (commessa && commessa.IdCantiere) {
-      // Cambiamento reale di commessa?
-      const commessaChanged = commessa.IdCantiere !== prevCantiereId.current;
-      prevCantiereId.current = commessa.IdCantiere;
-
-      if (commessaChanged) {
-        console.log(commessa);
-        // Aggiorno stato solo se è una nuova commessa
-        setDatiGenerali({
-          codice: commessa.NomeCantiere?.toString() || "",
-          cliente: commessa.RagioneSociale || "",
-          indirizzo: commessa.Indirizzo || "",
-          tipoLavori: commessa.TipoLavori || "",
-          tipoAppalto: commessa.TipoAppalto || "",
-          respUfficio: commessa.ResponsabileUfficio || "",
-          respCantiere: commessa.ResponsabileCantiere || "",
-          contratto: commessa.LinkCartellaContratto || "",
-          centroCosto: commessa.LinkCentroDiCosto || "",
-          gant: commessa.LinkGantt || "",
-          condivisione: commessa.LinkCartellaCondivisione || "",
-          sicurezza: commessa.LinkCartellaSicurezza || "",
-          foto: commessa.LinkCartellaFoto || "",
-          AnagraficaCliente_Nome: commessa.AnagraficaCliente_Nome || "",
-          AnagraficaCliente_Telefono: commessa.AnagraficaCliente_Telefono || "",
-          AnagraficaCliente_Email: commessa.AnagraficaCliente_Email || "",
-          AnagraficaDI_Nome: commessa.AnagraficaDI_Nome || "",
-          AnagraficaDI_Telefono: commessa.AnagraficaDI_Telefono || "",
-          AnagraficaDI_Email: commessa.AnagraficaDI_Email || "",
-          AnagraficaProgettista_Nome: commessa.AnagraficaProgettista_Nome || "",
-          AnagraficaProgettista_Telefono:
-            commessa.AnagraficaProgettista_Telefono || "",
-          AnagraficaProgettista_Email:
-            commessa.AnagraficaProgettista_Email || "",
-          AnagraficaCSE_Nome: commessa.AnagraficaCSE_Nome || "",
-          AnagraficaCSE_Telefono: commessa.AnagraficaCSE_Telefono || "",
-          AnagraficaCSE_Email: commessa.AnagraficaCSE_Email || "",
-        });
-
-        if (commessa.DataInizio) setDataInizio(new Date(commessa.DataInizio));
-        if (commessa.DataFine) setDataFine(new Date(commessa.DataFine));
-        fetchUsers(commessa.RespUfficio, commessa.RespCantiere);
-      }
+      setDataInizio(
+        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date(),
+      );
+      setDataFine(commessa.DataFine ? new Date(commessa.DataFine) : new Date());
+      fetchUsers(commessa.ResponsabileUfficio, commessa.ResponsabileCantiere);
+      inizializzato.current = true;
     }
   }, [commessa]);
   const handleChange = (field) => async (e) => {
