@@ -21,12 +21,9 @@ const cellStyle = {
   verticalAlign: "middle",
 };
 
-const parseFloatSafe = (val) => {
-  if (typeof val === "number") return val;
-  if (!val || typeof val !== "string") return 0;
-  const clean = val.replace(/\./g, "").replace(",", ".");
-  const parsed = parseFloat(clean);
-  return isNaN(parsed) ? 0 : parsed;
+const parseFloatSafe = (value) => {
+  const num = parseFloat(value);
+  return isNaN(num) ? 0 : num;
 };
 const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   const [datiGenerali2, setDatiGenerali2] = useState({
@@ -46,7 +43,10 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   const produzioneTotalePerLavoro = (descrizione) => {
     if (!descrizione) return 0;
 
-    const righe = righeFatture.filter((r) => r.Lavoro === descrizione);
+    const righe = righeFatture.filter(
+      (r) =>
+        r.Lavoro?.trim().toLowerCase() === descrizione?.trim().toLowerCase()
+    );
     if (righe.length > 0) {
       return righe.reduce((sum, r) => {
         const importo = parseFloatSafe(r.Importo);
