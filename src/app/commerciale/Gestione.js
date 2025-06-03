@@ -140,20 +140,6 @@ const CostiRicavi = ({ commessa }) => {
         commessa.IdCantiere
       );
 
-      const righeConvertite = (salEsistenti || []).map((r, idx) => ({
-        Lavoro: r.Lavoro || "",
-        Nodo: r.Nodo || "",
-        Numero1: r.NumeroFattura || "",
-        Data1: r.DataFattura?.substring(0, 10) || "",
-        Importo1: r.ImportoFattura || 0,
-        Numero2: r.NumeroSAL || "",
-        Data2: r.DataSAL?.substring(0, 10) || "",
-        Importo2: r.ImportoSAL || 0,
-        CostoTemp2: r.ImportoSAL || 0,
-        ImportoTEMP: r.ImportoSAL || 0,
-        Importo: r.ImportoFattura || 0,
-        Id: idx + 1,
-      }));
 
       //setRigheFatture(righeConvertite);
     } catch (err) {
