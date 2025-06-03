@@ -95,17 +95,25 @@ class Sidebar extends Component {
 
   async componentDidMount() {
     this.onRouteChanged();
-    const userId = localStorage.getItem("userId");
+
+    const userIdStr = localStorage.getItem("userId");
+    const userId = userIdStr ? parseInt(userIdStr) : null;
+
     if (userId) {
       try {
         const res = await fetch(`${BASE_URL}/RisorseUmane/CaricaRisorse`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ IdUtente: parseInt(userId) }),
+          body: JSON.stringify({ IdUtente: userId }),
         });
+
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
         const data = await res.json();
+        const currentUser = data.find((u) => u.IdUtente === userId);
+
         this.setState({
-          user: data.find((u) => u.IdUtente === parseInt(userId)),
+          user: currentUser || null,
           loading: false,
         });
       } catch (err) {
@@ -116,18 +124,30 @@ class Sidebar extends Component {
       this.setState({ loading: false });
     }
 
+    // Add hover behavior for sidebar nav items
     const body = document.querySelector("body");
-    document.querySelectorAll(".sidebar .nav-item").forEach((el) => {
-      el.addEventListener("mouseover", function () {
-        if (body && body.classList.contains("sidebar-icon-only")) {
+    const navItems = document.querySelectorAll(".sidebar .nav-item");
+
+    navItems.forEach((el) => {
+      // Remove existing listeners (optional, in case of remount)
+      el.removeEventListener("mouseover", el._hoverOpenIn);
+      el.removeEventListener("mouseout", el._hoverOpenOut);
+
+      // Define and store listeners as properties for future cleanup
+      el._hoverOpenIn = function () {
+        if (body?.classList.contains("sidebar-icon-only")) {
           el.classList.add("hover-open");
         }
-      });
-      el.addEventListener("mouseout", function () {
-        if (body && body.classList.contains("sidebar-icon-only")) {
+      };
+
+      el._hoverOpenOut = function () {
+        if (body?.classList.contains("sidebar-icon-only")) {
           el.classList.remove("hover-open");
         }
-      });
+      };
+
+      el.addEventListener("mouseover", el._hoverOpenIn);
+      el.addEventListener("mouseout", el._hoverOpenOut);
     });
   }
 
@@ -255,7 +275,7 @@ class Sidebar extends Component {
                         const cleanLabel = label.replace(/^Accesso\s+/i, ""); // Rimuove "Accesso " all'inizio
                         localStorage.setItem("selectedMenuLabel", cleanLabel);
                         window.dispatchEvent(
-                          new Event("selectedMenuLabelChanged"),
+                          new Event("selectedMenuLabelChanged")
                         );
                       }}
                     >
@@ -285,7 +305,7 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null,
+              ) : null
           )}
 
           <li className="nav-item mt-4">

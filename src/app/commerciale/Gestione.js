@@ -1193,13 +1193,6 @@ const DatiCommessa = ({ onComplete, commessa }) => {
       }
 
       if (id && !commessa) {
-        try {
-          const result = await CantiereService.caricaCommessa(id);
-          commessa = result;
-          localStorage.setItem("ultimaCommessa", JSON.stringify(result));
-        } catch (err) {
-          console.error("Errore nel caricamento della commessa:", err);
-        }
       }
     };
 
