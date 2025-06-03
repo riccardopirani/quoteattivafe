@@ -13,6 +13,7 @@ import { BASE_URL } from "../services/api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
+import ProduzioneService from "../services/produzione";
 import ApprovvigionamentoService from "../services/approvigionamenti";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
@@ -48,9 +49,61 @@ const CostiRicavi = ({ commessa }) => {
     statoDinamico: "BLOCCATO",
   });
   const [sezioni, setSezioni] = useState([]);
+  const [dataAggiornamento, setDataAggiornamento] = useState(null);
+  const [margineCommessa, setMargineCommessa] = useState(0);
+  const [marginePercentuale, setMarginePercentuale] = useState(0);
+
+  const generaCostiRicavi = async () => {
+    let totaleMDC = 0;
+    let totaleRicavi = 0;
+
+    sezioni.forEach((sezione) => {
+      sezione.sotto.forEach((sotto) => {
+        const aggiornato = +sotto.aggiornatoAl || 0;
+        const giacenze = +sotto.giacenze || 0;
+        const contabilita = +sotto.contabilita || 0;
+        const daContabilizzare = +sotto.daContabilizzare || 0;
+
+        const ricaviRaffronto = contabilita + daContabilizzare;
+        const mdc = ricaviRaffronto - aggiornato;
+
+        totaleRicavi += ricaviRaffronto;
+        totaleMDC += mdc;
+      });
+    });
+
+    setMargineCommessa(totaleMDC);
+    setMarginePercentuale(
+      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0
+    );
+    setDataAggiornamento(new Date());
+
+    // Attendi aggiornamento DOM prima dello screenshot
+    setTimeout(async () => {
+      const element = contentRef.current; // Assicurati che contentRef sia associato al contenitore principale
+
+      if (element) {
+        const canvas = await html2canvas(element, {
+          scrollY: -window.scrollY, // evita problemi con scroll
+          useCORS: true,
+          scale: 2, // migliora qualità
+        });
+
+        const image = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.href = image;
+        link.download = `CostiRicavi_${new Date()
+          .toISOString()
+          .slice(0, 10)}.png`;
+        link.click();
+      }
+    }, 500);
+  };
+
   useEffect(() => {
     const fetchStato = async () => {
       if (commessa?.IdCantiere) {
+        fetchSalEsistenti();
         try {
           const result = await CantiereService.statoCommessa({
             Codice: commessa.NomeCantiere,
@@ -79,13 +132,41 @@ const CostiRicavi = ({ commessa }) => {
   const aggiungiRigaValore = () => {
     setRigheValori((prev) => [...prev, { tipo: "", valore: "", note: "" }]);
   };
+  const fetchSalEsistenti = async () => {
+    if (!commessa?.IdCantiere) return;
+
+    try {
+      const salEsistenti = await CantiereService.leggiCosti(
+        commessa.IdCantiere
+      );
+
+      const righeConvertite = (salEsistenti || []).map((r, idx) => ({
+        Lavoro: r.Lavoro || "",
+        Nodo: r.Nodo || "",
+        Numero1: r.NumeroFattura || "",
+        Data1: r.DataFattura?.substring(0, 10) || "",
+        Importo1: r.ImportoFattura || 0,
+        Numero2: r.NumeroSAL || "",
+        Data2: r.DataSAL?.substring(0, 10) || "",
+        Importo2: r.ImportoSAL || 0,
+        CostoTemp2: r.ImportoSAL || 0,
+        ImportoTEMP: r.ImportoSAL || 0,
+        Importo: r.ImportoFattura || 0,
+        Id: idx + 1,
+      }));
+
+      //setRigheFatture(righeConvertite);
+    } catch (err) {
+      console.error("❌ Errore nel caricamento dei SAL:", err);
+    }
+  };
   useEffect(() => {
     const caricaCostiManuali = async () => {
       if (!commessa?.IdCantiere) return;
 
       try {
         const tuttiCosti = await CantiereService.leggiCosti(
-          commessa.IdCantiere,
+          commessa.IdCantiere
         );
 
         // Filtra quelli che sono "liberi" o non associati a nodi ARCA
@@ -164,7 +245,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
     );
 
     for (const nodo of datiExternal) {
@@ -191,7 +272,7 @@ const CostiRicavi = ({ commessa }) => {
 
       const totale = sotto.reduce(
         (acc, curr) => acc + (Number(curr.costo) || 0),
-        0,
+        0
       );
 
       const ultimaData = sotto.reduce((latest, riga) => {
@@ -199,31 +280,31 @@ const CostiRicavi = ({ commessa }) => {
         return isNaN(currDate)
           ? latest
           : !latest || currDate > latest
-            ? currDate
-            : latest;
+          ? currDate
+          : latest;
       }, null);
 
       sezioniMap[key].totale = totale;
       sezioniMap[key].dataUltimoAggiornamento = ultimaData;
       sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
         (acc, curr) => acc + (Number(curr.aggiornatoAl) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleGiacenze = sotto.reduce(
         (acc, curr) => acc + (Number(curr.giacenze) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleContabilita = sotto.reduce(
         (acc, curr) => acc + (Number(curr.contabilita) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleDaContabilizzare = sotto.reduce(
         (acc, curr) => acc + (Number(curr.daContabilizzare) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleBCWP = sotto.reduce(
         (acc, curr) => acc + (Number(curr.bcwp) || 0),
-        0,
+        0
       );
     }
 
@@ -265,7 +346,7 @@ const CostiRicavi = ({ commessa }) => {
     }
 
     const righeValide = righeValori.filter(
-      (r) => r.tipo && !isNaN(parseFloat(r.valore)),
+      (r) => r.tipo && !isNaN(parseFloat(r.valore))
     );
 
     if (righeValide.length === 0) {
@@ -470,7 +551,7 @@ const CostiRicavi = ({ commessa }) => {
                       .reduce(
                         (a, c) =>
                           a + ((+c.aggiornatoAl || 0) + (+c.giacenze || 0)),
-                        0,
+                        0
                       )
                       .toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -981,6 +1062,22 @@ const CostiRicavi = ({ commessa }) => {
           </div>
         </div>
       )}
+      <button
+        onClick={generaCostiRicavi}
+        style={{
+          marginTop: "1rem",
+          marginLeft: "1rem",
+          padding: "0.4rem 1rem",
+          backgroundColor: "#bbdefb",
+          border: "1px solid #1976d2",
+          borderRadius: 4,
+          cursor: "pointer",
+          fontWeight: "bold",
+        }}
+      >
+        📊 Genera costi e ricavi
+      </button>
+
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <div style={{ textAlign: "right", fontSize: "0.85rem", width: "40%" }}>
           <div
@@ -991,7 +1088,15 @@ const CostiRicavi = ({ commessa }) => {
             }}
           >
             <strong>Data aggiornamento</strong>:{" "}
-            <span style={{ float: "right" }}>10 giu. 2025</span>
+            <span style={{ float: "right" }}>
+              {dataAggiornamento
+                ? new Intl.DateTimeFormat("it-IT", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  }).format(dataAggiornamento)
+                : "--"}
+            </span>
           </div>
           <div
             style={{
@@ -1001,11 +1106,19 @@ const CostiRicavi = ({ commessa }) => {
             }}
           >
             <strong>Margine di commessa</strong>:{" "}
-            <span style={{ float: "right" }}>€ 20.000</span>
+            <span style={{ float: "right" }}>
+              €{" "}
+              {margineCommessa.toLocaleString("it-IT", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
           </div>
           <div style={{ backgroundColor: "#e6f2e6", padding: "0.4rem 0.6rem" }}>
             <strong>Margine %</strong>:{" "}
-            <span style={{ float: "right" }}>20 %</span>
+            <span style={{ float: "right" }}>
+              {marginePercentuale.toFixed(2)} %
+            </span>
           </div>
         </div>
       </div>
@@ -1147,7 +1260,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
       });
 
       setDataInizio(
-        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date(),
+        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date()
       );
       setDataFine(commessa.DataFine ? new Date(commessa.DataFine) : new Date());
       fetchUsers(commessa.ResponsabileUfficio, commessa.ResponsabileCantiere);
@@ -1631,7 +1744,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaCliente_Telefono,
+                        datiGenerali.AnagraficaCliente_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1735,7 +1848,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaProgettista_Telefono,
+                        datiGenerali.AnagraficaProgettista_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1767,7 +1880,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidEmail(
-                        datiGenerali.AnagraficaProgettista_Email,
+                        datiGenerali.AnagraficaProgettista_Email
                       )
                         ? "none"
                         : "1px solid red",
@@ -2028,7 +2141,7 @@ const CommessaTecnico = () => {
                   setSelectedCommessa(commessa);
                   localStorage.setItem(
                     "ultimaCommessa",
-                    JSON.stringify(commessa),
+                    JSON.stringify(commessa)
                   );
                   setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                   setFilteredOptions([]);
@@ -2130,7 +2243,7 @@ const CruscottoCommessa = ({
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err),
+          console.error("Errore nel recupero dello stato cantiere:", err)
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.NomeCantiere })
@@ -2994,7 +3107,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -3309,15 +3422,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
