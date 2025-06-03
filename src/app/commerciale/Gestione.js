@@ -85,7 +85,7 @@ const CostiRicavi = ({ commessa }) => {
 
       try {
         const tuttiCosti = await CantiereService.leggiCosti(
-          commessa.IdCantiere,
+          commessa.IdCantiere
         );
 
         // Filtra quelli che sono "liberi" o non associati a nodi ARCA
@@ -129,7 +129,7 @@ const CostiRicavi = ({ commessa }) => {
 
   useEffect(() => {
     if (datiExternal.length === 0) return;
-
+  
     const sezioniBase = [
       {
         nodo: "A",
@@ -162,11 +162,11 @@ const CostiRicavi = ({ commessa }) => {
         titolo: "RICAVI",
       },
     ];
-
+  
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
     );
-
+  
     for (const nodo of datiExternal) {
       const { CodiceNodo, Descrizione, Costo } = nodo;
       if (!CodiceNodo || CodiceNodo.length < 1) continue;
@@ -175,14 +175,62 @@ const CostiRicavi = ({ commessa }) => {
         sezioniMap[prefisso].sotto.push({
           codice: CodiceNodo,
           descrizione: Descrizione,
-          costo: Costo,
+          costo: Number(Costo) || 0,
+          aggiornatoAl: 0,
+          giacenze: 0,
+          contabilita: 0,
+          daContabilizzare: 0,
+          bcwp: 0,
+          dataAggiornamento: nodo.DataAggiornamento || null,
         });
       }
     }
-
+  
+    for (const key in sezioniMap) {
+      const sotto = sezioniMap[key].sotto || [];
+  
+      const totale = sotto.reduce(
+        (acc, curr) => acc + (Number(curr.costo) || 0),
+        0
+      );
+  
+      const ultimaData = sotto.reduce((latest, riga) => {
+        const currDate = new Date(riga.dataAggiornamento);
+        return isNaN(currDate)
+          ? latest
+          : !latest || currDate > latest
+          ? currDate
+          : latest;
+      }, null);
+  
+      sezioniMap[key].totale = totale;
+      sezioniMap[key].dataUltimoAggiornamento = ultimaData;
+      sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
+        (acc, curr) => acc + (Number(curr.aggiornatoAl) || 0),
+        0
+      );
+      sezioniMap[key].totaleGiacenze = sotto.reduce(
+        (acc, curr) => acc + (Number(curr.giacenze) || 0),
+        0
+      );
+      sezioniMap[key].totaleContabilita = sotto.reduce(
+        (acc, curr) => acc + (Number(curr.contabilita) || 0),
+        0
+      );
+      sezioniMap[key].totaleDaContabilizzare = sotto.reduce(
+        (acc, curr) => acc + (Number(curr.daContabilizzare) || 0),
+        0
+      );
+      sezioniMap[key].totaleBCWP = sotto.reduce(
+        (acc, curr) => acc + (Number(curr.bcwp) || 0),
+        0
+      );
+    }
+  
     const sezioniFinali = ["A", "E", "M", "I", "R"].map((k) => sezioniMap[k]);
     setSezioni(sezioniFinali);
   }, [datiExternal]);
+  
 
   const contentRef = useRef();
 
@@ -207,13 +255,10 @@ const CostiRicavi = ({ commessa }) => {
       }
     }
   };
-  const maxCostoSenzaRicavi = Math.max(
-    0,
-    ...sezioni
-      .filter((s) => s.nodo !== "R")
-      .flatMap((s) => s.sotto)
-      .map((el) => Number(el.costo) || 0),
-  );
+  const maxCostoSenzaRicavi = sezioni
+    .filter((s) => s.nodo !== "R")
+    .flatMap((s) => s.sotto)
+    .reduce((acc, el) => acc + (Number(el.costo) || 0), 0);
   const salvaRigheValori = async () => {
     if (!commessa?.IdCantiere) {
       alert("Cantiere non selezionato.");
@@ -221,7 +266,7 @@ const CostiRicavi = ({ commessa }) => {
     }
 
     const righeValide = righeValori.filter(
-      (r) => r.tipo && !isNaN(parseFloat(r.valore)),
+      (r) => r.tipo && !isNaN(parseFloat(r.valore))
     );
 
     if (righeValide.length === 0) {
@@ -347,137 +392,437 @@ const CostiRicavi = ({ commessa }) => {
           </tr>
         </thead>
         <tbody>
-          {sezioni.map((sezione, idx) => (
-            <React.Fragment key={idx}>
-              <tr>
-                <td
-                  style={{
-                    backgroundColor: sezione.coloreNodo,
-                    textAlign: "center",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {sezione.nodo}
-                </td>
-                <td
-                  colSpan={13}
-                  style={{
-                    backgroundColor: sezione.coloreNodo,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {sezione.titolo}
-                  <button
-                    onClick={() => aggiungiRiga(idx)}
+          {sezioni.map((sezione, idx) => {
+            let totaleAgg = 0,
+              totaleGiac = 0,
+              totaleCont = 0,
+              totaleDaCont = 0,
+              totaleBCWP = 0,
+              totaleRicavi = 0,
+              totaleMDC = 0;
+
+            return (
+              <React.Fragment key={idx}>
+                <tr>
+                  <td
                     style={{
-                      float: "right",
-                      padding: "0.2rem 0.6rem",
-                      fontSize: "0.75rem",
-                      border: "1px solid #bbb",
-                      borderRadius: 4,
-                      backgroundColor: "#fff",
-                      cursor: "pointer",
+                      backgroundColor: sezione.coloreNodo,
+                      textAlign: "center",
+                      fontWeight: "bold",
                     }}
                   >
-                    + Aggiungi riga
-                  </button>
-                </td>
-              </tr>
-              {sezione.sotto.map((sotto, i) => {
-                const isCategoria = sotto.codice.length === 3;
-                const mostraCosto =
-                  sezione.nodo === "R"
-                    ? (Number(sotto.costo) || 0).toLocaleString(undefined, {
+                    {sezione.nodo}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: sezione.coloreNodo,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {sezione.titolo}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: sezione.coloreNodo,
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {sezione.totale.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td style={{ backgroundColor: "white", border: "none" }}></td>
+                  <td
+                    style={{
+                      backgroundColor: sezione.coloreNodo,
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {sezione.totaleAggiornatoAl.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: sezione.coloreNodo,
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {sezione.sotto
+                      .reduce((a, c) => a + (Number(c.giacenze) || 0), 0)
+                      .toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
-                      })
-                    : "";
-                return (
-                  <tr key={i}>
-                    <td style={{ backgroundColor: sezione.coloreRiga }}>
-                      {isCategoria ? sotto.codice : ""}
-                    </td>
-                    <td style={{ backgroundColor: sezione.coloreRiga }}>
-                      {isCategoria
-                        ? sotto.descrizione
-                        : `${sotto.codice} ${sotto.descrizione}`}
-                    </td>
-                    <td style={{ backgroundColor: sezione.coloreRiga }}>
-                      {mostraCosto}
-                    </td>
-                    <td
-                      style={{ backgroundColor: "white", border: "none" }}
-                    ></td>
-                    {Array(10)
-                      .fill(null)
-                      .map((_, k) => (
-                        <td
-                          key={k}
-                          style={{ backgroundColor: sezione.coloreRiga }}
-                        ></td>
-                      ))}
-                  </tr>
-                );
-              })}
-            </React.Fragment>
-          ))}
+                      })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: sezione.coloreNodo,
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {sezione.sotto
+                      .reduce(
+                        (a, c) =>
+                          a + ((+c.aggiornatoAl || 0) + (+c.giacenze || 0)),
+                        0
+                      )
+                      .toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                  </td>
+                  <td
+                    colSpan={7}
+                    style={{ backgroundColor: sezione.coloreNodo }}
+                  ></td>
+                </tr>
 
-          <td style={{ fontWeight: "bold" }} colSpan={2}>
-            Totale Costi (esclusi Ricavi)
-          </td>
+                {sezione.sotto.map((sotto, i) => {
+                  const aggiornato = +sotto.aggiornatoAl || 0;
+                  const giacenze = +sotto.giacenze || 0;
+                  const contabilita = +sotto.contabilita || 0;
+                  const daContabilizzare = +sotto.daContabilizzare || 0;
+                  const bcwp = +sotto.bcwp || 0;
+                  const ricaviRaffronto = contabilita + daContabilizzare;
+                  const mdc = ricaviRaffronto - aggiornato;
+                  const mdcPerc =
+                    ricaviRaffronto !== 0 ? (mdc / ricaviRaffronto) * 100 : 0;
 
-          <td style={{ fontWeight: "bold" }}>
-            {maxCostoSenzaRicavi > 0
-              ? maxCostoSenzaRicavi.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })
-              : ""}
-          </td>
-          <tr>
-            <td colSpan={11}>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                  gap: "1rem",
-                  padding: "1rem 0",
-                }}
-              >
-                <button
-                  style={{
-                    padding: "0.5rem 1rem",
-                    border: "1px solid black",
-                    marginLeft: "50px",
-                    background: "white",
-                    fontWeight: "bold",
-                    minWidth: "200px",
-                    flex: "1 1 250px",
-                  }}
-                  onClick={() => setOpenArchivio(true)}
-                >
-                  Archivio costi/ricavi »
-                </button>
+                  totaleAgg += aggiornato;
+                  totaleGiac += giacenze;
+                  totaleCont += contabilita;
+                  totaleDaCont += daContabilizzare;
+                  totaleBCWP += bcwp;
+                  totaleRicavi += ricaviRaffronto;
+                  totaleMDC += mdc;
 
-                <button
-                  onClick={handleExportExcel}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    border: "1px solid black",
-                    background: "#b3dbff",
-                    fontWeight: "bold",
-                    minWidth: "200px",
-                    flex: "1 1 250px",
-                  }}
-                >
-                  Genera costi/ricavi
-                </button>
-              </div>
-            </td>
-          </tr>
+                  return (
+                    <tr key={i}>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3 ? sotto.codice : ""}
+                      </td>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3
+                          ? sotto.descrizione
+                          : `${sotto.codice} ${sotto.descrizione}`}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {(+sotto.costo || 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
+                        style={{ backgroundColor: "white", border: "none" }}
+                      ></td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.aggiornatoAl || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].aggiornatoAl = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.giacenze || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].giacenze = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {(aggiornato + giacenze).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.bcwp || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].bcwp = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.contabilita || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].contabilita = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.daContabilizzare || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].daContabilizzare = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {ricaviRaffronto.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {mdc.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {mdcPerc.toFixed(2)}%
+                      </td>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        <input
+                          type="text"
+                          value={sotto.note || ""}
+                          onChange={(e) => {
+                            const nuovo = [...sezioni];
+                            nuovo[idx].sotto[i].note = e.target.value;
+                            setSezioni(nuovo);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {/* Totali sezione */}
+                <tr>
+                  <td colSpan={4}></td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {totaleAgg.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {totaleGiac.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {(totaleAgg + totaleGiac).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {totaleBCWP.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {totaleCont.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {totaleDaCont.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {(totaleCont + totaleDaCont).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {totaleMDC.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: "#ddd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    {(totaleRicavi !== 0
+                      ? (totaleMDC / totaleRicavi) * 100
+                      : 0
+                    ).toFixed(2)}
+                    %
+                  </td>
+                  <td></td>
+                </tr>
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </table>
+
       <div style={{ marginTop: "2rem" }}>
         <table
           style={{
@@ -803,7 +1148,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
       });
 
       setDataInizio(
-        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date(),
+        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date()
       );
       setDataFine(commessa.DataFine ? new Date(commessa.DataFine) : new Date());
       fetchUsers(commessa.ResponsabileUfficio, commessa.ResponsabileCantiere);
@@ -1287,7 +1632,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaCliente_Telefono,
+                        datiGenerali.AnagraficaCliente_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1391,7 +1736,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaProgettista_Telefono,
+                        datiGenerali.AnagraficaProgettista_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1423,7 +1768,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidEmail(
-                        datiGenerali.AnagraficaProgettista_Email,
+                        datiGenerali.AnagraficaProgettista_Email
                       )
                         ? "none"
                         : "1px solid red",
@@ -1684,7 +2029,7 @@ const CommessaTecnico = () => {
                   setSelectedCommessa(commessa);
                   localStorage.setItem(
                     "ultimaCommessa",
-                    JSON.stringify(commessa),
+                    JSON.stringify(commessa)
                   );
                   setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                   setFilteredOptions([]);
@@ -1786,7 +2131,7 @@ const CruscottoCommessa = ({
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err),
+          console.error("Errore nel recupero dello stato cantiere:", err)
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.NomeCantiere })
@@ -2650,7 +2995,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -2965,15 +3310,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
