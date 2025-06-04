@@ -102,6 +102,13 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   }, [commessa?.IdCantiere]);
 
   useEffect(() => {
+    datiContratti.forEach((c, i) => {
+      if (!c.Descrizione || !c.CostoTemp2) {
+        console.warn("⚠️ Riga produzione incompleta:", c, "Index:", i);
+      }
+    });
+  }, [datiContratti]);
+  useEffect(() => {
     const generaRigheFatturaDaRicavi = () => {
       const sezioneRicavi = sezioni.find((s) => s.nodo === "R");
 
@@ -489,6 +496,9 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
     }
   };
 
+  useEffect(() => {
+    fetchSalEsistenti();
+  }, [commessa?.IdCantiere]);
   useEffect(() => {
     const totaleProduzione = datiContratti.reduce(
       (sum, c) => sum + produzioneTotalePerLavoro(c.Descrizione),
