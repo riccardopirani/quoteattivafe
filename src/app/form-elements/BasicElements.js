@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Drawer, Button } from "antd";
 import { Select, Input } from "antd";
 import CantiereService from "../services/cantiere";
+import ProduzioneService from "../services/produzione";
 const { Option } = Select;
 
 const cellHeaderStyle = {
@@ -22,6 +23,33 @@ const calcolaGiorniUltimoAgg = (data) => {
   return { text: "< 30 gg", color: "#2e7d32" };
 };
 
+const arricchisciCommessa = async (c) => {
+  const produzioni = await ProduzioneService.leggiProduzione(c.IdCantiere);
+  const sal = await ProduzioneService.leggiSal(c.IdCantiere);
+
+  const totaleProduzione = produzioni.reduce(
+    (sum, p) => sum + parseFloat(p.Importo || 0),
+    0
+  );
+  const totaleFatture = sal.reduce(
+    (sum, s) => sum + parseFloat(s.ImportoFattura || 0),
+    0
+  );
+  const totaleSAL = sal.reduce(
+    (sum, s) => sum + parseFloat(s.ImportoSAL || 0),
+    0
+  );
+
+  return {
+    avanzamentoProduzione:
+      totaleProduzione > 0
+        ? ((totaleFatture / totaleProduzione) * 100).toFixed(2)
+        : "0.00",
+    salNonFatturati: (totaleSAL - totaleFatture).toFixed(2),
+    lavoriAFinire: (totaleProduzione - totaleFatture).toFixed(2),
+    deltaFatture: (totaleProduzione - totaleFatture).toFixed(2),
+  };
+};
 const parseData = (str) => {
   if (!str) return new Date(0);
   const [dd, mm, yyyy] = str.split("/");
@@ -77,6 +105,7 @@ const TabelleCantieri = () => {
           return {
             cod: c.NomeCantiere,
             commessa: c.Indirizzo || "-",
+
             ResponsabileUfficio: c.ResponsabileUfficio || "-",
             costi60gg:
               parseFloat((c.CostiUltimi60gg || "0").replace(/[^\d.-]/g, "")) ||
@@ -96,7 +125,7 @@ const TabelleCantieri = () => {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
             ) || 0,
         }));
 
@@ -238,8 +267,8 @@ const TabelleCantieri = () => {
                         r.esposizione > 0
                           ? "red"
                           : r.esposizione === 0
-                            ? "#ff9800"
-                            : "#2e7d32",
+                          ? "#ff9800"
+                          : "#2e7d32",
                     }}
                   >
                     €{" "}
@@ -346,7 +375,7 @@ function DashboardTabsPanoramica() {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
             ) || 0,
         }));
 
@@ -414,7 +443,7 @@ function DashboardTabsPanoramica() {
             console.error("Errore aggiornamento stato:", e);
             return c;
           }
-        }),
+        })
       );
 
       const filtrateAgg = aggiornate
@@ -516,12 +545,12 @@ function DashboardTabsPanoramica() {
 
   const totaleSal = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.SalDaFatturare),
-    0,
+    0
   );
 
   const totaleSil = filteredCommesse.reduce(
     (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
-    0,
+    0
   );
 
   const commesseDaAggiornare = filteredCommesse.filter((c) => {
@@ -550,12 +579,12 @@ function DashboardTabsPanoramica() {
   });
   const totaleCosti30gg = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.Costi30gg),
-    0,
+    0
   );
 
   const totaleLavoriAFinire = filteredCommesse.reduce(
     (acc, c) => acc + getEuroValue(c.LavoriAFinire),
-    0,
+    0
   );
 
   const marginiValidi = filteredCommesse
@@ -639,7 +668,7 @@ function DashboardTabsPanoramica() {
       const idCliente = clienteRes.return;
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.codice, // <-- questo è il codice della commessa selezionata
+        datiGenerali.codice // <-- questo è il codice della commessa selezionata
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -751,8 +780,8 @@ function DashboardTabsPanoramica() {
                       !commesse.some(
                         (c) =>
                           normalize(c.NomeCantiere) ===
-                          normalize(row.NomeCantiere),
-                      ),
+                          normalize(row.NomeCantiere)
+                      )
                   )
                   .map((row, idx) => {
                     const isChecked =
@@ -835,6 +864,7 @@ function DashboardTabsPanoramica() {
       commessaPeggiore = c;
     }
   });
+
   const renderPanoramica = () => (
     <>
       <div
@@ -996,17 +1026,23 @@ function DashboardTabsPanoramica() {
                       ? "APERTA"
                       : c.StatoCantiere}
                   </td>
-                  <td style={cellStyle}>€ 0</td>
-                  <td style={cellStyle}>€ 0</td>
-                  <td style={cellStyle}>0%</td>
-                  <td style={cellStyle}>€ 0</td>
-                  <td style={cellStyle}>0</td>
-                  <td style={cellStyle}>€ 0</td>
-                  <td style={cellStyle}>0%</td>
                   <td style={cellStyle}>
-                    {c.DataCreazioneCantiere
-                      ? new Date(c.DataCreazioneCantiere).toLocaleDateString(
-                          "it-IT",
+                    {!c.StatoCantiere ||
+                    c.StatoCantiere.toLowerCase() === "incorso"
+                      ? "APERTA"
+                      : c.StatoCantiere}
+                  </td>
+                  <td style={cellStyle}>€ {c.deltaFatture}</td>
+                  <td style={cellStyle}>€ 0</td>
+                  <td style={cellStyle}>{c.avanzamentoProduzione}%</td>
+                  <td style={cellStyle}>€ {c.lavoriAFinire}</td>
+
+                  <td style={cellStyle}>€ {c.salNonFatturati}</td>
+                  <td style={cellStyle}>{c.Margine}%</td>
+                  <td style={cellStyle}>
+                    {c.DataAggiornamento
+                      ? new Date(c.DataAggiornamento).toLocaleDateString(
+                          "it-IT"
                         )
                       : ""}
                   </td>

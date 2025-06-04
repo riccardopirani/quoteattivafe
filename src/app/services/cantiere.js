@@ -11,7 +11,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       return response.data;
@@ -29,7 +29,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       return response.data;
@@ -47,7 +47,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       return response.data;
@@ -65,7 +65,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       return response.data;
@@ -83,7 +83,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       return response.data;
@@ -101,7 +101,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       return response.data;
     } catch (error) {
@@ -118,7 +118,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       return response.data;
     } catch (error) {
@@ -143,7 +143,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       return response.data;
@@ -163,7 +163,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       // La response contiene un oggetto con la proprietà "return" che è true/false
@@ -182,7 +182,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
       return response.data;
@@ -207,6 +207,24 @@ const CantiereService = {
     }
   },
 
+  aggiornaMargineCosti: async (data) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/cantieri/aggiorna/marginecosti`,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Errore creazione costo:", error);
+      throw error;
+    }
+  },
+
   leggiCosti: async (idCantiere) => {
     try {
       const response = await axios.post(
@@ -216,7 +234,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       return response.data;
     } catch (error) {
@@ -234,7 +252,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       return response.data;
     } catch (error) {
@@ -252,7 +270,7 @@ const CantiereService = {
           headers: {
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       return response.data;
     } catch (error) {

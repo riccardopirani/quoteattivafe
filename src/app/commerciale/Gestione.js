@@ -77,8 +77,13 @@ const CostiRicavi = ({ commessa }) => {
       totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0
     );
     setDataAggiornamento(new Date());
+    const data = {
+      IdCantiere: commessa?.IdCantiere,
+      Data: new Date(),
+      Margine: totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0,
+    };
 
-    // Attendi aggiornamento DOM prima dello screenshot
+    await CantiereService.aggiornaMargineCosti(data);
     setTimeout(async () => {
       const element = contentRef.current; // Assicurati che contentRef sia associato al contenitore principale
 
@@ -139,7 +144,6 @@ const CostiRicavi = ({ commessa }) => {
       const salEsistenti = await CantiereService.leggiCosti(
         commessa.IdCantiere
       );
-
 
       //setRigheFatture(righeConvertite);
     } catch (err) {
