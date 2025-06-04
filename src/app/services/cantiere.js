@@ -2,6 +2,24 @@ import axios from "axios";
 import { BASE_URL } from "./api";
 
 const CantiereService = {
+  aggiornaCustom: async (data) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/cantieri/aggiorna/marginecosti`,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
   statoCommessa: async (data) => {
     try {
       const response = await axios.post(

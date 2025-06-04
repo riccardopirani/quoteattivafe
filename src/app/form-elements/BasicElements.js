@@ -15,9 +15,24 @@ const cellHeaderStyle = {
 
 const calcolaGiorniUltimoAgg = (data) => {
   if (!data) return { text: "n.d.", color: "#999" };
-  const [dd, mm, yyyy] = data.split("/");
-  const dataAgg = new Date(`${yyyy}-${mm}-${dd}`);
+
+  let dataAgg;
+  if (typeof data === "string") {
+    if (data.includes("/")) {
+      const [dd, mm, yyyy] = data.split("/");
+      dataAgg = new Date(`${yyyy}-${mm}-${dd}`);
+    } else {
+      // Assume ISO format
+      dataAgg = new Date(data);
+    }
+  } else if (data instanceof Date) {
+    dataAgg = data;
+  } else {
+    return { text: "n.d.", color: "#999" };
+  }
+
   const giorni = Math.floor((new Date() - dataAgg) / (1000 * 60 * 60 * 24));
+
   if (giorni > 60) return { text: "> 60 gg", color: "red" };
   if (giorni > 30) return { text: "> 30 gg", color: "#ff9800" };
   return { text: "< 30 gg", color: "#2e7d32" };
@@ -101,7 +116,7 @@ const TabelleCantieri = () => {
         const dati = await CantiereService.ricercaCantieri({});
 
         const gestione = dati.map((c) => {
-          const parsedDate = parseData(c.DataCreazioneCantiere);
+          const parsedDate = parseData(c.DataAggiornamento); // cambia origine
           return {
             cod: c.NomeCantiere,
             commessa: c.Indirizzo || "-",
@@ -350,6 +365,7 @@ function DashboardTabsPanoramica() {
           return new Date(`${yyyy}-${mm}-${dd}`);
         };
         const gestione = dati.map((c) => {
+          console.log(c.DataAggiornamento);
           const parsedDate = parseData(c.DataCreazioneCantiere);
           return {
             cod: c.NomeCantiere,
@@ -359,7 +375,7 @@ function DashboardTabsPanoramica() {
             costi60gg:
               parseFloat((c.CostiUltimi60gg || "0").replace(/[^\d.-]/g, "")) ||
               0,
-            aggiornataDa: calcolaGiorniUltimoAgg(c.DataCreazioneCantiere),
+            aggiornataDa: calcolaGiorniUltimoAgg(c.DataAggiornamento),
             dataObj: parsedDate,
           };
         });
@@ -1026,12 +1042,7 @@ function DashboardTabsPanoramica() {
                       ? "APERTA"
                       : c.StatoCantiere}
                   </td>
-                  <td style={cellStyle}>
-                    {!c.StatoCantiere ||
-                    c.StatoCantiere.toLowerCase() === "incorso"
-                      ? "APERTA"
-                      : c.StatoCantiere}
-                  </td>
+                  <td style={cellStyle}></td>
                   <td style={cellStyle}>€ {c.deltaFatture}</td>
                   <td style={cellStyle}>€ 0</td>
                   <td style={cellStyle}>{c.avanzamentoProduzione}%</td>

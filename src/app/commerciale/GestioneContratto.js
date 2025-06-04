@@ -330,6 +330,29 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
     [commessa?.IdCantiere]
   );
 
+  useEffect(() => {
+    const totale = righeFatture.reduce((sum, r) => {
+      const importo2 = parseFloatSafe(r?.Importo2);
+      const importo = parseFloatSafe(r?.Importo);
+      return sum + Math.max(importo2 - importo, 0);
+    }, 0);
+
+    //setTotaleSalNonFatturato(totale);
+  }, [righeFatture]);
+
+  useEffect(() => {
+    const totale = datiContratti.reduce(
+      (sum, c) => sum + Number(c.produzioneResidua || 0),
+      0
+    );
+
+    CantiereService.aggiornaCustom({
+      IdCantiere: commessa?.IdCantiere,
+      LavoriResidui: totale,
+    });
+    //setTotaleLavoriResidui(totale);
+  }, [datiContratti]);
+
   const totaleImportiFatture = righeFatture.reduce(
     (sum, r) => sum + Number(r.Importo || 0),
     0
