@@ -1,6 +1,5 @@
 import axios from "axios";
 export const BASE_URL = "http://192.168.10.16:4501";
-
 const GaraService = {
   creaGara: async (garaData) => {
     try {

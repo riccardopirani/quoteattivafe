@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -13,9 +13,7 @@ import { BASE_URL } from "../services/api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
-import ProduzioneService from "../services/produzione";
 import ApprovvigionamentoService from "../services/approvigionamenti";
-import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
 import dayjs from "dayjs";
@@ -24,6 +22,8 @@ import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/it";
 import { BarChart, Bar } from "recharts";
+import CruscottoCommessa from "./CruscottoCommessa.js";
+import "sweetalert2/dist/sweetalert2.min.css";
 import GestioneContratto from "./GestioneContratto.js";
 moment.locale("it");
 
@@ -48,6 +48,7 @@ const CostiRicavi = ({ commessa }) => {
   const [datiGenerali, setDatiGenerali] = useState({
     statoDinamico: "BLOCCATO",
   });
+  const [loadingArchivio, setLoadingArchivio] = useState(false);
   const [sezioni, setSezioni] = useState([]);
   const [dataAggiornamento, setDataAggiornamento] = useState(null);
   const [margineCommessa, setMargineCommessa] = useState(0);
@@ -60,7 +61,6 @@ const CostiRicavi = ({ commessa }) => {
     sezioni.forEach((sezione) => {
       sezione.sotto.forEach((sotto) => {
         const aggiornato = +sotto.aggiornatoAl || 0;
-        const giacenze = +sotto.giacenze || 0;
         const contabilita = +sotto.contabilita || 0;
         const daContabilizzare = +sotto.daContabilizzare || 0;
 
@@ -72,37 +72,56 @@ const CostiRicavi = ({ commessa }) => {
       });
     });
 
+    const marginePercentuale =
+      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0;
     setMargineCommessa(totaleMDC);
-    setMarginePercentuale(
-      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0,
-    );
+    setMarginePercentuale(marginePercentuale);
     setDataAggiornamento(new Date());
+
     const data = {
       IdCantiere: commessa?.IdCantiere,
       Data: new Date(),
-      Margine: totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0,
+      Margine: marginePercentuale,
     };
 
     await CantiereService.aggiornaMargineCosti(data);
-    setTimeout(async () => {
-      const element = contentRef.current; // Assicurati che contentRef sia associato al contenitore principale
 
+    try {
+      const element = contentRef.current;
       if (element) {
         const canvas = await html2canvas(element, {
-          scrollY: -window.scrollY, // evita problemi con scroll
+          scrollY: -window.scrollY,
           useCORS: true,
-          scale: 2, // migliora qualità
+          scale: 2,
         });
 
         const image = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = image;
-        link.download = `CostiRicavi_${new Date()
-          .toISOString()
-          .slice(0, 10)}.png`;
-        link.click();
+        const base64 = image.split(",")[1];
+        const idUser = await localStorage.getItem("userId");
+
+        await CantiereService.inserisciDocumento({
+          IdCantiere: commessa?.IdCantiere,
+          IdUtente: idUser,
+          File: base64,
+        });
+
+        // ✅ Mostra SweetAlert invece di scaricare il file
+        Swal.fire({
+          icon: "success",
+          title: "Costi e ricavi salvati",
+          text: "Il documento è stato generato e salvato correttamente.",
+          confirmButtonColor: "#4caf50",
+        });
       }
-    }, 500);
+    } catch (error) {
+      console.error("Errore nel salvataggio documento:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Errore",
+        text: "Si è verificato un errore durante il salvataggio del documento.",
+        confirmButtonColor: "#d33",
+      });
+    }
   };
 
   useEffect(() => {
@@ -141,10 +160,6 @@ const CostiRicavi = ({ commessa }) => {
     if (!commessa?.IdCantiere) return;
 
     try {
-      const salEsistenti = await CantiereService.leggiCosti(
-        commessa.IdCantiere,
-      );
-
       //setRigheFatture(righeConvertite);
     } catch (err) {
       console.error("❌ Errore nel caricamento dei SAL:", err);
@@ -156,7 +171,7 @@ const CostiRicavi = ({ commessa }) => {
 
       try {
         const tuttiCosti = await CantiereService.leggiCosti(
-          commessa.IdCantiere,
+          commessa.IdCantiere
         );
 
         // Filtra quelli che sono "liberi" o non associati a nodi ARCA
@@ -235,7 +250,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
     );
 
     for (const nodo of datiExternal) {
@@ -262,7 +277,7 @@ const CostiRicavi = ({ commessa }) => {
 
       const totale = sotto.reduce(
         (acc, curr) => acc + (Number(curr.costo) || 0),
-        0,
+        0
       );
 
       const ultimaData = sotto.reduce((latest, riga) => {
@@ -270,31 +285,35 @@ const CostiRicavi = ({ commessa }) => {
         return isNaN(currDate)
           ? latest
           : !latest || currDate > latest
-            ? currDate
-            : latest;
+          ? currDate
+          : latest;
       }, null);
 
       sezioniMap[key].totale = totale;
       sezioniMap[key].dataUltimoAggiornamento = ultimaData;
       sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
         (acc, curr) => acc + (Number(curr.aggiornatoAl) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleGiacenze = sotto.reduce(
         (acc, curr) => acc + (Number(curr.giacenze) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleContabilita = sotto.reduce(
         (acc, curr) => acc + (Number(curr.contabilita) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleDaContabilizzare = sotto.reduce(
         (acc, curr) => acc + (Number(curr.daContabilizzare) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleBCWP = sotto.reduce(
         (acc, curr) => acc + (Number(curr.bcwp) || 0),
-        0,
+        0
+      );
+      sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
+        (acc, curr) => acc + (+curr.aggiornatoAl || 0),
+        0
       );
     }
 
@@ -304,47 +323,60 @@ const CostiRicavi = ({ commessa }) => {
 
   const contentRef = useRef();
 
-  const handleExportExcel = async () => {
-    const content = contentRef.current;
-    if (content) {
+  useEffect(() => {
+    const caricaArchivio = async () => {
+      if (!commessa?.IdCantiere || !openArchivio) return;
+
       try {
-        const canvas = await html2canvas(content, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#ffffff", // evita trasparenze
+        setLoadingArchivio(true);
+        const result = await CantiereService.caricadocumenti({
+          IdCantiere: commessa.IdCantiere,
         });
 
-        canvas.toBlob((blob) => {
-          if (blob) {
-            saveAs(blob, "CostiRicavi_Screenshot.png");
-          }
-        }, "image/png");
-      } catch (error) {
-        console.error("Errore durante lo screenshot:", error);
+        const parsed = result.map((doc) => ({
+          nome: doc.DataInserimento,
+          base64: doc.DocumentoFile,
+          preview: `data:image/png;base64,${doc.DocumentoFile}`,
+        }));
+
+        setDocumentiArchivio(parsed);
+      } catch (err) {
+        console.error("Errore caricamento archivio PNG:", err);
+      } finally {
+        setLoadingArchivio(false);
       }
-    }
-  };
-  const maxCostoSenzaRicavi = sezioni
-    .filter((s) => s.nodo !== "R")
-    .flatMap((s) => s.sotto)
-    .reduce((acc, el) => acc + (Number(el.costo) || 0), 0);
+    };
+
+    caricaArchivio();
+  }, [commessa?.IdCantiere, openArchivio]);
+
   const salvaRigheValori = async () => {
     if (!commessa?.IdCantiere) {
-      alert("Cantiere non selezionato.");
+      Swal.fire({
+        icon: "warning",
+        title: "Cantiere non selezionato",
+        text: "Per favore seleziona un cantiere prima di salvare.",
+        confirmButtonColor: "#3085d6",
+      });
       return;
     }
 
     const righeValide = righeValori.filter(
-      (r) => r.tipo && !isNaN(parseFloat(r.valore)),
+      (r) => r.tipo && !isNaN(parseFloat(r.valore))
     );
 
     if (righeValide.length === 0) {
-      alert("Nessuna riga valida da salvare.");
+      Swal.fire({
+        icon: "info",
+        title: "Nessuna riga valida",
+        text: "Non ci sono righe con valori da salvare.",
+        confirmButtonColor: "#00a86b",
+      });
       return;
     }
 
     let success = true;
+
     for (const riga of righeValide) {
       try {
         await CantiereService.creaCosto({
@@ -355,48 +387,40 @@ const CostiRicavi = ({ commessa }) => {
         });
       } catch (err) {
         console.error("Errore creazione riga costo:", err);
-        alert("Errore durante il salvataggio di una riga.");
+        Swal.fire({
+          icon: "error",
+          title: "Errore",
+          text: "Errore durante il salvataggio di una riga.",
+          confirmButtonColor: "#d33",
+        });
         success = false;
+        break;
       }
     }
 
     if (success) {
-      alert("Costi salvati con successo!");
+      Swal.fire({
+        icon: "success",
+        title: "Salvataggio riuscito",
+        text: "Costi salvati con successo!",
+        confirmButtonColor: "#00aa5e",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     }
   };
 
-  const aggiungiRiga = async (index) => {
-    const sezioneCorrente = sezioni[index];
-
-    if (!commessa?.IdCantiere || !sezioneCorrente?.nodo) return;
-
-    const nuovoNodo = {
-      IdCantiere: commessa.IdCantiere,
-      Nome: `${sezioneCorrente.titolo} - Riga manuale`,
-      Note: `Aggiunto da interfaccia - nodo ${sezioneCorrente.nodo}`,
-      Importo: 0.0,
-    };
-
-    try {
-      const result = await CantiereService.creaCosto(nuovoNodo);
-
-      if (result?.return === true || result === true) {
-        // Solo dopo creazione lato server, aggiorno localmente
-        const nuovo = [...sezioni];
-        nuovo[index].sotto.push({
-          codice: "",
-          descrizione: nuovoNodo.Nome,
-          costo: nuovoNodo.Importo,
-        });
-        setSezioni(nuovo);
-      } else {
-        alert("Errore durante la creazione della riga.");
-      }
-    } catch (error) {
-      console.error("Errore API creaCosto:", error);
-      alert("Errore durante la chiamata al server.");
-    }
-  };
+  const totaleCostiSenzaRicavi = useMemo(() => {
+    return sezioni
+      .filter((s) => s.nodo !== "R")
+      .reduce((acc, sezione) => {
+        const subtotal = sezione.sotto.reduce(
+          (tot, curr) => tot + (+curr.costo || 0),
+          0
+        );
+        return acc + subtotal;
+      }, 0);
+  }, [sezioni]);
 
   return (
     <div ref={contentRef} style={{ padding: "1rem", backgroundColor: "white" }}>
@@ -462,116 +486,216 @@ const CostiRicavi = ({ commessa }) => {
           </tr>
         </thead>
         <tbody>
-          {sezioni.map((sezione, idx) => {
-            let totaleAgg = 0,
-              totaleGiac = 0,
-              totaleCont = 0,
-              totaleDaCont = 0,
-              totaleBCWP = 0,
-              totaleRicavi = 0,
-              totaleMDC = 0;
-
-            return (
-              <React.Fragment key={idx}>
-                <tr>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {sezione.nodo}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {sezione.titolo}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.totale.toLocaleString(undefined, {
+          {sezioni.map((sezione, idx) => (
+            <React.Fragment key={idx}>
+              {/* ✅ Riga aggregata (somma) */}
+              <tr>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {sezione.nodo}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {sezione.titolo}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.costo || 0), 0)
+                    .toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                  </td>
-                  <td style={{ backgroundColor: "white", border: "none" }}></td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.totaleAggiornatoAl.toLocaleString(undefined, {
+                </td>
+                <td style={{ backgroundColor: "white", border: "none" }}></td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.aggiornatoAl || 0), 0)
+                    .toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.sotto
-                      .reduce((a, c) => a + (Number(c.giacenze) || 0), 0)
-                      .toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.sotto
-                      .reduce(
-                        (a, c) =>
-                          a + ((+c.aggiornatoAl || 0) + (+c.giacenze || 0)),
-                        0,
-                      )
-                      .toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                  </td>
-                  <td
-                    colSpan={7}
-                    style={{ backgroundColor: sezione.coloreNodo }}
-                  ></td>
-                </tr>
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.giacenze || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce(
+                      (acc, curr) =>
+                        acc + (+curr.aggiornatoAl || 0) + (+curr.giacenze || 0),
+                      0
+                    )
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.bcwp || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.contabilita || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce(
+                      (acc, curr) => acc + (+curr.daContabilizzare || 0),
+                      0
+                    )
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce(
+                      (acc, curr) =>
+                        acc +
+                        (+curr.contabilita || 0) +
+                        (+curr.daContabilizzare || 0),
+                      0
+                    )
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {(
+                    sezione.sotto.reduce(
+                      (acc, curr) =>
+                        acc +
+                        (+curr.contabilita || 0) +
+                        (+curr.daContabilizzare || 0),
+                      0
+                    ) -
+                    sezione.sotto.reduce(
+                      (acc, curr) => acc + (+curr.aggiornatoAl || 0),
+                      0
+                    )
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {(() => {
+                    const ricavi = sezione.sotto.reduce(
+                      (acc, curr) =>
+                        acc +
+                        (+curr.contabilita || 0) +
+                        (+curr.daContabilizzare || 0),
+                      0
+                    );
+                    const aggiornato = sezione.sotto.reduce(
+                      (acc, curr) => acc + (+curr.aggiornatoAl || 0),
+                      0
+                    );
+                    const perc =
+                      ricavi !== 0 ? ((ricavi - aggiornato) / ricavi) * 100 : 0;
+                    return perc.toFixed(2) + "%";
+                  })()}
+                </td>
+                <td style={{ backgroundColor: sezione.coloreNodo }}></td>
+              </tr>
 
-                {sezione.sotto.map((sotto, i) => {
+              {sezione.sotto.map((sotto, i) => {
+                const isRicavi = sezione.nodo === "R";
+
+                if (!isRicavi) {
                   const aggiornato = +sotto.aggiornatoAl || 0;
                   const giacenze = +sotto.giacenze || 0;
                   const contabilita = +sotto.contabilita || 0;
                   const daContabilizzare = +sotto.daContabilizzare || 0;
-                  const bcwp = +sotto.bcwp || 0;
                   const ricaviRaffronto = contabilita + daContabilizzare;
                   const mdc = ricaviRaffronto - aggiornato;
                   const mdcPerc =
                     ricaviRaffronto !== 0 ? (mdc / ricaviRaffronto) * 100 : 0;
-
-                  totaleAgg += aggiornato;
-                  totaleGiac += giacenze;
-                  totaleCont += contabilita;
-                  totaleDaCont += daContabilizzare;
-                  totaleBCWP += bcwp;
-                  totaleRicavi += ricaviRaffronto;
-                  totaleMDC += mdc;
 
                   return (
                     <tr key={i}>
@@ -771,128 +895,205 @@ const CostiRicavi = ({ commessa }) => {
                       </td>
                     </tr>
                   );
-                })}
-
-                {/* Totali sezione */}
-                <tr>
-                  <td colSpan={4}></td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleAgg.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleGiac.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {(totaleAgg + totaleGiac).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleBCWP.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleCont.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleDaCont.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {(totaleCont + totaleDaCont).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleMDC.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {(totaleRicavi !== 0
-                      ? (totaleMDC / totaleRicavi) * 100
-                      : 0
-                    ).toFixed(2)}
-                    %
-                  </td>
-                  <td></td>
-                </tr>
-              </React.Fragment>
-            );
-          })}
+                } else {
+                  return (
+                    <tr key={i}>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3 ? sotto.codice : ""}
+                      </td>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3
+                          ? sotto.descrizione
+                          : `${sotto.codice} ${sotto.descrizione}`}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {(+sotto.costo || 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      {/* Colspan per mantenere la struttura a 14 colonne totali */}
+                      <td
+                        colSpan={11}
+                        style={{ backgroundColor: "#f9f9f9" }}
+                      ></td>
+                    </tr>
+                  );
+                }
+              })}
+            </React.Fragment>
+          ))}
         </tbody>
       </table>
+      {openArchivio && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            width: "480px",
+            height: "100%",
+            backgroundColor: "#fdfdfd",
+            boxShadow: "-2px 0 8px rgba(0,0,0,0.2)",
+            zIndex: 1000,
+            padding: "1.5rem",
+            overflowY: "auto",
+            borderLeft: "5px solid green",
+          }}
+        >
+          <button
+            onClick={() => setOpenArchivio(false)}
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              backgroundColor: "#fce4ec",
+              border: "none",
+              fontSize: "1.2rem",
+              cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+          <h2 style={{ color: "#6a1b9a", marginBottom: "1rem" }}>
+            Archivio costi/ricavi
+          </h2>
 
+          {loadingArchivio ? (
+            <div style={{ textAlign: "center", marginTop: "2rem" }}>
+              <div
+                style={{
+                  border: "4px solid #f3f3f3",
+                  borderTop: "4px solid green",
+                  borderRadius: "50%",
+                  width: "40px",
+                  height: "40px",
+                  animation: "spin 1s linear infinite",
+                  margin: "auto",
+                }}
+              />
+              <div
+                style={{
+                  marginTop: "0.75rem",
+                  color: "#666",
+                  fontSize: "1rem",
+                  fontStyle: "italic",
+                }}
+              >
+                Caricamento documenti...
+              </div>
+            </div>
+          ) : documentiArchivio.length > 0 ? (
+            <>
+              <ul style={{ listStyle: "none", padding: 0 }}>
+                {documentiArchivio.map((doc, idx) => (
+                  <li key={idx} style={{ marginBottom: "1rem" }}>
+                    <div
+                      style={{
+                        border: "1px solid #ccc",
+                        borderRadius: 6,
+                        padding: "0.5rem",
+                        backgroundColor: "#fafafa",
+                      }}
+                    >
+                      Data Creazione: {doc.nome}
+                      <button
+                        onClick={() => {
+                          try {
+                            if (
+                              !doc.base64 ||
+                              !Array.isArray(doc.base64.data)
+                            ) {
+                              alert("Errore: formato del file non valido.");
+                              return;
+                            }
+
+                            const uint8Array = new Uint8Array(doc.base64.data);
+                            const blob = new Blob([uint8Array], {
+                              type: "image/png",
+                            }); // Cambia il tipo se necessario
+
+                            // Prepara il download
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement("a");
+                            link.href = url;
+                            link.download = doc.nome.endsWith(".png")
+                              ? doc.nome
+                              : `${doc.nome}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          } catch (e) {
+                            console.error("Errore nel download:", e);
+                            alert("Errore durante il download del file.");
+                          }
+                        }}
+                        style={{
+                          marginTop: "0.5rem",
+                          width: "100%",
+                          padding: "0.4rem",
+                          backgroundColor: "#d1c4e9",
+                          border: "none",
+                          borderRadius: 4,
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ⬇️ Scarica {doc.nome}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div style={{ textAlign: "center", marginTop: "2rem" }}>
+                <button
+                  onClick={() => setOpenArchivio(false)}
+                  style={{
+                    padding: "0.5rem 1.5rem",
+                    backgroundColor: "#a5d6a7", // verde chiaro
+                    border: "1px solid #81c784", // bordo leggermente più scuro
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: "1rem",
+                    color: "#1b5e20", // testo verde scuro per contrasto
+                  }}
+                >
+                  ❌ Chiudi archivio
+                </button>
+              </div>
+            </>
+          ) : (
+            <p style={{ color: "#666" }}>Nessun PNG disponibile.</p>
+          )}
+        </div>
+      )}
+      <div
+        style={{
+          marginTop: "1.5rem",
+          marginBottom: "0.5rem",
+          padding: "0.6rem 1rem",
+          borderRadius: 4,
+          fontWeight: "bold",
+          fontSize: "1rem",
+          textAlign: "left",
+        }}
+      >
+        Totale Costi (senza ricavi):{" "}
+        <span style={{ marginLeft: "1rem" }}>
+          €{" "}
+          {totaleCostiSenzaRicavi.toLocaleString("it-IT", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+      </div>
       <div style={{ marginTop: "2rem" }}>
         <table
           style={{
@@ -976,98 +1177,75 @@ const CostiRicavi = ({ commessa }) => {
             ))}
           </tbody>
         </table>
-
-        <div style={{ marginTop: "1rem", textAlign: "right" }}>
-          <button
-            onClick={aggiungiRigaValore}
-            style={{
-              padding: "0.6rem 1.2rem",
-              backgroundColor: "#e0f7fa",
-              border: "1px solid #0097a7",
-              borderRadius: 4,
-              cursor: "pointer",
-              fontWeight: "bold",
-              fontSize: "1rem",
-            }}
-          >
-            + Aggiungi riga
-          </button>
-        </div>
       </div>
 
-      <br></br>
-      <button
-        onClick={salvaRigheValori}
+      <div
         style={{
           marginTop: "1rem",
-          padding: "0.4rem 1rem",
-          backgroundColor: "#d0f0c0",
-          border: "1px solid #008000",
-          borderRadius: 4,
-          cursor: "pointer",
-          fontWeight: "bold",
+          display: "flex",
+          gap: "1rem",
+          alignItems: "stretch",
         }}
       >
-        💾 Salva righe
-      </button>
-      {openArchivio && (
-        <div
+        <button
+          onClick={aggiungiRigaValore}
           style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            width: "400px",
-            height: "100%",
-            backgroundColor: "white",
-            boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
-            zIndex: 1000,
-            padding: "1rem",
-            overflowY: "auto",
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#e0f7fa",
+            border: "1px solid #0097a7",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "1rem",
           }}
         >
-          <button
-            onClick={() => setOpenArchivio(false)}
-            style={{
-              float: "right",
-              backgroundColor: "transparent",
-              border: "none",
-              fontSize: "1.2rem",
-              cursor: "pointer",
-            }}
-          >
-            ✕
-          </button>
-          <h3>Archivio costi/ricavi</h3>
-
-          <div>
-            {documentiArchivio.length > 0 ? (
-              <ul>
-                {documentiArchivio.map((doc, idx) => (
-                  <li key={idx}>{doc.nome || "Documento"}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>Nessun documento disponibile.</p>
-            )}
-          </div>
-        </div>
-      )}
-      <button
-        onClick={generaCostiRicavi}
-        style={{
-          marginTop: "1rem",
-          marginLeft: "1rem",
-          padding: "0.4rem 1rem",
-          backgroundColor: "#bbdefb",
-          border: "1px solid #1976d2",
-          borderRadius: 4,
-          cursor: "pointer",
-          fontWeight: "bold",
-        }}
-      >
-        📊 Genera costi e ricavi
-      </button>
-
+          + Aggiungi riga
+        </button>
+        <button
+          onClick={salvaRigheValori}
+          style={{
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#d0f0c0",
+            border: "1px solid #388e3c",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "1rem",
+          }}
+        >
+          💾 Salva righe
+        </button>
+        <button
+          onClick={generaCostiRicavi}
+          style={{
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#bbdefb",
+            border: "1px solid #1976d2",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "1rem",
+          }}
+        >
+          📊 Genera costi e ricavi
+        </button>
+        <button
+          onClick={() => setOpenArchivio(true)}
+          style={{
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#a5d6a7",
+            border: "1px solid #81c784",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "1rem",
+            color: "#1b5e20",
+          }}
+        >
+          🗂️ Archivio
+        </button>
+      </div>
+      <br></br>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <div style={{ textAlign: "right", fontSize: "0.85rem", width: "40%" }}>
           <div
@@ -1116,17 +1294,15 @@ const CostiRicavi = ({ commessa }) => {
   );
 };
 
-const DatiCommessa = ({ onComplete, commessa }) => {
+const DatiCommessa = ({ commessa }) => {
   const [triggered, setTriggered] = useState(false);
   const [dataInizio, setDataInizio] = useState(new Date());
   const [dataFine, setDataFine] = useState(new Date());
   const [mappaUrl, setMappaUrl] = useState(null);
   const [zonaImageUrl, setZonaImageUrl] = useState(null);
   const [users, setUsers] = useState([]);
-  const prevCantiereId = useRef(null);
   const inizializzato = useRef(false);
   const [error, setError] = useState(null);
-  const skipDateUpdate = useRef(true);
   const [datiGenerali, setDatiGenerali] = useState({
     codice: "",
     cliente: "",
@@ -1243,7 +1419,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
       });
 
       setDataInizio(
-        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date(),
+        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date()
       );
       setDataFine(commessa.DataFine ? new Date(commessa.DataFine) : new Date());
       fetchUsers(commessa.ResponsabileUfficio, commessa.ResponsabileCantiere);
@@ -1727,7 +1903,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaCliente_Telefono,
+                        datiGenerali.AnagraficaCliente_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1831,7 +2007,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaProgettista_Telefono,
+                        datiGenerali.AnagraficaProgettista_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1863,7 +2039,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidEmail(
-                        datiGenerali.AnagraficaProgettista_Email,
+                        datiGenerali.AnagraficaProgettista_Email
                       )
                         ? "none"
                         : "1px solid red",
@@ -1921,6 +2097,7 @@ const CommessaTecnico = () => {
     "C.D.P.",
     "Cruscotto di commessa",
   ];
+  const [gestioneContrattoAperta, setGestioneContrattoAperta] = useState(false);
 
   const [parametriIniziali, setParametriIniziali] = useState(null);
   const [hasLoadedCommessaIniziale, setHasLoadedCommessaIniziale] =
@@ -2068,12 +2245,18 @@ const CommessaTecnico = () => {
           }}
         >
           {tabsVisibili.map((label) => {
-            const isDisabled = !selectedCommessa;
+            const isCruscotto = label === "Cruscotto di commessa";
+            const isDisabled =
+              !selectedCommessa || (isCruscotto && !gestioneContrattoAperta);
             return (
               <div
                 key={label}
                 onClick={() => {
-                  if (!isDisabled) setSelectedTab(label);
+                  if (!isDisabled) {
+                    if (label === "Gestione contratto")
+                      setGestioneContrattoAperta(true);
+                    setSelectedTab(label);
+                  }
                 }}
                 style={{
                   cursor: isDisabled ? "not-allowed" : "pointer",
@@ -2124,7 +2307,7 @@ const CommessaTecnico = () => {
                   setSelectedCommessa(commessa);
                   localStorage.setItem(
                     "ultimaCommessa",
-                    JSON.stringify(commessa),
+                    JSON.stringify(commessa)
                   );
                   setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                   setFilteredOptions([]);
@@ -2178,7 +2361,6 @@ const CommessaTecnico = () => {
         {selectedTab === "C.D.P." && (
           <CDP key={selectedCommessa?.IdCantiere} commessa={selectedCommessa} />
         )}
-
         {selectedTab === "Cruscotto di commessa" &&
           selectedCommessa != null && (
             <CruscottoCommessa
@@ -2186,546 +2368,16 @@ const CommessaTecnico = () => {
               commessa={selectedCommessa}
               percentualeAvanzamento={datiProduzione.percentualeAvanzamento}
               totaleProduzione={datiProduzione.totaleProduzione}
-              produzioneResidua={datiProduzione.produzioneResidua}
+              produzioneResidua={datiProduzione.residuo}
+              avanzamentoSAL={datiProduzione.avanzamentoSAL}
+              totaleSAL={datiProduzione.totaleSAL}
+              salNonFatturati={datiProduzione.salNonFatturati}
+              percentualeFatturazione={datiProduzione.percentualeFatturazione}
+              totaleFatturato={datiProduzione.totaleFatturato}
+              produzioneNonFatturata={datiProduzione.produzioneNonFatturata}
             />
           )}
       </div>
-    </div>
-  );
-};
-
-const CruscottoCommessa = ({
-  commessa,
-  percentualeAvanzamento,
-  totaleProduzione,
-  produzioneResidua,
-}) => {
-  const [chartData, setChartData] = useState([]);
-  const [marginePerc, setMarginePerc] = useState(0);
-  const [margineVal, setMargineVal] = useState(0);
-  const [dataAggiornamento, setDataAggiornamento] = useState("");
-  const [fattureTotali, setFattureTotali] = useState(0);
-  const [costiTotali, setCostiTotali] = useState(0);
-
-  const [datiGenerali, setDatiGenerali] = useState({
-    statoDinamico: "BLOCCATO",
-  });
-  const [contratti, setContratti] = useState([]);
-  const [datiContratti, setDatiContratti] = useState([]);
-  const [righeFatture, setRigheFatture] = useState([]);
-
-  useEffect(() => {
-    if (commessa?.IdCantiere) {
-      CantiereService.statoCommessa({ Codice: commessa.NomeCantiere })
-        .then((result) => {
-          const statoPulito = result.trim().toUpperCase();
-          let statoLabel = "BLOCCATO";
-          if (statoPulito.includes("A")) statoLabel = "APERTO";
-          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
-          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
-          setDatiGenerali({ statoDinamico: statoLabel });
-        })
-        .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err),
-        );
-
-      CantiereService.graficoCommessa({ Codice: commessa.NomeCantiere })
-        .then((dati) => {
-          const datiPerMese = {};
-          let totaleCosti = 0;
-          let totaleRicavi = 0;
-          let ultimaData = null;
-
-          for (const voce of dati) {
-            const mese = voce.MeseAnno;
-            if (!datiPerMese[mese]) {
-              datiPerMese[mese] = { month: mese, costi: 0, ricavi: 0 };
-            }
-
-            if (voce.Descrizione.toLowerCase() === "costi") {
-              datiPerMese[mese].costi += voce.CostoTotale;
-              totaleCosti += voce.CostoTotale;
-            } else if (voce.Descrizione.toLowerCase() === "ricavi") {
-              datiPerMese[mese].ricavi += voce.CostoTotale;
-              totaleRicavi += voce.CostoTotale;
-            }
-
-            if (!ultimaData || dayjs(mese).isAfter(dayjs(ultimaData))) {
-              ultimaData = mese;
-            }
-          }
-
-          const margine = totaleRicavi - totaleCosti;
-          const perc = totaleRicavi
-            ? ((margine / totaleRicavi) * 100).toFixed(2)
-            : 0;
-
-          setCostiTotali(totaleCosti);
-          setMargineVal(margine);
-          setMarginePerc(perc);
-          setDataAggiornamento(dayjs(ultimaData).format("DD MMM YYYY"));
-
-          const chart = Object.values(datiPerMese)
-            .sort((a, b) => a.month.localeCompare(b.month))
-            .map((el) => ({ ...el, label: dayjs(el.month).format("MMM-YY") }));
-
-          setChartData(chart);
-        })
-        .catch((err) => console.error("Errore caricamento dati grafico:", err));
-    }
-  }, [commessa]);
-
-  useEffect(() => {
-    const iniziali = contratti.map((c) => {
-      const costo = Number(c?.Costo || 0);
-      const quantita = Number(c?.Quantita || 1);
-      const produzioneTotale = costo * quantita;
-      return {
-        ...c,
-        produzioneTotale,
-        produzioneResidua: produzioneTotale,
-      };
-    });
-    setDatiContratti(iniziali);
-    const fetchStato = async () => {
-      if (!commessa?.NomeCantiere) return;
-
-      try {
-        const result = await CantiereService.statoCommessa({
-          Codice: commessa.NomeCantiere,
-        });
-
-        const statoPulito = result?.trim().toUpperCase();
-        let statoLabel = "BLOCCATO";
-
-        if (statoPulito.includes("A")) statoLabel = "APERTO";
-        else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
-        else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
-
-        setDatiGenerali((prev) => ({
-          ...prev,
-          statoDinamico: statoLabel,
-        }));
-      } catch (error) {
-        console.error("Errore nel recupero dello stato cantiere:", error);
-      }
-    };
-
-    fetchStato();
-  }, [contratti]);
-
-  const parseFloatSafe = (val) => {
-    if (typeof val === "number") return val;
-    if (!val || typeof val !== "string") return 0;
-    const clean = val.replace(/\./g, "").replace(",", ".");
-    const parsed = parseFloat(clean);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
-  return (
-    <div style={{ padding: "1rem", backgroundColor: "white" }}>
-      <div
-        style={{ fontWeight: "bold", marginBottom: "1rem", fontSize: "1rem" }}
-      >
-        Cod. {commessa?.NomeCantiere || "—"} {commessa?.RagioneSociale || ""}{" "}
-        {commessa?.Indirizzo || ""}
-        <span
-          style={{
-            float: "right",
-            backgroundColor: (() => {
-              const stato = datiGenerali.statoDinamico || "";
-              if (stato === "CHIUSO") return "#d32f2f";
-              if (stato === "APERTO") return "#388e3c";
-              return "#fbc02d";
-            })(),
-            color: "white",
-            padding: "0.3rem 1rem",
-            fontWeight: "bold",
-            borderRadius: 4,
-          }}
-        >
-          {datiGenerali?.statoDinamico || "BLOCCATO"}
-        </span>
-      </div>
-
-      <div
-        style={{
-          textAlign: "center",
-          fontWeight: "bold",
-          fontSize: "1rem",
-          marginBottom: "0.5rem",
-        }}
-      >
-        Costi Ricavi Margine
-      </div>
-
-      <div
-        style={{
-          textAlign: "center",
-          fontSize: "0.85rem",
-          marginBottom: "0.5rem",
-        }}
-      >
-        <span style={{ backgroundColor: "#e0e0e0", padding: "0.2rem 1rem" }}>
-          Data aggiornamento
-        </span>
-        <span style={{ padding: "0.2rem 1rem" }}>
-          {moment(dataAggiornamento).format("D MMM YYYY")}
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "2rem",
-          marginBottom: "1rem",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "#e0eee3",
-            padding: "0.5rem 1rem",
-            fontWeight: "bold",
-          }}
-        >
-          Margine %
-          <span style={{ marginLeft: "1rem" }}>{Math.ceil(marginePerc)} %</span>
-        </div>
-        <div
-          style={{
-            backgroundColor: "#e0eee3",
-            padding: "0.5rem 1rem",
-            fontWeight: "bold",
-          }}
-        >
-          Margine di commessa
-          <span style={{ marginLeft: "1rem" }}>
-            € {Math.ceil(Math.abs(margineVal)).toLocaleString()}
-          </span>
-        </div>
-      </div>
-
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart
-          data={chartData}
-          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="month" />
-          <YAxis tickFormatter={(value) => `${value.toLocaleString()} €`} />
-          <Tooltip formatter={(value) => `${value.toLocaleString()} €`} />
-          <Legend />
-          <Line type="monotone" dataKey="costi" stroke="red" name="Costi" />
-          <Line type="monotone" dataKey="ricavi" stroke="green" name="Ricavi" />
-        </LineChart>
-      </ResponsiveContainer>
-      <div
-        style={{
-          fontFamily: "Arial, sans-serif",
-
-          padding: "1rem",
-        }}
-      >
-        {/* GESTIONE FINANZIARIA */}
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: "bold",
-            fontSize: "1.2rem",
-            marginBottom: "1rem",
-          }}
-        >
-          Gestione finanziaria
-        </div>
-
-        <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-          <span
-            style={{
-              background: "#ddd",
-              padding: "0.3rem 1rem",
-              borderRadius: 4,
-            }}
-          >
-            Data aggiornamento
-          </span>
-          <span
-            style={{
-              marginLeft: 10,
-              padding: "0.3rem 1rem",
-              border: "1px solid #ccc",
-              borderRadius: 4,
-            }}
-          >
-            {dataAggiornamento}
-          </span>
-        </div>
-
-        {/* Bars */}
-        {[
-          {
-            label: "Avanzamento commessa",
-            text: "Avanzamento produzione: 75,90%",
-            value: "€ 113.850",
-            barColor: "#b6dfc4",
-            rightLabel: "Produzione non salizzata",
-            rightValue: "€ 13.850",
-            rightBg: "#f5f5f5",
-          },
-          {
-            label: "Avanzamento SAL",
-            text: "Avanzamento SAL: 66,66%",
-            value: "€ 100.000",
-            barColor: "#b6dfc4",
-            rightLabel: "Sal non fatturati",
-            rightValue: "€ 25.000",
-            rightBg: "#f5f5f5",
-          },
-          {
-            label: "Avanzamento fatturazione",
-            text: "Avanzamento fatturazione: 50 %",
-            value: "€ 75.000",
-            barColor: "#b6dfc4",
-            rightLabel: "Produzione non fatturata",
-            rightValue: "€ 33.850",
-            rightBg: "#f6b6b6",
-          },
-        ].map((r, i) => (
-          <div key={i} style={{ display: "flex", marginBottom: "0.5rem" }}>
-            <div
-              style={{
-                width: "15%",
-                background: "#eee",
-                padding: "0.3rem",
-                textAlign: "right",
-                fontWeight: "bold",
-                border: "1px solid #ccc",
-              }}
-            >
-              {r.label}
-            </div>
-            <div
-              style={{
-                width: "55%",
-                background: r.barColor,
-                padding: "0.3rem",
-                textAlign: "center",
-                border: "1px solid #ccc",
-              }}
-            >
-              {r.text} <strong>{r.value}</strong>
-            </div>
-            <div
-              style={{
-                width: "15%",
-                background: r.rightBg,
-                padding: "0.3rem",
-                textAlign: "right",
-                border: "1px solid #ccc",
-              }}
-            >
-              {r.rightLabel}
-            </div>
-            <div
-              style={{
-                width: "15%",
-                background: "#fff",
-                padding: "0.3rem",
-                textAlign: "center",
-                fontWeight: "bold",
-                border: "1px solid #ccc",
-              }}
-            >
-              {r.rightValue}
-            </div>
-          </div>
-        ))}
-
-        {/* ESPOSIZIONE ROW */}
-        <div style={{ display: "flex", marginBottom: "1.5rem" }}>
-          <div
-            style={{
-              width: "15%",
-              background: "#eee",
-              padding: "0.3rem",
-              textAlign: "right",
-              fontWeight: "bold",
-              border: "1px solid #ccc",
-            }}
-          >
-            Esposizione
-          </div>
-          <div
-            style={{
-              width: "20%",
-              background: "#ffe8a1",
-              padding: "0.3rem",
-              textAlign: "center",
-              fontWeight: "bold",
-              border: "1px solid #ccc",
-            }}
-          >
-            €{" "}
-            {(costiTotali - fattureTotali).toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-          <div
-            style={{
-              width: "15%",
-              background: "#eee",
-              padding: "0.3rem",
-              textAlign: "right",
-              border: "1px solid #ccc",
-            }}
-          >
-            Costi sostenuti
-          </div>
-          <div
-            style={{
-              width: "20%",
-              background: "#f6b6b6",
-              padding: "0.3rem",
-              textAlign: "center",
-              fontWeight: "bold",
-              border: "1px solid #ccc",
-            }}
-          >
-            €{" "}
-            {costiTotali.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-          </div>
-
-          <div
-            style={{
-              width: "15%",
-              background: "#eee",
-              padding: "0.3rem",
-              textAlign: "right",
-              border: "1px solid #ccc",
-            }}
-          >
-            Fatture emesse
-          </div>
-          <div
-            style={{
-              width: "15%",
-              background: "#d7f0d7",
-              padding: "0.3rem",
-              textAlign: "center",
-              fontWeight: "bold",
-              border: "1px solid #ccc",
-            }}
-          >
-            € {fattureTotali.toLocaleString("it-IT")}
-          </div>
-        </div>
-
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: "bold",
-            fontSize: "1.2rem",
-            marginBottom: "1rem",
-          }}
-        >
-          Andamento produzione
-        </div>
-
-        <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-          <span
-            style={{
-              background: "#ddd",
-              padding: "0.3rem 1rem",
-              borderRadius: 4,
-            }}
-          >
-            Data aggiornamento
-          </span>
-          <span
-            style={{
-              marginLeft: 10,
-              padding: "0.3rem 1rem",
-              border: "1px solid #ccc",
-              borderRadius: 4,
-            }}
-          >
-            {dataAggiornamento}
-          </span>
-        </div>
-        <div style={{ display: "flex", width: "100%" }}>
-          <div
-            style={{
-              width: "50%",
-              background: "#b6dfc4",
-              padding: "0.3rem",
-              textAlign: "center",
-              fontWeight: "bold",
-              border: "1px solid #ccc",
-            }}
-          >
-            Avanzamento produzione: {percentualeAvanzamento}% €{" "}
-            {Number(totaleProduzione).toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-
-          <div
-            style={{
-              width: "50%",
-              background: "#eee",
-              padding: "0.3rem",
-              textAlign: "center",
-              fontWeight: "bold",
-              border: "1px solid #ccc",
-            }}
-          >
-            Lavori residui: €{" "}
-            {Number(produzioneResidua).toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
-          </div>
-        </div>
-
-        <div
-          style={{
-            width: "100%",
-            borderTop: "1px solid #ccc",
-            paddingTop: "1rem",
-            textAlign: "center",
-            color: "gray",
-          }}
-        >
-          <div style={{ fontStyle: "italic" }}>
-            <GraficoCostiMese
-              chartData={chartData}
-              dataAggiornamento={dataAggiornamento}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const GraficoCostiMese = ({ chartData }) => {
-  return (
-    <div style={{ width: "100%", height: 500 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="label" />
-          <YAxis />
-          <Tooltip
-            formatter={(value) =>
-              new Intl.NumberFormat("it-IT", {
-                style: "currency",
-                currency: "EUR",
-              }).format(value)
-            }
-          />
-          <Bar dataKey="costi" fill="#90D19C" name="Costi mese" />
-        </BarChart>
-      </ResponsiveContainer>
     </div>
   );
 };
@@ -3090,7 +2742,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -3405,15 +3057,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
