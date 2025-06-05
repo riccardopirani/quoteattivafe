@@ -29,6 +29,27 @@ import "sweetalert2/dist/sweetalert2.min.css";
 import GestioneContratto from "./GestioneContratto.js";
 moment.locale("it");
 
+function b64toBlob(b64Data, contentType = "", sliceSize = 512) {
+  // Rimuove eventuale intestazione "data:image/png;base64,"
+  const base64 = b64Data.includes(",") ? b64Data.split(",")[1] : b64Data;
+
+  const byteCharacters = atob(base64); // <- errore nasce qui se base64 è sporco
+  const byteArrays = [];
+
+  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+    const slice = byteCharacters.slice(offset, offset + sliceSize);
+    const byteNumbers = new Array(slice.length);
+
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+
+    byteArrays.push(new Uint8Array(byteNumbers));
+  }
+
+  return new Blob(byteArrays, { type: contentType });
+}
+
 const tableStyle = {
   borderCollapse: "collapse",
   width: "100%",
@@ -73,21 +94,22 @@ const CostiRicavi = ({ commessa }) => {
       });
     });
 
+    const marginePercentuale =
+      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0;
     setMargineCommessa(totaleMDC);
-    setMarginePercentuale(
-      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0
-    );
+    setMarginePercentuale(marginePercentuale);
     setDataAggiornamento(new Date());
+
     const data = {
       IdCantiere: commessa?.IdCantiere,
       Data: new Date(),
-      Margine: totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0,
+      Margine: marginePercentuale,
     };
 
     await CantiereService.aggiornaMargineCosti(data);
+
     setTimeout(async () => {
       const element = contentRef.current;
-
       if (element) {
         const canvas = await html2canvas(element, {
           scrollY: -window.scrollY,
@@ -96,11 +118,22 @@ const CostiRicavi = ({ commessa }) => {
         });
 
         const image = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = image;
-        link.download = `CostiRicavi_${new Date()
+        const base64 = image.split(",")[1];
+        const nomeFile = `CostiRicavi_${new Date()
           .toISOString()
           .slice(0, 10)}.png`;
+
+        const idUser = await localStorage.getItem("userId");
+
+        await CantiereService.inserisciDocumento({
+          IdCantiere: commessa?.IdCantiere,
+          IdUtente: idUser,
+          File: base64,
+        });
+
+        const link = document.createElement("a");
+        link.href = image;
+        link.download = nomeFile;
         link.click();
       }
     }, 500);
@@ -304,6 +337,31 @@ const CostiRicavi = ({ commessa }) => {
   }, [datiExternal]);
 
   const contentRef = useRef();
+
+  useEffect(() => {
+    const caricaArchivio = async () => {
+      if (!commessa?.IdCantiere || !openArchivio) return;
+
+      try {
+        const result = await CantiereService.caricadocumenti({
+          IdCantiere: commessa.IdCantiere,
+        });
+
+        const documenti = result;
+        const parsed = documenti.map((doc) => ({
+          nome: doc.DataInserimento,
+          base64: doc.DocumentoFile,
+          preview: `data:image/png;base64,${doc.DocumentoFile}`,
+        }));
+
+        setDocumentiArchivio(parsed);
+      } catch (err) {
+        console.error("Errore caricamento archivio PNG:", err);
+      }
+    };
+
+    caricaArchivio();
+  }, [commessa?.IdCantiere, openArchivio]);
 
   const salvaRigheValori = async () => {
     if (!commessa?.IdCantiere) {
@@ -840,6 +898,105 @@ const CostiRicavi = ({ commessa }) => {
           ))}
         </tbody>
       </table>
+      {openArchivio && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            width: "480px",
+            height: "100%",
+            backgroundColor: "#fdfdfd",
+            boxShadow: "-2px 0 8px rgba(0,0,0,0.2)",
+            zIndex: 1000,
+            padding: "1.5rem",
+            overflowY: "auto",
+            borderLeft: "5px solid #9c27b0",
+          }}
+        >
+          <button
+            onClick={() => setOpenArchivio(false)}
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              backgroundColor: "#fce4ec",
+              border: "none",
+              fontSize: "1.2rem",
+              cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+          <h2 style={{ color: "#6a1b9a", marginBottom: "1rem" }}>
+            Archivio costi/ricavi
+          </h2>
+
+          {documentiArchivio.length > 0 ? (
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {documentiArchivio.map((doc, idx) => (
+                <li key={idx} style={{ marginBottom: "1rem" }}>
+                  <div
+                    style={{
+                      border: "1px solid #ccc",
+                      borderRadius: 6,
+                      padding: "0.5rem",
+                      backgroundColor: "#fafafa",
+                    }}
+                  >
+                    Data Creazione: {doc.nome}
+                    <button
+                      onClick={() => {
+                        try {
+                          if (!doc.base64 || !Array.isArray(doc.base64.data)) {
+                            alert("Errore: formato del file non valido.");
+                            return;
+                          }
+
+                          // Ricostruisce il buffer binario dall’array di byte
+                          const uint8Array = new Uint8Array(doc.base64.data);
+                          const blob = new Blob([uint8Array], {
+                            type: "image/png",
+                          }); // Cambia il tipo se necessario
+
+                          // Prepara il download
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = doc.nome.endsWith(".png")
+                            ? doc.nome
+                            : `${doc.nome}.png`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        } catch (e) {
+                          console.error("Errore nel download:", e);
+                          alert("Errore durante il download del file.");
+                        }
+                      }}
+                      style={{
+                        marginTop: "0.5rem",
+                        width: "100%",
+                        padding: "0.4rem",
+                        backgroundColor: "#d1c4e9",
+                        border: "none",
+                        borderRadius: 4,
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ⬇️ Scarica {doc.nome}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: "#666" }}>Nessun PNG disponibile.</p>
+          )}
+        </div>
+      )}
 
       <div style={{ marginTop: "2rem" }}>
         <table
@@ -958,63 +1115,36 @@ const CostiRicavi = ({ commessa }) => {
       >
         💾 Salva righe
       </button>
-      {openArchivio && (
-        <div
+
+      <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
+        <button
+          onClick={generaCostiRicavi}
           style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            width: "400px",
-            height: "100%",
-            backgroundColor: "white",
-            boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
-            zIndex: 1000,
-            padding: "1rem",
-            overflowY: "auto",
+            padding: "0.4rem 1rem",
+            backgroundColor: "#bbdefb",
+            border: "1px solid #1976d2",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontWeight: "bold",
           }}
         >
-          <button
-            onClick={() => setOpenArchivio(false)}
-            style={{
-              float: "right",
-              backgroundColor: "transparent",
-              border: "none",
-              fontSize: "1.2rem",
-              cursor: "pointer",
-            }}
-          >
-            ✕
-          </button>
-          <h3>Archivio costi/ricavi</h3>
+          📊 Genera costi e ricavi
+        </button>
 
-          <div>
-            {documentiArchivio.length > 0 ? (
-              <ul>
-                {documentiArchivio.map((doc, idx) => (
-                  <li key={idx}>{doc.nome || "Documento"}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>Nessun documento disponibile.</p>
-            )}
-          </div>
-        </div>
-      )}
-      <button
-        onClick={generaCostiRicavi}
-        style={{
-          marginTop: "1rem",
-          marginLeft: "1rem",
-          padding: "0.4rem 1rem",
-          backgroundColor: "#bbdefb",
-          border: "1px solid #1976d2",
-          borderRadius: 4,
-          cursor: "pointer",
-          fontWeight: "bold",
-        }}
-      >
-        📊 Genera costi e ricavi
-      </button>
+        <button
+          onClick={() => setOpenArchivio(true)}
+          style={{
+            padding: "0.4rem 1rem",
+            backgroundColor: "#f3e5f5",
+            border: "1px solid #9c27b0",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          🗂️ Archivio
+        </button>
+      </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <div style={{ textAlign: "right", fontSize: "0.85rem", width: "40%" }}>
