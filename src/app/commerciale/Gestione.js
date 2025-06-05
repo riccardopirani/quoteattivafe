@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -13,9 +13,7 @@ import { BASE_URL } from "../services/api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
-import ProduzioneService from "../services/produzione";
 import ApprovvigionamentoService from "../services/approvigionamenti";
-import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { useRef } from "react";
 import dayjs from "dayjs";
@@ -404,6 +402,18 @@ const CostiRicavi = ({ commessa }) => {
       });
     }
   };
+
+  const totaleCostiSenzaRicavi = useMemo(() => {
+    return sezioni
+      .filter((s) => s.nodo !== "R")
+      .reduce((acc, sezione) => {
+        const subtotal = sezione.sotto.reduce(
+          (tot, curr) => tot + (+curr.costo || 0),
+          0
+        );
+        return acc + subtotal;
+      }, 0);
+  }, [sezioni]);
 
   return (
     <div ref={contentRef} style={{ padding: "1rem", backgroundColor: "white" }}>
@@ -1023,7 +1033,26 @@ const CostiRicavi = ({ commessa }) => {
           )}
         </div>
       )}
-
+      <div
+        style={{
+          marginTop: "1.5rem",
+          marginBottom: "0.5rem",
+          padding: "0.6rem 1rem",
+          borderRadius: 4,
+          fontWeight: "bold",
+          fontSize: "1rem",
+          textAlign: "left",
+        }}
+      >
+        Totale Costi (senza ricavi):{" "}
+        <span style={{ marginLeft: "1rem" }}>
+          €{" "}
+          {totaleCostiSenzaRicavi.toLocaleString("it-IT", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+      </div>
       <div style={{ marginTop: "2rem" }}>
         <table
           style={{
