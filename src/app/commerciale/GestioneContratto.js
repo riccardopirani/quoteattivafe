@@ -342,7 +342,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
 
   useEffect(() => {
     const totale = datiContratti.reduce(
-      (sum, c) => sum + Number(c.produzioneResidua || 0),
+      (sum, c) => sum + produzioneResidua(c.Descrizione),
       0
     );
 
@@ -637,7 +637,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
           >
             Lavori residui: €{" "}
             {datiContratti
-              .reduce((sum, c) => sum + Number(c.produzioneResidua || 0), 0)
+              .reduce((sum, c) => sum + produzioneResidua(c.Descrizione), 0)
               .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
           </div>
         </div>
