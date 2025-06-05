@@ -86,7 +86,7 @@ const CostiRicavi = ({ commessa }) => {
 
     await CantiereService.aggiornaMargineCosti(data);
 
-    setTimeout(async () => {
+    try {
       const element = contentRef.current;
       if (element) {
         const canvas = await html2canvas(element, {
@@ -97,10 +97,6 @@ const CostiRicavi = ({ commessa }) => {
 
         const image = canvas.toDataURL("image/png");
         const base64 = image.split(",")[1];
-        const nomeFile = `CostiRicavi_${new Date()
-          .toISOString()
-          .slice(0, 10)}.png`;
-
         const idUser = await localStorage.getItem("userId");
 
         await CantiereService.inserisciDocumento({
@@ -109,12 +105,23 @@ const CostiRicavi = ({ commessa }) => {
           File: base64,
         });
 
-        const link = document.createElement("a");
-        link.href = image;
-        link.download = nomeFile;
-        link.click();
+        // ✅ Mostra SweetAlert invece di scaricare il file
+        Swal.fire({
+          icon: "success",
+          title: "Costi e ricavi salvati",
+          text: "Il documento è stato generato e salvato correttamente.",
+          confirmButtonColor: "#4caf50",
+        });
       }
-    }, 500);
+    } catch (error) {
+      console.error("Errore nel salvataggio documento:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Errore",
+        text: "Si è verificato un errore durante il salvataggio del documento.",
+        confirmButtonColor: "#d33",
+      });
+    }
   };
 
   useEffect(() => {
@@ -1016,12 +1023,13 @@ const CostiRicavi = ({ commessa }) => {
                   onClick={() => setOpenArchivio(false)}
                   style={{
                     padding: "0.5rem 1.5rem",
-                    backgroundColor: "#fce4ec",
-                    border: "1px solid green",
+                    backgroundColor: "#a5d6a7", // verde chiaro
+                    border: "1px solid #81c784", // bordo leggermente più scuro
                     borderRadius: 6,
                     cursor: "pointer",
                     fontWeight: "bold",
                     fontSize: "1rem",
+                    color: "#1b5e20", // testo verde scuro per contrasto
                   }}
                 >
                   ❌ Chiudi archivio
@@ -1136,71 +1144,75 @@ const CostiRicavi = ({ commessa }) => {
             ))}
           </tbody>
         </table>
-
-        <div style={{ marginTop: "1rem", textAlign: "right" }}>
-          <button
-            onClick={aggiungiRigaValore}
-            style={{
-              padding: "0.6rem 1.2rem",
-              backgroundColor: "#e0f7fa",
-              border: "1px solid #0097a7",
-              borderRadius: 4,
-              cursor: "pointer",
-              fontWeight: "bold",
-              fontSize: "1rem",
-            }}
-          >
-            + Aggiungi riga
-          </button>
-        </div>
       </div>
 
-      <br></br>
-      <button
-        onClick={salvaRigheValori}
+      <div
         style={{
           marginTop: "1rem",
-          padding: "0.4rem 1rem",
-          backgroundColor: "#d0f0c0",
-          border: "1px solid #008000",
-          borderRadius: 4,
-          cursor: "pointer",
-          fontWeight: "bold",
+          display: "flex",
+          gap: "1rem",
+          alignItems: "stretch",
         }}
       >
-        💾 Salva righe
-      </button>
-
-      <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
+        <button
+          onClick={aggiungiRigaValore}
+          style={{
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#e0f7fa",
+            border: "1px solid #0097a7",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "1rem",
+          }}
+        >
+          + Aggiungi riga
+        </button>
+        <button
+          onClick={salvaRigheValori}
+          style={{
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#d0f0c0",
+            border: "1px solid #388e3c",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "1rem",
+          }}
+        >
+          💾 Salva righe
+        </button>
         <button
           onClick={generaCostiRicavi}
           style={{
-            padding: "0.4rem 1rem",
+            padding: "0.6rem 1.2rem",
             backgroundColor: "#bbdefb",
             border: "1px solid #1976d2",
-            borderRadius: 4,
+            borderRadius: 6,
             cursor: "pointer",
             fontWeight: "bold",
+            fontSize: "1rem",
           }}
         >
           📊 Genera costi e ricavi
         </button>
-
         <button
           onClick={() => setOpenArchivio(true)}
           style={{
-            padding: "0.4rem 1rem",
-            backgroundColor: "#f3e5f5",
-            border: "1px solid green",
-            borderRadius: 4,
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#a5d6a7",
+            border: "1px solid #81c784",
+            borderRadius: 6,
             cursor: "pointer",
             fontWeight: "bold",
+            fontSize: "1rem",
+            color: "#1b5e20",
           }}
         >
           🗂️ Archivio
         </button>
       </div>
-
+      <br></br>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <div style={{ textAlign: "right", fontSize: "0.85rem", width: "40%" }}>
           <div
