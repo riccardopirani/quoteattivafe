@@ -74,7 +74,7 @@ const CostiRicavi = ({ commessa }) => {
 
     setMargineCommessa(totaleMDC);
     setMarginePercentuale(
-      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0
+      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0,
     );
     setDataAggiornamento(new Date());
     const data = {
@@ -142,7 +142,7 @@ const CostiRicavi = ({ commessa }) => {
 
     try {
       const salEsistenti = await CantiereService.leggiCosti(
-        commessa.IdCantiere
+        commessa.IdCantiere,
       );
 
       //setRigheFatture(righeConvertite);
@@ -156,7 +156,7 @@ const CostiRicavi = ({ commessa }) => {
 
       try {
         const tuttiCosti = await CantiereService.leggiCosti(
-          commessa.IdCantiere
+          commessa.IdCantiere,
         );
 
         // Filtra quelli che sono "liberi" o non associati a nodi ARCA
@@ -235,7 +235,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
     );
 
     for (const nodo of datiExternal) {
@@ -262,7 +262,7 @@ const CostiRicavi = ({ commessa }) => {
 
       const totale = sotto.reduce(
         (acc, curr) => acc + (Number(curr.costo) || 0),
-        0
+        0,
       );
 
       const ultimaData = sotto.reduce((latest, riga) => {
@@ -270,31 +270,31 @@ const CostiRicavi = ({ commessa }) => {
         return isNaN(currDate)
           ? latest
           : !latest || currDate > latest
-          ? currDate
-          : latest;
+            ? currDate
+            : latest;
       }, null);
 
       sezioniMap[key].totale = totale;
       sezioniMap[key].dataUltimoAggiornamento = ultimaData;
       sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
         (acc, curr) => acc + (Number(curr.aggiornatoAl) || 0),
-        0
+        0,
       );
       sezioniMap[key].totaleGiacenze = sotto.reduce(
         (acc, curr) => acc + (Number(curr.giacenze) || 0),
-        0
+        0,
       );
       sezioniMap[key].totaleContabilita = sotto.reduce(
         (acc, curr) => acc + (Number(curr.contabilita) || 0),
-        0
+        0,
       );
       sezioniMap[key].totaleDaContabilizzare = sotto.reduce(
         (acc, curr) => acc + (Number(curr.daContabilizzare) || 0),
-        0
+        0,
       );
       sezioniMap[key].totaleBCWP = sotto.reduce(
         (acc, curr) => acc + (Number(curr.bcwp) || 0),
-        0
+        0,
       );
     }
 
@@ -336,7 +336,7 @@ const CostiRicavi = ({ commessa }) => {
     }
 
     const righeValide = righeValori.filter(
-      (r) => r.tipo && !isNaN(parseFloat(r.valore))
+      (r) => r.tipo && !isNaN(parseFloat(r.valore)),
     );
 
     if (righeValide.length === 0) {
@@ -541,7 +541,7 @@ const CostiRicavi = ({ commessa }) => {
                       .reduce(
                         (a, c) =>
                           a + ((+c.aggiornatoAl || 0) + (+c.giacenze || 0)),
-                        0
+                        0,
                       )
                       .toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -1243,7 +1243,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
       });
 
       setDataInizio(
-        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date()
+        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date(),
       );
       setDataFine(commessa.DataFine ? new Date(commessa.DataFine) : new Date());
       fetchUsers(commessa.ResponsabileUfficio, commessa.ResponsabileCantiere);
@@ -1727,7 +1727,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaCliente_Telefono
+                        datiGenerali.AnagraficaCliente_Telefono,
                       )
                         ? "none"
                         : "1px solid red",
@@ -1831,7 +1831,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaProgettista_Telefono
+                        datiGenerali.AnagraficaProgettista_Telefono,
                       )
                         ? "none"
                         : "1px solid red",
@@ -1863,7 +1863,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidEmail(
-                        datiGenerali.AnagraficaProgettista_Email
+                        datiGenerali.AnagraficaProgettista_Email,
                       )
                         ? "none"
                         : "1px solid red",
@@ -2124,7 +2124,7 @@ const CommessaTecnico = () => {
                   setSelectedCommessa(commessa);
                   localStorage.setItem(
                     "ultimaCommessa",
-                    JSON.stringify(commessa)
+                    JSON.stringify(commessa),
                   );
                   setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                   setFilteredOptions([]);
@@ -2226,7 +2226,7 @@ const CruscottoCommessa = ({
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err)
+          console.error("Errore nel recupero dello stato cantiere:", err),
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.NomeCantiere })
@@ -3090,7 +3090,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err)
+          console.error("Errore nel caricamento approvvigionamenti:", err),
         );
     }
   }, [commessa?.IdCantiere]);
@@ -3405,15 +3405,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?"
+                          "Sei sicuro di voler eliminare questo approvvigionamento?",
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero
+                            editingItem.Numero,
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere
+                            commessa?.IdCantiere,
                           );
                           setRighe(updated);
                           chiudiDrawer();

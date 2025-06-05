@@ -1,7 +1,6 @@
 import React, { Component } from "react";
 import { Link, withRouter } from "react-router-dom";
 import { Collapse, Spinner } from "react-bootstrap";
-import { Trans } from "react-i18next";
 import { BASE_URL } from "../services/api";
 import "./Sidebar.css";
 
@@ -70,23 +69,23 @@ class Sidebar extends Component {
     user: null,
     menuStates: {},
     loading: true,
-    sidebarOpen: false, // Track whether the sidebar is open or closed
+    sidebarOpen: false,
   };
 
-  // Toggle the state of the menu
-  toggleMenuState(menuState) {
-    this.setState((prevState) => ({
-      menuStates: {
+  toggleMenuState = (menuKey) => {
+    this.setState((prevState) => {
+      const newMenuStates = {
         ...Object.keys(prevState.menuStates).reduce((acc, key) => {
           acc[key] = false;
           return acc;
         }, {}),
-        [menuState]: !prevState.menuStates[menuState],
-      },
-    }));
-  }
+        [menuKey]: !prevState.menuStates[menuKey],
+      };
+      localStorage.setItem("menuStates", JSON.stringify(newMenuStates));
+      return { menuStates: newMenuStates };
+    });
+  };
 
-  // Toggle the sidebar visibility on mobile
   toggleSidebar = () => {
     this.setState((prevState) => ({
       sidebarOpen: !prevState.sidebarOpen,
@@ -94,7 +93,11 @@ class Sidebar extends Component {
   };
 
   async componentDidMount() {
-    this.onRouteChanged();
+    // Ripristina stato dei menu da localStorage
+    const storedMenuStates = localStorage.getItem("menuStates");
+    if (storedMenuStates) {
+      this.setState({ menuStates: JSON.parse(storedMenuStates) });
+    }
 
     const userIdStr = localStorage.getItem("userId");
     const userId = userIdStr ? parseInt(userIdStr) : null;
@@ -123,48 +126,6 @@ class Sidebar extends Component {
     } else {
       this.setState({ loading: false });
     }
-
-    // Add hover behavior for sidebar nav items
-    const body = document.querySelector("body");
-    const navItems = document.querySelectorAll(".sidebar .nav-item");
-
-    navItems.forEach((el) => {
-      // Remove existing listeners (optional, in case of remount)
-      el.removeEventListener("mouseover", el._hoverOpenIn);
-      el.removeEventListener("mouseout", el._hoverOpenOut);
-
-      // Define and store listeners as properties for future cleanup
-      el._hoverOpenIn = function () {
-        if (body?.classList.contains("sidebar-icon-only")) {
-          el.classList.add("hover-open");
-        }
-      };
-
-      el._hoverOpenOut = function () {
-        if (body?.classList.contains("sidebar-icon-only")) {
-          el.classList.remove("hover-open");
-        }
-      };
-
-      el.addEventListener("mouseover", el._hoverOpenIn);
-      el.addEventListener("mouseout", el._hoverOpenOut);
-    });
-  }
-
-  componentDidUpdate(prevProps) {
-    if (this.props.location !== prevProps.location) {
-      this.onRouteChanged();
-    }
-  }
-
-  onRouteChanged() {
-    const sidebar = document.querySelector("#sidebar");
-    if (sidebar) {
-      sidebar.classList.remove("active");
-    }
-
-    // Rimuoviamo solo la classe "active" dal DOM, ma NON resettiamo menuStates
-    // Così i menu restano espansi come l'utente li aveva lasciati
   }
 
   isPathActive(path) {
@@ -174,6 +135,7 @@ class Sidebar extends Component {
   handleLogout = () => {
     localStorage.removeItem("isLogin");
     localStorage.removeItem("userId");
+    localStorage.removeItem("menuStates");
     this.props.history.push("/login");
   };
 
@@ -198,7 +160,6 @@ class Sidebar extends Component {
         className={`sidebar sidebar-offcanvas ${sidebarOpen ? "active" : ""}`}
         id="sidebar"
       >
-        {/* Add a button for mobile toggle */}
         <button
           className="sidebar-toggler d-lg-none"
           onClick={this.toggleSidebar}
@@ -216,7 +177,6 @@ class Sidebar extends Component {
         </div>
 
         <ul className="nav">
-          {/* User info */}
           <div className="sidebar-user-info">
             <div
               className="sidebar-user-img"
@@ -229,7 +189,8 @@ class Sidebar extends Component {
               <img
                 src={imageUrl}
                 onError={(e) =>
-                  (e.target.src = "https://via.placeholder.com/50")
+                  (e.target.src =
+                    "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg")
                 }
                 alt="utente"
                 style={{ borderRadius: "50%", width: 50, height: 50 }}
@@ -253,7 +214,6 @@ class Sidebar extends Component {
             </p>
           </div>
 
-          {/* Sidebar Menu */}
           {permessiPersonalizzati.map(
             ({ label, key, route, subMenu, menuKey, icon }) =>
               permessi[key] ? (
@@ -272,10 +232,10 @@ class Sidebar extends Component {
                       }
                       onClick={() => {
                         this.toggleMenuState(menuKey);
-                        const cleanLabel = label.replace(/^Accesso\s+/i, ""); // Rimuove "Accesso " all'inizio
+                        const cleanLabel = label.replace(/^Accesso\s+/i, "");
                         localStorage.setItem("selectedMenuLabel", cleanLabel);
                         window.dispatchEvent(
-                          new Event("selectedMenuLabelChanged")
+                          new Event("selectedMenuLabelChanged"),
                         );
                       }}
                     >
@@ -305,14 +265,14 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null
+              ) : null,
           )}
 
           <li className="nav-item mt-4">
             <button className="btn btn-sm w-100" onClick={this.handleLogout}>
               <img
                 src={require("../../assets/images/logout.jpg")}
-                alt="profile"
+                alt="logout"
                 width="70%"
               />
             </button>
