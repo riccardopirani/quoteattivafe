@@ -24,6 +24,8 @@ import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/it";
 import { BarChart, Bar } from "recharts";
+
+import "sweetalert2/dist/sweetalert2.min.css";
 import GestioneContratto from "./GestioneContratto.js";
 moment.locale("it");
 
@@ -329,9 +331,15 @@ const CostiRicavi = ({ commessa }) => {
     .filter((s) => s.nodo !== "R")
     .flatMap((s) => s.sotto)
     .reduce((acc, el) => acc + (Number(el.costo) || 0), 0);
+
   const salvaRigheValori = async () => {
     if (!commessa?.IdCantiere) {
-      alert("Cantiere non selezionato.");
+      Swal.fire({
+        icon: "warning",
+        title: "Cantiere non selezionato",
+        text: "Per favore seleziona un cantiere prima di salvare.",
+        confirmButtonColor: "#3085d6",
+      });
       return;
     }
 
@@ -340,11 +348,17 @@ const CostiRicavi = ({ commessa }) => {
     );
 
     if (righeValide.length === 0) {
-      alert("Nessuna riga valida da salvare.");
+      Swal.fire({
+        icon: "info",
+        title: "Nessuna riga valida",
+        text: "Non ci sono righe con valori da salvare.",
+        confirmButtonColor: "#00a86b",
+      });
       return;
     }
 
     let success = true;
+
     for (const riga of righeValide) {
       try {
         await CantiereService.creaCosto({
@@ -355,13 +369,26 @@ const CostiRicavi = ({ commessa }) => {
         });
       } catch (err) {
         console.error("Errore creazione riga costo:", err);
-        alert("Errore durante il salvataggio di una riga.");
+        Swal.fire({
+          icon: "error",
+          title: "Errore",
+          text: "Errore durante il salvataggio di una riga.",
+          confirmButtonColor: "#d33",
+        });
         success = false;
+        break;
       }
     }
 
     if (success) {
-      alert("Costi salvati con successo!");
+      Swal.fire({
+        icon: "success",
+        title: "Salvataggio riuscito",
+        text: "Costi salvati con successo!",
+        confirmButtonColor: "#00aa5e",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     }
   };
 
@@ -462,434 +489,301 @@ const CostiRicavi = ({ commessa }) => {
           </tr>
         </thead>
         <tbody>
-          {sezioni.map((sezione, idx) => {
-            let totaleAgg = 0,
-              totaleGiac = 0,
-              totaleCont = 0,
-              totaleDaCont = 0,
-              totaleBCWP = 0,
-              totaleRicavi = 0,
-              totaleMDC = 0;
+          {sezioni.map((sezione, idx) => (
+            <React.Fragment key={idx}>
+              <tr>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {sezione.nodo}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {sezione.titolo}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.totale.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td style={{ backgroundColor: "white", border: "none" }}></td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.totaleAggiornatoAl.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((a, c) => a + (Number(c.giacenze) || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce(
+                      (a, c) =>
+                        a + ((+c.aggiornatoAl || 0) + (+c.giacenze || 0)),
+                      0,
+                    )
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  colSpan={7}
+                  style={{ backgroundColor: sezione.coloreNodo }}
+                ></td>
+              </tr>
 
-            return (
-              <React.Fragment key={idx}>
-                <tr>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {sezione.nodo}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {sezione.titolo}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.totale.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td style={{ backgroundColor: "white", border: "none" }}></td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.totaleAggiornatoAl.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.sotto
-                      .reduce((a, c) => a + (Number(c.giacenze) || 0), 0)
-                      .toLocaleString(undefined, {
+              {sezione.sotto.map((sotto, i) => {
+                const aggiornato = +sotto.aggiornatoAl || 0;
+                const giacenze = +sotto.giacenze || 0;
+                const contabilita = +sotto.contabilita || 0;
+                const daContabilizzare = +sotto.daContabilizzare || 0;
+                const bcwp = +sotto.bcwp || 0;
+                const ricaviRaffronto = contabilita + daContabilizzare;
+                const mdc = ricaviRaffronto - aggiornato;
+                const mdcPerc =
+                  ricaviRaffronto !== 0 ? (mdc / ricaviRaffronto) * 100 : 0;
+
+                return (
+                  <tr key={i}>
+                    <td style={{ backgroundColor: sezione.coloreRiga }}>
+                      {sotto.codice.length === 3 ? sotto.codice : ""}
+                    </td>
+                    <td style={{ backgroundColor: sezione.coloreRiga }}>
+                      {sotto.codice.length === 3
+                        ? sotto.descrizione
+                        : `${sotto.codice} ${sotto.descrizione}`}
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      {(+sotto.costo || 0).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: sezione.coloreNodo,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {sezione.sotto
-                      .reduce(
-                        (a, c) =>
-                          a + ((+c.aggiornatoAl || 0) + (+c.giacenze || 0)),
-                        0,
-                      )
-                      .toLocaleString(undefined, {
+                    </td>
+                    <td
+                      style={{ backgroundColor: "white", border: "none" }}
+                    ></td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      <input
+                        type="number"
+                        value={sotto.aggiornatoAl || ""}
+                        onChange={(e) => {
+                          const valore = parseFloat(e.target.value) || 0;
+                          const nuove = [...sezioni];
+                          nuove[idx].sotto[i].aggiornatoAl = valore;
+                          setSezioni(nuove);
+                        }}
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
+                          textAlign: "center",
+                        }}
+                      />
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      <input
+                        type="number"
+                        value={sotto.giacenze || ""}
+                        onChange={(e) => {
+                          const valore = parseFloat(e.target.value) || 0;
+                          const nuove = [...sezioni];
+                          nuove[idx].sotto[i].giacenze = valore;
+                          setSezioni(nuove);
+                        }}
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
+                          textAlign: "center",
+                        }}
+                      />
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      {(aggiornato + giacenze).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
-                  </td>
-                  <td
-                    colSpan={7}
-                    style={{ backgroundColor: sezione.coloreNodo }}
-                  ></td>
-                </tr>
-
-                {sezione.sotto.map((sotto, i) => {
-                  const aggiornato = +sotto.aggiornatoAl || 0;
-                  const giacenze = +sotto.giacenze || 0;
-                  const contabilita = +sotto.contabilita || 0;
-                  const daContabilizzare = +sotto.daContabilizzare || 0;
-                  const bcwp = +sotto.bcwp || 0;
-                  const ricaviRaffronto = contabilita + daContabilizzare;
-                  const mdc = ricaviRaffronto - aggiornato;
-                  const mdcPerc =
-                    ricaviRaffronto !== 0 ? (mdc / ricaviRaffronto) * 100 : 0;
-
-                  totaleAgg += aggiornato;
-                  totaleGiac += giacenze;
-                  totaleCont += contabilita;
-                  totaleDaCont += daContabilizzare;
-                  totaleBCWP += bcwp;
-                  totaleRicavi += ricaviRaffronto;
-                  totaleMDC += mdc;
-
-                  return (
-                    <tr key={i}>
-                      <td style={{ backgroundColor: sezione.coloreRiga }}>
-                        {sotto.codice.length === 3 ? sotto.codice : ""}
-                      </td>
-                      <td style={{ backgroundColor: sezione.coloreRiga }}>
-                        {sotto.codice.length === 3
-                          ? sotto.descrizione
-                          : `${sotto.codice} ${sotto.descrizione}`}
-                      </td>
-                      <td
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      <input
+                        type="number"
+                        value={sotto.bcwp || ""}
+                        onChange={(e) => {
+                          const valore = parseFloat(e.target.value) || 0;
+                          const nuove = [...sezioni];
+                          nuove[idx].sotto[i].bcwp = valore;
+                          setSezioni(nuove);
+                        }}
                         style={{
-                          backgroundColor: sezione.coloreRiga,
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
                           textAlign: "center",
                         }}
-                      >
-                        {(+sotto.costo || 0).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td
-                        style={{ backgroundColor: "white", border: "none" }}
-                      ></td>
-                      <td
+                      />
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      <input
+                        type="number"
+                        value={sotto.contabilita || ""}
+                        onChange={(e) => {
+                          const valore = parseFloat(e.target.value) || 0;
+                          const nuove = [...sezioni];
+                          nuove[idx].sotto[i].contabilita = valore;
+                          setSezioni(nuove);
+                        }}
                         style={{
-                          backgroundColor: sezione.coloreRiga,
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
                           textAlign: "center",
                         }}
-                      >
-                        <input
-                          type="number"
-                          value={sotto.aggiornatoAl || ""}
-                          onChange={(e) => {
-                            const valore = parseFloat(e.target.value) || 0;
-                            const nuove = [...sezioni];
-                            nuove[idx].sotto[i].aggiornatoAl = valore;
-                            setSezioni(nuove);
-                          }}
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            background: "transparent",
-                            textAlign: "center",
-                          }}
-                        />
-                      </td>
-                      <td
+                      />
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      <input
+                        type="number"
+                        value={sotto.daContabilizzare || ""}
+                        onChange={(e) => {
+                          const valore = parseFloat(e.target.value) || 0;
+                          const nuove = [...sezioni];
+                          nuove[idx].sotto[i].daContabilizzare = valore;
+                          setSezioni(nuove);
+                        }}
                         style={{
-                          backgroundColor: sezione.coloreRiga,
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
                           textAlign: "center",
                         }}
-                      >
-                        <input
-                          type="number"
-                          value={sotto.giacenze || ""}
-                          onChange={(e) => {
-                            const valore = parseFloat(e.target.value) || 0;
-                            const nuove = [...sezioni];
-                            nuove[idx].sotto[i].giacenze = valore;
-                            setSezioni(nuove);
-                          }}
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            background: "transparent",
-                            textAlign: "center",
-                          }}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          backgroundColor: sezione.coloreRiga,
-                          textAlign: "center",
+                      />
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      {ricaviRaffronto.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      {mdc.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td
+                      style={{
+                        backgroundColor: sezione.coloreRiga,
+                        textAlign: "center",
+                      }}
+                    >
+                      {mdcPerc.toFixed(2)}%
+                    </td>
+                    <td style={{ backgroundColor: sezione.coloreRiga }}>
+                      <input
+                        type="text"
+                        value={sotto.note || ""}
+                        onChange={(e) => {
+                          const nuovo = [...sezioni];
+                          nuovo[idx].sotto[i].note = e.target.value;
+                          setSezioni(nuovo);
                         }}
-                      >
-                        {(aggiornato + giacenze).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td
                         style={{
-                          backgroundColor: sezione.coloreRiga,
-                          textAlign: "center",
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
                         }}
-                      >
-                        <input
-                          type="number"
-                          value={sotto.bcwp || ""}
-                          onChange={(e) => {
-                            const valore = parseFloat(e.target.value) || 0;
-                            const nuove = [...sezioni];
-                            nuove[idx].sotto[i].bcwp = valore;
-                            setSezioni(nuove);
-                          }}
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            background: "transparent",
-                            textAlign: "center",
-                          }}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          backgroundColor: sezione.coloreRiga,
-                          textAlign: "center",
-                        }}
-                      >
-                        <input
-                          type="number"
-                          value={sotto.contabilita || ""}
-                          onChange={(e) => {
-                            const valore = parseFloat(e.target.value) || 0;
-                            const nuove = [...sezioni];
-                            nuove[idx].sotto[i].contabilita = valore;
-                            setSezioni(nuove);
-                          }}
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            background: "transparent",
-                            textAlign: "center",
-                          }}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          backgroundColor: sezione.coloreRiga,
-                          textAlign: "center",
-                        }}
-                      >
-                        <input
-                          type="number"
-                          value={sotto.daContabilizzare || ""}
-                          onChange={(e) => {
-                            const valore = parseFloat(e.target.value) || 0;
-                            const nuove = [...sezioni];
-                            nuove[idx].sotto[i].daContabilizzare = valore;
-                            setSezioni(nuove);
-                          }}
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            background: "transparent",
-                            textAlign: "center",
-                          }}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          backgroundColor: sezione.coloreRiga,
-                          textAlign: "center",
-                        }}
-                      >
-                        {ricaviRaffronto.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td
-                        style={{
-                          backgroundColor: sezione.coloreRiga,
-                          textAlign: "center",
-                        }}
-                      >
-                        {mdc.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td
-                        style={{
-                          backgroundColor: sezione.coloreRiga,
-                          textAlign: "center",
-                        }}
-                      >
-                        {mdcPerc.toFixed(2)}%
-                      </td>
-                      <td style={{ backgroundColor: sezione.coloreRiga }}>
-                        <input
-                          type="text"
-                          value={sotto.note || ""}
-                          onChange={(e) => {
-                            const nuovo = [...sezioni];
-                            nuovo[idx].sotto[i].note = e.target.value;
-                            setSezioni(nuovo);
-                          }}
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            background: "transparent",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {/* Totali sezione */}
-                <tr>
-                  <td colSpan={4}></td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleAgg.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleGiac.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {(totaleAgg + totaleGiac).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleBCWP.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleCont.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleDaCont.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {(totaleCont + totaleDaCont).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {totaleMDC.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td
-                    style={{
-                      backgroundColor: "#ddd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {(totaleRicavi !== 0
-                      ? (totaleMDC / totaleRicavi) * 100
-                      : 0
-                    ).toFixed(2)}
-                    %
-                  </td>
-                  <td></td>
-                </tr>
-              </React.Fragment>
-            );
-          })}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </React.Fragment>
+          ))}
         </tbody>
       </table>
 
