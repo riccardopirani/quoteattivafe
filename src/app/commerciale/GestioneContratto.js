@@ -540,9 +540,15 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
 
     if (onProduzioneUpdate) {
       onProduzioneUpdate({
-        percentualeAvanzamento: percentuale,
+        percentualeAvanzamento,
         totaleProduzione,
-        produzioneResidua: residuo,
+        residuo,
+        avanzamentoSAL: Number(avanzamentoPercentuale),
+        totaleSAL: avanzamentoTotale,
+        salNonFatturati: salDaFare,
+        percentualeFatturazione,
+        totaleFatturato: totaleImportiFatture,
+        produzioneNonFatturata,
       });
     }
   }, [datiContratti, righeFatture]);
@@ -620,10 +626,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
               fontWeight: "600",
             }}
           >
-            Avanzamento produzione: {percentualeAvanzamento}% €{" "}
-            {totaleImportiManuali.toLocaleString("it-IT", {
-              minimumFractionDigits: 2,
-            })}
+            Avanzamento produzione: {percentualeAvanzamento}%{" "}
           </div>
           <div
             style={{
@@ -636,9 +639,9 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
             }}
           >
             Lavori residui: €{" "}
-            {datiContratti
-              .reduce((sum, c) => sum + produzioneResidua(c.Descrizione), 0)
-              .toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+            {totaleImportiManuali.toLocaleString("it-IT", {
+              minimumFractionDigits: 2,
+            })}
           </div>
         </div>
 
