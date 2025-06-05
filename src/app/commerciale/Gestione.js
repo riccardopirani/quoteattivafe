@@ -62,7 +62,6 @@ const CostiRicavi = ({ commessa }) => {
     sezioni.forEach((sezione) => {
       sezione.sotto.forEach((sotto) => {
         const aggiornato = +sotto.aggiornatoAl || 0;
-        const giacenze = +sotto.giacenze || 0;
         const contabilita = +sotto.contabilita || 0;
         const daContabilizzare = +sotto.daContabilizzare || 0;
 
@@ -76,7 +75,7 @@ const CostiRicavi = ({ commessa }) => {
 
     setMargineCommessa(totaleMDC);
     setMarginePercentuale(
-      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0,
+      totaleRicavi !== 0 ? (totaleMDC / totaleRicavi) * 100 : 0
     );
     setDataAggiornamento(new Date());
     const data = {
@@ -87,13 +86,13 @@ const CostiRicavi = ({ commessa }) => {
 
     await CantiereService.aggiornaMargineCosti(data);
     setTimeout(async () => {
-      const element = contentRef.current; // Assicurati che contentRef sia associato al contenitore principale
+      const element = contentRef.current;
 
       if (element) {
         const canvas = await html2canvas(element, {
-          scrollY: -window.scrollY, // evita problemi con scroll
+          scrollY: -window.scrollY,
           useCORS: true,
-          scale: 2, // migliora qualità
+          scale: 2,
         });
 
         const image = canvas.toDataURL("image/png");
@@ -143,10 +142,6 @@ const CostiRicavi = ({ commessa }) => {
     if (!commessa?.IdCantiere) return;
 
     try {
-      const salEsistenti = await CantiereService.leggiCosti(
-        commessa.IdCantiere,
-      );
-
       //setRigheFatture(righeConvertite);
     } catch (err) {
       console.error("❌ Errore nel caricamento dei SAL:", err);
@@ -158,7 +153,7 @@ const CostiRicavi = ({ commessa }) => {
 
       try {
         const tuttiCosti = await CantiereService.leggiCosti(
-          commessa.IdCantiere,
+          commessa.IdCantiere
         );
 
         // Filtra quelli che sono "liberi" o non associati a nodi ARCA
@@ -237,7 +232,7 @@ const CostiRicavi = ({ commessa }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
     );
 
     for (const nodo of datiExternal) {
@@ -264,7 +259,7 @@ const CostiRicavi = ({ commessa }) => {
 
       const totale = sotto.reduce(
         (acc, curr) => acc + (Number(curr.costo) || 0),
-        0,
+        0
       );
 
       const ultimaData = sotto.reduce((latest, riga) => {
@@ -272,35 +267,35 @@ const CostiRicavi = ({ commessa }) => {
         return isNaN(currDate)
           ? latest
           : !latest || currDate > latest
-            ? currDate
-            : latest;
+          ? currDate
+          : latest;
       }, null);
 
       sezioniMap[key].totale = totale;
       sezioniMap[key].dataUltimoAggiornamento = ultimaData;
       sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
         (acc, curr) => acc + (Number(curr.aggiornatoAl) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleGiacenze = sotto.reduce(
         (acc, curr) => acc + (Number(curr.giacenze) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleContabilita = sotto.reduce(
         (acc, curr) => acc + (Number(curr.contabilita) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleDaContabilizzare = sotto.reduce(
         (acc, curr) => acc + (Number(curr.daContabilizzare) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleBCWP = sotto.reduce(
         (acc, curr) => acc + (Number(curr.bcwp) || 0),
-        0,
+        0
       );
       sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
         (acc, curr) => acc + (+curr.aggiornatoAl || 0),
-        0,
+        0
       );
     }
 
@@ -309,32 +304,6 @@ const CostiRicavi = ({ commessa }) => {
   }, [datiExternal]);
 
   const contentRef = useRef();
-
-  const handleExportExcel = async () => {
-    const content = contentRef.current;
-    if (content) {
-      try {
-        const canvas = await html2canvas(content, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#ffffff", // evita trasparenze
-        });
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            saveAs(blob, "CostiRicavi_Screenshot.png");
-          }
-        }, "image/png");
-      } catch (error) {
-        console.error("Errore durante lo screenshot:", error);
-      }
-    }
-  };
-  const maxCostoSenzaRicavi = sezioni
-    .filter((s) => s.nodo !== "R")
-    .flatMap((s) => s.sotto)
-    .reduce((acc, el) => acc + (Number(el.costo) || 0), 0);
 
   const salvaRigheValori = async () => {
     if (!commessa?.IdCantiere) {
@@ -348,7 +317,7 @@ const CostiRicavi = ({ commessa }) => {
     }
 
     const righeValide = righeValori.filter(
-      (r) => r.tipo && !isNaN(parseFloat(r.valore)),
+      (r) => r.tipo && !isNaN(parseFloat(r.valore))
     );
 
     if (righeValide.length === 0) {
@@ -393,39 +362,6 @@ const CostiRicavi = ({ commessa }) => {
         timer: 2000,
         showConfirmButton: false,
       });
-    }
-  };
-
-  const aggiungiRiga = async (index) => {
-    const sezioneCorrente = sezioni[index];
-
-    if (!commessa?.IdCantiere || !sezioneCorrente?.nodo) return;
-
-    const nuovoNodo = {
-      IdCantiere: commessa.IdCantiere,
-      Nome: `${sezioneCorrente.titolo} - Riga manuale`,
-      Note: `Aggiunto da interfaccia - nodo ${sezioneCorrente.nodo}`,
-      Importo: 0.0,
-    };
-
-    try {
-      const result = await CantiereService.creaCosto(nuovoNodo);
-
-      if (result?.return === true || result === true) {
-        // Solo dopo creazione lato server, aggiorno localmente
-        const nuovo = [...sezioni];
-        nuovo[index].sotto.push({
-          codice: "",
-          descrizione: nuovoNodo.Nome,
-          costo: nuovoNodo.Importo,
-        });
-        setSezioni(nuovo);
-      } else {
-        alert("Errore durante la creazione della riga.");
-      }
-    } catch (error) {
-      console.error("Errore API creaCosto:", error);
-      alert("Errore durante la chiamata al server.");
     }
   };
 
@@ -568,7 +504,7 @@ const CostiRicavi = ({ commessa }) => {
                     .reduce(
                       (acc, curr) =>
                         acc + (+curr.aggiornatoAl || 0) + (+curr.giacenze || 0),
-                      0,
+                      0
                     )
                     .toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -613,7 +549,7 @@ const CostiRicavi = ({ commessa }) => {
                   {sezione.sotto
                     .reduce(
                       (acc, curr) => acc + (+curr.daContabilizzare || 0),
-                      0,
+                      0
                     )
                     .toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -633,7 +569,7 @@ const CostiRicavi = ({ commessa }) => {
                         acc +
                         (+curr.contabilita || 0) +
                         (+curr.daContabilizzare || 0),
-                      0,
+                      0
                     )
                     .toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -653,11 +589,11 @@ const CostiRicavi = ({ commessa }) => {
                         acc +
                         (+curr.contabilita || 0) +
                         (+curr.daContabilizzare || 0),
-                      0,
+                      0
                     ) -
                     sezione.sotto.reduce(
                       (acc, curr) => acc + (+curr.aggiornatoAl || 0),
-                      0,
+                      0
                     )
                   ).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
@@ -677,11 +613,11 @@ const CostiRicavi = ({ commessa }) => {
                         acc +
                         (+curr.contabilita || 0) +
                         (+curr.daContabilizzare || 0),
-                      0,
+                      0
                     );
                     const aggiornato = sezione.sotto.reduce(
                       (acc, curr) => acc + (+curr.aggiornatoAl || 0),
-                      0,
+                      0
                     );
                     const perc =
                       ricavi !== 0 ? ((ricavi - aggiornato) / ricavi) * 100 : 0;
@@ -692,15 +628,10 @@ const CostiRicavi = ({ commessa }) => {
               </tr>
 
               {sezione.sotto.map((sotto, i) => {
-                const totaleCostoSezione = sezione.sotto.reduce(
-                  (acc, curr) => acc + (Number(curr.costo) || 0),
-                  0,
-                );
                 const aggiornato = +sotto.aggiornatoAl || 0;
                 const giacenze = +sotto.giacenze || 0;
                 const contabilita = +sotto.contabilita || 0;
                 const daContabilizzare = +sotto.daContabilizzare || 0;
-                const bcwp = +sotto.bcwp || 0;
                 const ricaviRaffronto = contabilita + daContabilizzare;
                 const mdc = ricaviRaffronto - aggiornato;
                 const mdcPerc =
@@ -1133,17 +1064,15 @@ const CostiRicavi = ({ commessa }) => {
   );
 };
 
-const DatiCommessa = ({ onComplete, commessa }) => {
+const DatiCommessa = ({ commessa }) => {
   const [triggered, setTriggered] = useState(false);
   const [dataInizio, setDataInizio] = useState(new Date());
   const [dataFine, setDataFine] = useState(new Date());
   const [mappaUrl, setMappaUrl] = useState(null);
   const [zonaImageUrl, setZonaImageUrl] = useState(null);
   const [users, setUsers] = useState([]);
-  const prevCantiereId = useRef(null);
   const inizializzato = useRef(false);
   const [error, setError] = useState(null);
-  const skipDateUpdate = useRef(true);
   const [datiGenerali, setDatiGenerali] = useState({
     codice: "",
     cliente: "",
@@ -1260,7 +1189,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
       });
 
       setDataInizio(
-        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date(),
+        commessa.DataInizio ? new Date(commessa.DataInizio) : new Date()
       );
       setDataFine(commessa.DataFine ? new Date(commessa.DataFine) : new Date());
       fetchUsers(commessa.ResponsabileUfficio, commessa.ResponsabileCantiere);
@@ -1744,7 +1673,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaCliente_Telefono,
+                        datiGenerali.AnagraficaCliente_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1848,7 +1777,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidPhone(
-                        datiGenerali.AnagraficaProgettista_Telefono,
+                        datiGenerali.AnagraficaProgettista_Telefono
                       )
                         ? "none"
                         : "1px solid red",
@@ -1880,7 +1809,7 @@ const DatiCommessa = ({ onComplete, commessa }) => {
                     style={{
                       width: "100%",
                       border: isValidEmail(
-                        datiGenerali.AnagraficaProgettista_Email,
+                        datiGenerali.AnagraficaProgettista_Email
                       )
                         ? "none"
                         : "1px solid red",
@@ -2141,7 +2070,7 @@ const CommessaTecnico = () => {
                   setSelectedCommessa(commessa);
                   localStorage.setItem(
                     "ultimaCommessa",
-                    JSON.stringify(commessa),
+                    JSON.stringify(commessa)
                   );
                   setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                   setFilteredOptions([]);
@@ -2243,7 +2172,7 @@ const CruscottoCommessa = ({
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err),
+          console.error("Errore nel recupero dello stato cantiere:", err)
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.NomeCantiere })
@@ -2330,14 +2259,6 @@ const CruscottoCommessa = ({
 
     fetchStato();
   }, [contratti]);
-
-  const parseFloatSafe = (val) => {
-    if (typeof val === "number") return val;
-    if (!val || typeof val !== "string") return 0;
-    const clean = val.replace(/\./g, "").replace(",", ".");
-    const parsed = parseFloat(clean);
-    return isNaN(parsed) ? 0 : parsed;
-  };
 
   return (
     <div style={{ padding: "1rem", backgroundColor: "white" }}>
@@ -3107,7 +3028,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -3422,15 +3343,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
