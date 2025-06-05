@@ -685,213 +685,246 @@ const CostiRicavi = ({ commessa }) => {
               </tr>
 
               {sezione.sotto.map((sotto, i) => {
-                const aggiornato = +sotto.aggiornatoAl || 0;
-                const giacenze = +sotto.giacenze || 0;
-                const contabilita = +sotto.contabilita || 0;
-                const daContabilizzare = +sotto.daContabilizzare || 0;
-                const ricaviRaffronto = contabilita + daContabilizzare;
-                const mdc = ricaviRaffronto - aggiornato;
-                const mdcPerc =
-                  ricaviRaffronto !== 0 ? (mdc / ricaviRaffronto) * 100 : 0;
+                const isRicavi = sezione.nodo === "R";
 
-                return (
-                  <tr key={i}>
-                    <td style={{ backgroundColor: sezione.coloreRiga }}>
-                      {sotto.codice.length === 3 ? sotto.codice : ""}
-                    </td>
-                    <td style={{ backgroundColor: sezione.coloreRiga }}>
-                      {sotto.codice.length === 3
-                        ? sotto.descrizione
-                        : `${sotto.codice} ${sotto.descrizione}`}
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      {(+sotto.costo || 0).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td
-                      style={{ backgroundColor: "white", border: "none" }}
-                    ></td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      <input
-                        type="number"
-                        value={sotto.aggiornatoAl || ""}
-                        onChange={(e) => {
-                          const valore = parseFloat(e.target.value) || 0;
-                          const nuove = [...sezioni];
-                          nuove[idx].sotto[i].aggiornatoAl = valore;
-                          setSezioni(nuove);
-                        }}
+                if (!isRicavi) {
+                  const aggiornato = +sotto.aggiornatoAl || 0;
+                  const giacenze = +sotto.giacenze || 0;
+                  const contabilita = +sotto.contabilita || 0;
+                  const daContabilizzare = +sotto.daContabilizzare || 0;
+                  const ricaviRaffronto = contabilita + daContabilizzare;
+                  const mdc = ricaviRaffronto - aggiornato;
+                  const mdcPerc =
+                    ricaviRaffronto !== 0 ? (mdc / ricaviRaffronto) * 100 : 0;
+
+                  return (
+                    <tr key={i}>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3 ? sotto.codice : ""}
+                      </td>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3
+                          ? sotto.descrizione
+                          : `${sotto.codice} ${sotto.descrizione}`}
+                      </td>
+                      <td
                         style={{
-                          width: "100%",
-                          border: "none",
-                          background: "transparent",
+                          backgroundColor: sezione.coloreRiga,
                           textAlign: "center",
                         }}
-                      />
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      <input
-                        type="number"
-                        value={sotto.giacenze || ""}
-                        onChange={(e) => {
-                          const valore = parseFloat(e.target.value) || 0;
-                          const nuove = [...sezioni];
-                          nuove[idx].sotto[i].giacenze = valore;
-                          setSezioni(nuove);
-                        }}
+                      >
+                        {(+sotto.costo || 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
+                        style={{ backgroundColor: "white", border: "none" }}
+                      ></td>
+                      <td
                         style={{
-                          width: "100%",
-                          border: "none",
-                          background: "transparent",
+                          backgroundColor: sezione.coloreRiga,
                           textAlign: "center",
                         }}
-                      />
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      {(aggiornato + giacenze).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      <input
-                        type="number"
-                        value={sotto.bcwp || ""}
-                        onChange={(e) => {
-                          const valore = parseFloat(e.target.value) || 0;
-                          const nuove = [...sezioni];
-                          nuove[idx].sotto[i].bcwp = valore;
-                          setSezioni(nuove);
-                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.aggiornatoAl || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].aggiornatoAl = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
                         style={{
-                          width: "100%",
-                          border: "none",
-                          background: "transparent",
+                          backgroundColor: sezione.coloreRiga,
                           textAlign: "center",
                         }}
-                      />
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      <input
-                        type="number"
-                        value={sotto.contabilita || ""}
-                        onChange={(e) => {
-                          const valore = parseFloat(e.target.value) || 0;
-                          const nuove = [...sezioni];
-                          nuove[idx].sotto[i].contabilita = valore;
-                          setSezioni(nuove);
-                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.giacenze || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].giacenze = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
                         style={{
-                          width: "100%",
-                          border: "none",
-                          background: "transparent",
+                          backgroundColor: sezione.coloreRiga,
                           textAlign: "center",
                         }}
-                      />
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      <input
-                        type="number"
-                        value={sotto.daContabilizzare || ""}
-                        onChange={(e) => {
-                          const valore = parseFloat(e.target.value) || 0;
-                          const nuove = [...sezioni];
-                          nuove[idx].sotto[i].daContabilizzare = valore;
-                          setSezioni(nuove);
-                        }}
+                      >
+                        {(aggiornato + giacenze).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
                         style={{
-                          width: "100%",
-                          border: "none",
-                          background: "transparent",
+                          backgroundColor: sezione.coloreRiga,
                           textAlign: "center",
                         }}
-                      />
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      {ricaviRaffronto.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      {mdc.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td
-                      style={{
-                        backgroundColor: sezione.coloreRiga,
-                        textAlign: "center",
-                      }}
-                    >
-                      {mdcPerc.toFixed(2)}%
-                    </td>
-                    <td style={{ backgroundColor: sezione.coloreRiga }}>
-                      <input
-                        type="text"
-                        value={sotto.note || ""}
-                        onChange={(e) => {
-                          const nuovo = [...sezioni];
-                          nuovo[idx].sotto[i].note = e.target.value;
-                          setSezioni(nuovo);
-                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.bcwp || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].bcwp = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
                         style={{
-                          width: "100%",
-                          border: "none",
-                          background: "transparent",
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
                         }}
-                      />
-                    </td>
-                  </tr>
-                );
+                      >
+                        <input
+                          type="number"
+                          value={sotto.contabilita || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].contabilita = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          value={sotto.daContabilizzare || ""}
+                          onChange={(e) => {
+                            const valore = parseFloat(e.target.value) || 0;
+                            const nuove = [...sezioni];
+                            nuove[idx].sotto[i].daContabilizzare = valore;
+                            setSezioni(nuove);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "center",
+                          }}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {ricaviRaffronto.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {mdc.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {mdcPerc.toFixed(2)}%
+                      </td>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        <input
+                          type="text"
+                          value={sotto.note || ""}
+                          onChange={(e) => {
+                            const nuovo = [...sezioni];
+                            nuovo[idx].sotto[i].note = e.target.value;
+                            setSezioni(nuovo);
+                          }}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                } else {
+                  return (
+                    <tr key={i}>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3 ? sotto.codice : ""}
+                      </td>
+                      <td style={{ backgroundColor: sezione.coloreRiga }}>
+                        {sotto.codice.length === 3
+                          ? sotto.descrizione
+                          : `${sotto.codice} ${sotto.descrizione}`}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: sezione.coloreRiga,
+                          textAlign: "center",
+                        }}
+                      >
+                        {(+sotto.costo || 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      {/* Colspan per mantenere la struttura a 14 colonne totali */}
+                      <td
+                        colSpan={11}
+                        style={{ backgroundColor: "#f9f9f9" }}
+                      ></td>
+                    </tr>
+                  );
+                }
               })}
             </React.Fragment>
           ))}
