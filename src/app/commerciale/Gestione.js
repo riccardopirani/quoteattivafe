@@ -298,6 +298,10 @@ const CostiRicavi = ({ commessa }) => {
         (acc, curr) => acc + (Number(curr.bcwp) || 0),
         0,
       );
+      sezioniMap[key].totaleAggiornatoAl = sotto.reduce(
+        (acc, curr) => acc + (+curr.aggiornatoAl || 0),
+        0,
+      );
     }
 
     const sezioniFinali = ["A", "E", "M", "I", "R"].map((k) => sezioniMap[k]);
@@ -491,6 +495,7 @@ const CostiRicavi = ({ commessa }) => {
         <tbody>
           {sezioni.map((sezione, idx) => (
             <React.Fragment key={idx}>
+              {/* ✅ Riga aggregata (somma) */}
               <tr>
                 <td
                   style={{
@@ -516,10 +521,12 @@ const CostiRicavi = ({ commessa }) => {
                     textAlign: "center",
                   }}
                 >
-                  {sezione.totale.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.costo || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                 </td>
                 <td style={{ backgroundColor: "white", border: "none" }}></td>
                 <td
@@ -529,10 +536,12 @@ const CostiRicavi = ({ commessa }) => {
                     textAlign: "center",
                   }}
                 >
-                  {sezione.totaleAggiornatoAl.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.aggiornatoAl || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                 </td>
                 <td
                   style={{
@@ -542,7 +551,7 @@ const CostiRicavi = ({ commessa }) => {
                   }}
                 >
                   {sezione.sotto
-                    .reduce((a, c) => a + (Number(c.giacenze) || 0), 0)
+                    .reduce((acc, curr) => acc + (+curr.giacenze || 0), 0)
                     .toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -557,8 +566,8 @@ const CostiRicavi = ({ commessa }) => {
                 >
                   {sezione.sotto
                     .reduce(
-                      (a, c) =>
-                        a + ((+c.aggiornatoAl || 0) + (+c.giacenze || 0)),
+                      (acc, curr) =>
+                        acc + (+curr.aggiornatoAl || 0) + (+curr.giacenze || 0),
                       0,
                     )
                     .toLocaleString(undefined, {
@@ -567,12 +576,126 @@ const CostiRicavi = ({ commessa }) => {
                     })}
                 </td>
                 <td
-                  colSpan={7}
-                  style={{ backgroundColor: sezione.coloreNodo }}
-                ></td>
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.bcwp || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce((acc, curr) => acc + (+curr.contabilita || 0), 0)
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce(
+                      (acc, curr) => acc + (+curr.daContabilizzare || 0),
+                      0,
+                    )
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {sezione.sotto
+                    .reduce(
+                      (acc, curr) =>
+                        acc +
+                        (+curr.contabilita || 0) +
+                        (+curr.daContabilizzare || 0),
+                      0,
+                    )
+                    .toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {(
+                    sezione.sotto.reduce(
+                      (acc, curr) =>
+                        acc +
+                        (+curr.contabilita || 0) +
+                        (+curr.daContabilizzare || 0),
+                      0,
+                    ) -
+                    sezione.sotto.reduce(
+                      (acc, curr) => acc + (+curr.aggiornatoAl || 0),
+                      0,
+                    )
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td
+                  style={{
+                    backgroundColor: sezione.coloreNodo,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  {(() => {
+                    const ricavi = sezione.sotto.reduce(
+                      (acc, curr) =>
+                        acc +
+                        (+curr.contabilita || 0) +
+                        (+curr.daContabilizzare || 0),
+                      0,
+                    );
+                    const aggiornato = sezione.sotto.reduce(
+                      (acc, curr) => acc + (+curr.aggiornatoAl || 0),
+                      0,
+                    );
+                    const perc =
+                      ricavi !== 0 ? ((ricavi - aggiornato) / ricavi) * 100 : 0;
+                    return perc.toFixed(2) + "%";
+                  })()}
+                </td>
+                <td style={{ backgroundColor: sezione.coloreNodo }}></td>
               </tr>
 
               {sezione.sotto.map((sotto, i) => {
+                const totaleCostoSezione = sezione.sotto.reduce(
+                  (acc, curr) => acc + (Number(curr.costo) || 0),
+                  0,
+                );
                 const aggiornato = +sotto.aggiornatoAl || 0;
                 const giacenze = +sotto.giacenze || 0;
                 const contabilita = +sotto.contabilita || 0;
