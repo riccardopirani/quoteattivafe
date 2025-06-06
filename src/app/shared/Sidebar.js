@@ -34,7 +34,10 @@ const permessiPersonalizzati = [
     label: "Produzione",
     key: "AccessoCantieri",
     route: "/form-elements",
-    subMenu: [{ label: "Cordinamento", to: "/produzione/cordinamento" }],
+    subMenu: [
+      { label: "Cordinamento", to: "/produzione/cordinamento" },
+      { label: "Dashboard", to: "/gestione/dashboard" },
+    ],
     menuKey: "tecnicoMenuOpen",
     icon: "mdi mdi-format-list-bulleted",
   },

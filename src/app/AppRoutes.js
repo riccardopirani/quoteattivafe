@@ -10,6 +10,8 @@ const Dropdowns = lazy(() => import("./basic-ui/Dropdowns"));
 const GareUpcoming = lazy(() => import("./basic-ui/GareUpcoming"));
 const DashboardPanoramica = lazy(() => import("./form-elements/BasicElements"));
 const GestioneCommesse = lazy(() => import("./commerciale/Gestione"));
+const DashboardOre = lazy(() => import("./gestione/DashboardOre"));
+
 const Cordinamento = lazy(() => import("./commerciale/Cordinamento"));
 const BasicTable = lazy(() => import("./tables/BasicTable"));
 const Mdi = lazy(() => import("./icons/Mdi"));
@@ -38,6 +40,7 @@ class AppRoutes extends Component {
           <Route path="/basic-ui/dropdowns" component={Dropdowns} />
           <Route path="/gare/upcoming" component={GareUpcoming} />
           <Route path="/gestione/commesse" component={GestioneCommesse} />
+          <Route path="/gestione/dashboard" component={DashboardOre} />
           <Route path="/tecnico/dashboard" component={DashboardPanoramica} />
           <Route path="/produzione/cordinamento" component={Cordinamento} />
           <Route path="/tables/basic-table" component={BasicTable} />
