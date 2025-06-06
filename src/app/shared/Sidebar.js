@@ -20,13 +20,21 @@ const permessiPersonalizzati = [
     icon: "mdi mdi-crosshairs-gps",
   },
   {
-    label: " Tecnico",
+    label: "Tecnico",
     key: "AccessoCantieri",
     route: "/form-elements",
     subMenu: [
       { label: "Dashboard", to: "/tecnico/dashboard" },
       { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
     ],
+    menuKey: "tecnicoMenuOpen",
+    icon: "mdi mdi-format-list-bulleted",
+  },
+  {
+    label: "Produzione",
+    key: "AccessoCantieri",
+    route: "/form-elements",
+    subMenu: [{ label: "Cordinamento", to: "/produzione/cordinamento" }],
     menuKey: "tecnicoMenuOpen",
     icon: "mdi mdi-format-list-bulleted",
   },
@@ -235,7 +243,7 @@ class Sidebar extends Component {
                         const cleanLabel = label.replace(/^Accesso\s+/i, "");
                         localStorage.setItem("selectedMenuLabel", cleanLabel);
                         window.dispatchEvent(
-                          new Event("selectedMenuLabelChanged"),
+                          new Event("selectedMenuLabelChanged")
                         );
                       }}
                     >
@@ -265,7 +273,7 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null,
+              ) : null
           )}
 
           <li className="nav-item mt-4">
