@@ -1,0 +1,302 @@
+import React, { useState, useEffect } from "react";
+import "react-datepicker/dist/react-datepicker.css";
+import CantiereService from "../services/cantiere";
+import ApprovvigionamentoService from "../services/approvigionamenti";
+import CDPService from "../services/cdp";
+import Swal from "sweetalert2";
+import moment from "moment";
+import "moment/locale/it";
+
+import "sweetalert2/dist/sweetalert2.min.css";
+
+import { Approvvigionamenti, CDP } from "../commerciale/Gestione";
+moment.locale("it");
+const styles = {
+  container: {
+    fontFamily: "Arial, sans-serif",
+    padding: "20px",
+    backgroundColor: "#f8f8f8",
+  },
+  sectionTitle: {
+    fontWeight: "bold",
+    fontSize: "18px",
+    marginTop: "20px",
+    marginBottom: "10px",
+  },
+  header: {
+    fontSize: "22px",
+    fontWeight: "600",
+    textAlign: "center",
+    margin: "20px 0",
+    position: "relative",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    backgroundColor: "white",
+  },
+  th: {
+    border: "1px solid #ccc",
+    padding: "8px",
+    backgroundColor: "#dff0d8",
+    textAlign: "left",
+    verticalAlign: "middle",
+  },
+  td: {
+    border: "1px solid #ccc",
+    padding: "8px",
+    verticalAlign: "middle",
+  },
+  greenButton: {
+    backgroundColor: "#00b050",
+    color: "white",
+    border: "none",
+    padding: "6px 12px",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
+  blockedButton: {
+    backgroundColor: "#ffc000",
+    color: "black",
+    border: "none",
+    padding: "8px 16px",
+    fontWeight: "bold",
+    position: "absolute",
+    right: 0,
+    top: "50%",
+    transform: "translateY(-50%)",
+  },
+  grayButton: {
+    backgroundColor: "#d9d9d9",
+    padding: "10px 20px",
+    minWidth: "160px",
+    height: "40px",
+    textAlign: "center",
+    fontWeight: "bold",
+    border: "1px solid #aaa",
+  },
+  topBar: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "20px",
+    marginBottom: "20px",
+  },
+  tableTitleRow: {
+    backgroundColor: "#f0f0f0",
+    fontWeight: "bold",
+  },
+};
+export default function GestioneCommessaUI() {
+  const [gestioneContrattoAperta, setGestioneContrattoAperta] = useState(false);
+
+  const [parametriIniziali, setParametriIniziali] = useState(null);
+  const [hasLoadedCommessaIniziale, setHasLoadedCommessaIniziale] =
+    useState(false);
+
+  const [datiProduzione, setDatiProduzione] = useState({
+    percentualeAvanzamento: "0.00",
+    totaleProduzione: 0,
+    produzioneResidua: 0,
+  });
+  const [allCommesse, setAllCommesse] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredOptions, setFilteredOptions] = useState([]);
+  const [selectedCommessa, setSelectedCommessa] = useState(null);
+  const [isModalitaNuova, setIsModalitaNuova] = useState(false);
+  const [selectedTab, setSelectedTab] = useState("GeneraCantiere");
+
+  const [datiCommessa, setDatiCommessa] = useState(null);
+  const [contratti, setContratti] = useState([]);
+  const [datiContratti, setDatiContratti] = useState([]);
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchTerm.trim().length >= 2) {
+        try {
+          const risultati = await CantiereService.ricercaCantieri({
+            filtro: searchTerm,
+          });
+          setFilteredOptions(risultati || []);
+        } catch (err) {
+          console.error("Errore nella ricerca delle commesse:", err);
+          setFilteredOptions([]);
+        }
+      } else {
+        setFilteredOptions([]);
+      }
+    }, 300); // debounce di 300ms
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.topBar}>
+        <button
+          style={styles.grayButton}
+          onClick={() => setSelectedTab("GeneraCantiere")}
+        >
+          Gestione cantiere
+        </button>
+        <button
+          style={styles.grayButton}
+          onClick={() => setSelectedTab("Reportcantiere")}
+        >
+          Report cantiere
+        </button>
+        <button
+          style={styles.grayButton}
+          onClick={() => setSelectedTab("Approvvigionamenti")}
+        >
+          Approvvigionamenti
+        </button>
+        <button
+          style={{
+            ...styles.grayButton,
+            backgroundColor: "#d9d9d9",
+            color: "#666",
+          }}
+          onClick={() => setSelectedTab("C.D.P.")}
+        >
+          C.D.P.
+        </button>
+      </div>
+
+      <input
+        type="text"
+        placeholder="Filtra per codice, cliente o indirizzo..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "0.5rem",
+          border: "1px solid #ccc",
+        }}
+      />
+      {filteredOptions.length > 0 && (
+        <div
+          style={{
+            border: "1px solid #ccc",
+            backgroundColor: "#fff",
+            maxHeight: "200px",
+            overflowY: "auto",
+          }}
+        >
+          {filteredOptions.map((commessa) => (
+            <div
+              key={commessa.IdCantiere}
+              onClick={() => {
+                setSelectedCommessa(commessa);
+                localStorage.setItem(
+                  "ultimaCommessa",
+                  JSON.stringify(commessa)
+                );
+                setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
+                setFilteredOptions([]);
+              }}
+              style={{
+                padding: "0.5rem",
+                cursor: "pointer",
+                borderBottom: "1px solid #eee",
+              }}
+            >
+              <strong>{commessa.NomeCantiere}</strong> -{" "}
+              {commessa.RagioneSociale}
+              {commessa.Indirizzo && ` (${commessa.Indirizzo})`}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selectedCommessa && (
+        <div style={styles.header}>
+          Cod. {selectedCommessa?.NomeCantiere}{" "}
+          <b>{selectedCommessa?.RagioneSociale}</b>{" "}
+          {selectedCommessa?.Indirizzo ? selectedCommessa.Indirizzo : ""}
+          <button style={styles.blockedButton}>
+            {(selectedCommessa?.StatoDinamico || "BLOCCATO").toUpperCase()}
+          </button>
+        </div>
+      )}
+
+      {selectedTab === "GeneraCantiere" && selectedCommessa && (
+        <>
+          <div style={styles.sectionTitle}>APPRESTAMENTI DI CANTIERE</div>
+
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>DESCRIZIONE</th>
+                <th style={styles.th}>DATA INSTALLAZIONE</th>
+                <th style={styles.th}>FORNITORE</th>
+                <th style={styles.th}>Q.TÀ</th>
+                <th style={styles.th}>ARCHIVIO CDP</th>
+                <th style={styles.th}>DAL</th>
+                <th style={styles.th}>AL</th>
+                <th style={styles.th}>WBS</th>
+                <th style={styles.th}>GENERA CDP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={styles.tableTitleRow}>
+                <td colSpan={9}>1) ACCANTIERAMENTO</td>
+              </tr>
+              {[
+                ["Ponteggio", "100 ponteggi srl", "100 Mq", "A01"],
+                ["Baracca di cantiere", "Baschieri srl", "Cad. 1", "A02"],
+                ["Wc chimico", "Sebach", "Cad. 1", "A03"],
+                ["Quadro elettrico", "Attiv A Srl", "Cad. 1", "A04"],
+                ["Gru edile", "Martin gru srl", "Cad. 1", "A05"],
+              ].map(([desc, fornitore, qta, wbs], i) => (
+                <tr key={i}>
+                  <td style={styles.td}>{desc}</td>
+                  <td style={styles.td}>1 gennaio 2025</td>
+                  <td style={styles.td}>{fornitore}</td>
+                  <td style={styles.td}>{qta}</td>
+                  <td style={styles.td}>…</td>
+                  <td style={styles.td}>1 febbraio 2025</td>
+                  <td style={styles.td}>28 febbraio 2025</td>
+                  <td style={styles.td}>{wbs}</td>
+                  <td style={styles.td}>
+                    <button style={styles.greenButton}>Genera CDP</button>
+                  </td>
+                </tr>
+              ))}
+
+              <tr style={styles.tableTitleRow}>
+                <td colSpan={9}>2) UTENZE DI CANTIERE</td>
+              </tr>
+              {[
+                ["Luce", "ENEL", "A06"],
+                ["Acqua", "SORGEEA", "A06"],
+              ].map(([desc, fornitore, wbs], i) => (
+                <tr key={i + 10}>
+                  <td style={styles.td}>{desc}</td>
+                  <td style={styles.td}>1 gennaio 2025</td>
+                  <td style={styles.td}>{fornitore}</td>
+                  <td style={styles.td}>…</td>
+                  <td style={styles.td}>1 febbraio 2025</td>
+                  <td style={styles.td}>28 febbraio 2025</td>
+                  <td style={styles.td}></td>
+                  <td style={styles.td}>{wbs}</td>
+                  <td style={styles.td}>
+                    <button style={styles.greenButton}>Genera CDP</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {selectedTab === "Approvvigionamenti" && selectedCommessa && (
+        <Approvvigionamenti
+          key={selectedCommessa?.IdCantiere}
+          commessa={selectedCommessa}
+        />
+      )}
+
+      {selectedTab === "C.D.P." && selectedCommessa && (
+        <CDP key={selectedCommessa?.IdCantiere} commessa={selectedCommessa} />
+      )}
+    </div>
+  );
+}

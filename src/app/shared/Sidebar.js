@@ -37,7 +37,7 @@ const permessiPersonalizzati = [
     subMenu: [
       { label: "Cordinamento", to: "/produzione/cordinamento" },
       { label: "Dashboard", to: "/produzione/dashboard" },
-      { label: "Gestione Commessa", to: "/produzione/dashboard" },
+      { label: "Gestione Commessa", to: "/produzione/gestionecommessa" },
     ],
     menuKey: "ProduzioneMenuOpen",
     icon: "mdi mdi-format-list-bulleted",

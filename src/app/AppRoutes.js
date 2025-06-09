@@ -17,7 +17,9 @@ const BasicTable = lazy(() => import("./tables/BasicTable"));
 const Error404 = lazy(() => import("./error-pages/Error404"));
 const Error500 = lazy(() => import("./error-pages/Error500"));
 const Login = lazy(() => import("./user-pages/Login"));
-
+const GestioneCommessaUI = lazy(() =>
+  import("./produzione/GestioneCommessaUI")
+);
 class AppRoutes extends Component {
   render() {
     const isLoggedIn = localStorage.getItem("isLogin");
@@ -36,6 +38,11 @@ class AppRoutes extends Component {
           <Route path="/tecnico/dashboard" component={DashboardPanoramica} />
           <Route path="/produzione/cordinamento" component={Cordinamento} />
           <Route path="/produzione/dashboard" component={PanoramicaDashboard} />
+          <Route
+            path="/produzione/gestionecommessa"
+            component={GestioneCommessaUI}
+          />
+
           <Route path="/tables/basic-table" component={BasicTable} />
           <Route path="/icons/mdi" component={BasicTable} />
           <Route path="/charts/chart-js" component={BasicTable} />
