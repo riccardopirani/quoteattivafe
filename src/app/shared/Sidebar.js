@@ -22,7 +22,7 @@ const permessiPersonalizzati = [
   {
     label: "Tecnico",
     key: "AccessoCantieri",
-    route: "/form-elements",
+    route: "/tecnico/dashboard",
     subMenu: [
       { label: "Dashboard", to: "/tecnico/dashboard" },
       { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
@@ -69,7 +69,7 @@ const permessiPersonalizzati = [
   {
     label: "Anagrafica",
     key: "AccessoArticoli",
-    route: "/form-elements",
+    route: "/basic-ui/newsuer",
     subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
     menuKey: "gestioneMenuOpen",
     icon: "mdi mdi-account-box-outline",
