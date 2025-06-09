@@ -57,7 +57,7 @@ const DashboardOre = () => {
     return entry
       ? Object.values(entry).reduce(
           (a, b) => a + (typeof b === "number" ? b : 0),
-          0
+          0,
         )
       : 0;
   };
@@ -99,8 +99,8 @@ const DashboardOre = () => {
                       tipo === "Attiv.A"
                         ? "#4CAF50"
                         : tipo === "Manodopera"
-                        ? "#FFC107"
-                        : "#90CAF9",
+                          ? "#FFC107"
+                          : "#90CAF9",
                     color: tipo === "Aziende" ? "#000" : "#000",
                     fontWeight: "bold",
                   }}
@@ -113,7 +113,7 @@ const DashboardOre = () => {
                   </td>
                 ))}
               </tr>
-            ))
+            )),
           )}
           <tr>
             <td style={{ ...cellStyle, fontWeight: "bold" }} colSpan={2}>

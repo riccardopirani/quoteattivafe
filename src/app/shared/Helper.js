@@ -49,17 +49,17 @@ export async function getTotaliCostiERicavi(idCantiere, nomeCantiere) {
 
   const totaleRicavi = sezioniMap["R"].reduce(
     (acc, item) => acc + item.costo,
-    0
+    0,
   );
 
   // Avanzamento produzione (teorico)
   const produzioneComplessiva = sezioniMap["R"].reduce(
     (acc, item) => acc + item.contabilita + item.daContabilizzare,
-    0
+    0,
   );
   const produzioneContabilizzata = sezioniMap["R"].reduce(
     (acc, item) => acc + item.contabilita,
-    0
+    0,
   );
 
   const avanzamentoProduzione =
@@ -80,7 +80,7 @@ export async function getTotaliCostiERicavi(idCantiere, nomeCantiere) {
   // Fatturazione (da nodidettagli)
   const totaleFatturato = sezioniMap["R"].reduce(
     (acc, item) => acc + item.costo,
-    0
+    0,
   );
   const avanzamentoFatturazione =
     totaleRicavi > 0 ? (totaleFatturato / totaleRicavi) * 100 : 0;
@@ -100,7 +100,7 @@ export async function getTotaliCostiERicavi(idCantiere, nomeCantiere) {
   // Totale costi manuali
   const costiManualiTotali = costiManuali.reduce(
     (sum, c) => sum + parseFloat(c.Importo || 0),
-    0
+    0,
   );
 
   // Totale produzione (come in GestioneContratto)
@@ -109,7 +109,7 @@ export async function getTotaliCostiERicavi(idCantiere, nomeCantiere) {
 
     const righe = sal.filter(
       (r) =>
-        r.Lavoro?.trim().toLowerCase() === descrizione?.trim().toLowerCase()
+        r.Lavoro?.trim().toLowerCase() === descrizione?.trim().toLowerCase(),
     );
     if (righe.length > 0) {
       return righe.reduce((sum, r) => {
@@ -134,12 +134,12 @@ export async function getTotaliCostiERicavi(idCantiere, nomeCantiere) {
 
   const totaleProduzioneTotale = produzioni.reduce(
     (sum, p) => sum + produzioneTotalePerLavoro(p.Lavori),
-    0
+    0,
   );
 
   const lavoriResiduiDaGestioneContratto = produzioni.reduce(
     (sum, p) => sum + produzioneResidua(p.Lavori),
-    0
+    0,
   );
 
   // Avanzamento reale
@@ -163,7 +163,7 @@ export async function getTotaliCostiERicavi(idCantiere, nomeCantiere) {
     salNonFatturati: Number(salNonFatturati.toFixed(2)),
     siltotali: Number(siltotali.toFixed(2)),
     percentualeAvanzamentoProduzioneReale: Number(
-      percentualeAvanzamentoProduzioneReale.toFixed(2)
+      percentualeAvanzamentoProduzioneReale.toFixed(2),
     ),
     salTotali: Number(salTotali.toFixed(2)),
   };

@@ -225,7 +225,7 @@ function Buttons() {
           "User-Agent": "CentoImpiantiMap/1.0 (centoimpianti.com)",
           "Accept-Language": "it",
         },
-      }
+      },
     );
     const data = await res.json();
     if (data.length > 0) {
@@ -279,7 +279,7 @@ function Buttons() {
           acc[name] = value;
           return acc;
         },
-        {}
+        {},
       );
 
       updatedForm.tipoLavori = gara.TipoLavori || tipoLavoriMap[selectedMenu];
@@ -307,7 +307,7 @@ function Buttons() {
     const obbligatori = getObbligatori(form.tipoLavori);
     const mancanti = obbligatori.filter(
       (campo) =>
-        typeof form[campo] === "undefined" || String(form[campo]).trim() === ""
+        typeof form[campo] === "undefined" || String(form[campo]).trim() === "",
     );
 
     if (mancanti.length > 0) {
@@ -381,7 +381,7 @@ function Buttons() {
       console.error("Errore durante il salvataggio della gara:", error);
       alert(
         "Errore durante il salvataggio della gara:\n" +
-          (error?.message || "Errore sconosciuto")
+          (error?.message || "Errore sconosciuto"),
       );
     }
   };
@@ -554,14 +554,14 @@ function Buttons() {
                 €
                 {filteredGare.reduce(
                   (sum, g) => sum + (g.TotaleMeccanici || 0),
-                  0
+                  0,
                 )}
               </td>
               <td style={centeredCellStyle}>
                 €
                 {filteredGare.reduce(
                   (sum, g) => sum + (g.TotaleElettrici || 0),
-                  0
+                  0,
                 )}
               </td>
               <td style={centeredCellStyle}>

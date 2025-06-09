@@ -58,7 +58,7 @@ const CruscottoCommessa = ({
           setDatiGenerali({ statoDinamico: statoLabel });
         })
         .catch((err) =>
-          console.error("Errore nel recupero dello stato cantiere:", err)
+          console.error("Errore nel recupero dello stato cantiere:", err),
         );
 
       CantiereService.graficoCommessa({ Codice: commessa.NomeCantiere })
@@ -129,7 +129,7 @@ const CruscottoCommessa = ({
           setMarginePerc(
             totaleRicavi > 0
               ? ((esposizione / totaleRicavi) * 100).toFixed(2)
-              : "0.00"
+              : "0.00",
           );
         })
         .catch((err) => console.error("Errore nel calcolo costi/ricavi:", err));
@@ -318,7 +318,7 @@ const CruscottoCommessa = ({
           {
             label: "Avanzamento commessa",
             text: `Avanzamento produzione: ${Number(
-              percentualeAvanzamento
+              percentualeAvanzamento,
             ).toFixed(2)}%`,
             value: "",
             barColor: "#b6dfc4",
@@ -344,7 +344,7 @@ const CruscottoCommessa = ({
           {
             label: "Avanzamento fatturazione",
             text: `Avanzamento fatturazione: ${Number(
-              percentualeFatturazione
+              percentualeFatturazione,
             ).toFixed(2)}%`,
             value: `€ ${Number(totaleFatturato).toLocaleString("it-IT", {
               minimumFractionDigits: 2,
@@ -355,7 +355,7 @@ const CruscottoCommessa = ({
               "it-IT",
               {
                 minimumFractionDigits: 2,
-              }
+              },
             )}`,
             rightBg: "#f6b6b6",
           },

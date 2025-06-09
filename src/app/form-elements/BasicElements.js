@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Drawer, Button } from "antd";
 import { Select, Input } from "antd";
 import CantiereService from "../services/cantiere";
-import ProduzioneService from "../services/produzione";
+import { useMemo } from "react";
 import { getTotaliCostiERicavi } from "../shared/Helper.js";
 const { Option } = Select;
 
@@ -536,25 +536,42 @@ function DashboardTabsPanoramica() {
   const getEuroValue = (str) =>
     parseFloat((str || "0").replace(/[^\d.-]/g, "")) || 0;
 
-  const now = new Date();
-  const MILLISECONDS_IN_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+  const totaleSal = filteredCommesse.reduce((acc, c) => {
+    const salValue = parseFloat(
+      (c.salTotali || "0").toString().replace(/[^\d.-]/g, "")
+    );
+    return acc + (isNaN(salValue) ? 0 : salValue);
+  }, 0);
 
-  const totaleSal = filteredCommesse.reduce(
-    (acc, c) => acc + getEuroValue(c.SalDaFatturare),
-    0
-  );
-
-  const totaleSil = filteredCommesse.reduce(
-    (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
-    0
-  );
+  const totaleSil = filteredCommesse.reduce((acc, c) => {
+    const silValue = parseFloat(
+      (c.siltotali || "0").toString().replace(/[^\d.-]/g, "")
+    );
+    return acc + (isNaN(silValue) ? 0 : silValue);
+  }, 0);
 
   const commesseDaAggiornare = filteredCommesse.filter((c) => {
-    const dataAgg = c.DataCreazioneCantiere;
+    const dataAgg = c.DataAggiornamento;
+
     if (!dataAgg) return false;
-    const [day, month, year] = dataAgg.split("/");
-    const dateObj = new Date(`${year}-${month}-${day}`);
-    return now - dateObj > MILLISECONDS_IN_30_DAYS;
+
+    let dataObj;
+    if (typeof dataAgg === "string") {
+      if (dataAgg.includes("/")) {
+        const [dd, mm, yyyy] = dataAgg.split("/");
+        dataObj = new Date(`${yyyy}-${mm}-${dd}`);
+      } else {
+        // Assume ISO format
+        dataObj = new Date(dataAgg);
+      }
+    } else if (dataAgg instanceof Date) {
+      dataObj = dataAgg;
+    } else {
+      return false;
+    }
+
+    const giorni = Math.floor((new Date() - dataObj) / (1000 * 60 * 60 * 24));
+    return giorni > 30;
   }).length;
 
   let commessaMigliore = null;
@@ -582,46 +599,45 @@ function DashboardTabsPanoramica() {
     0
   );
 
-  const marginiValidi = filteredCommesse
-    .map((c) => getEuroValue(c.MarginePercentuale))
-    .filter((v) => !isNaN(v));
-
-  const mediaMargine =
-    marginiValidi.length > 0
-      ? (
-          marginiValidi.reduce((acc, val) => acc + val, 0) /
-          marginiValidi.length
-        ).toFixed(1)
-      : "0";
-
-  const dashboardCards = [
-    { label: "Commesse gestite", value: filteredCommesse.length },
-    {
-      label: "Sal da fatturare",
-      value: `€ ${totaleSal.toLocaleString("it-IT", {
-        maximumFractionDigits: 0,
-      })}`,
-      highlight: true,
-    },
-    {
-      label: "Sil da salizzare",
-      value: totaleSil,
-    },
-    {
-      label: "Commesse da aggiornare",
-      value: commesseDaAggiornare,
-    },
-    {
-      label: "Commessa migliore",
-      value: commessaMigliore ? `Cod ${commessaMigliore.IdCantiere}` : "-",
-      highlight: true,
-    },
-    {
-      label: "Commessa peggiore",
-      value: commessaPeggiore ? `Cod ${commessaPeggiore.IdCantiere}` : "-",
-      highlight: true,
-    },
-  ];
+  const dashboardCards = useMemo(() => {
+    return [
+      { label: "Commesse gestite", value: filteredCommesse.length },
+      {
+        label: "Sal da fatturare",
+        value: `€ ${totaleSal.toLocaleString("it-IT", {
+          maximumFractionDigits: 0,
+        })}`,
+        highlight: true,
+      },
+      {
+        label: "Sil da salizzare",
+        value: `€ ${totaleSil.toLocaleString("it-IT", {
+          maximumFractionDigits: 0,
+        })}`,
+      },
+      {
+        label: "Commesse da aggiornare",
+        value: commesseDaAggiornare,
+      },
+      {
+        label: "Commessa migliore",
+        value: commessaMigliore ? `Cod ${commessaMigliore.NomeCantiere}` : "-",
+        highlight: true,
+      },
+      {
+        label: "Commessa peggiore",
+        value: commessaPeggiore ? `Cod ${commessaPeggiore.NomeCantiere}` : "-",
+        highlight: true,
+      },
+    ];
+  }, [
+    filteredCommesse.length,
+    totaleSal,
+    totaleSil,
+    commesseDaAggiornare,
+    commessaMigliore,
+    commessaPeggiore,
+  ]);
 
   const handleCommessaSelection = (value) => {
     setCommessaOption(value);
@@ -653,8 +669,8 @@ function DashboardTabsPanoramica() {
       anagraficaProgettista: "",
     };
 
-    const dataInizio = new Date(); // o derivata da UI
-    const dataFine = new Date(); // o derivata da UI
+    const dataInizio = new Date();
+    const dataFine = new Date();
 
     try {
       const clienteRes = await CantiereService.creaCliente({
@@ -663,7 +679,7 @@ function DashboardTabsPanoramica() {
       const idCliente = clienteRes.return;
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.codice // <-- questo è il codice della commessa selezionata
+        datiGenerali.codice
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -702,6 +718,23 @@ function DashboardTabsPanoramica() {
       console.error("Errore durante la creazione della commessa:", error);
     }
   };
+  const calcolaMargineMedio = (commesse) => {
+    const margini = commesse
+      .map((c) => {
+        const valore = parseFloat(
+          (c.Margine || "").toString().replace("%", "").replace(",", ".")
+        );
+        return isNaN(valore) ? null : valore;
+      })
+      .filter((v) => v !== null);
+
+    if (margini.length === 0) return "0";
+
+    const sommaMargini = margini.reduce((acc, val) => acc + val, 0);
+    return (sommaMargini / margini.length).toFixed(1);
+  };
+
+  const mediaMargine = calcolaMargineMedio(filteredCommesse);
   const normalize = (str) =>
     str
       ?.toString()
@@ -881,6 +914,7 @@ function DashboardTabsPanoramica() {
                 backgroundColor: "#2e7d32",
                 border: "none",
                 fontWeight: "bold",
+                color: "white",
               }}
             >
               Genera Commessa
@@ -892,14 +926,18 @@ function DashboardTabsPanoramica() {
   );
 
   filteredCommesse.forEach((c) => {
-    const margine = getEuroValue(c.MarginePercentuale); // assume e.g., "20%" or "0%"
-    if (margine > maxMargine) {
-      maxMargine = margine;
-      commessaMigliore = c;
-    }
-    if (margine < minMargine) {
-      minMargine = margine;
-      commessaPeggiore = c;
+    const margine = parseFloat(
+      (c.Margine || "").toString().replace("%", "").replace(",", ".")
+    );
+    if (!isNaN(margine)) {
+      if (margine > maxMargine) {
+        maxMargine = margine;
+        commessaMigliore = c;
+      }
+      if (margine < minMargine) {
+        minMargine = margine;
+        commessaPeggiore = c;
+      }
     }
   });
 
