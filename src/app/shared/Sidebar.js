@@ -32,13 +32,14 @@ const permessiPersonalizzati = [
   },
   {
     label: "Produzione",
-    key: "AccessoCantieri",
-    route: "/form-elements",
+    key: "AccessoArticoli",
+    route: "/produzione/dashboard",
     subMenu: [
       { label: "Cordinamento", to: "/produzione/cordinamento" },
-      { label: "Dashboard", to: "/gestione/dashboard" },
+      { label: "Dashboard", to: "/produzione/dashboard" },
+      { label: "Gestione Commessa", to: "/produzione/dashboard" },
     ],
-    menuKey: "tecnicoMenuOpen",
+    menuKey: "ProduzioneMenuOpen",
     icon: "mdi mdi-format-list-bulleted",
   },
   {
@@ -235,25 +236,29 @@ class Sidebar extends Component {
                   }
                 >
                   {subMenu.length > 0 ? (
-                    <div
+                    <Link
+                      to={route}
                       className={
                         menuStates[menuKey]
                           ? "nav-link menu-expanded green-hover"
                           : "nav-link green-hover"
                       }
-                      onClick={() => {
+                      onClick={(e) => {
+                        // Permette il redirect + toggle del menu
+                        e.preventDefault(); // evita doppia navigazione istantanea
                         this.toggleMenuState(menuKey);
                         const cleanLabel = label.replace(/^Accesso\s+/i, "");
                         localStorage.setItem("selectedMenuLabel", cleanLabel);
                         window.dispatchEvent(
-                          new Event("selectedMenuLabelChanged"),
+                          new Event("selectedMenuLabelChanged")
                         );
+                        this.props.history.push(route); // naviga esplicitamente
                       }}
                     >
                       <i className={`${icon} menu-icon`}></i>
                       <span className="menu-title text-green">{label}</span>
                       <i className="menu-arrow"></i>
-                    </div>
+                    </Link>
                   ) : (
                     <Link className="nav-link green-hover" to={route}>
                       <i className={`${icon} menu-icon`}></i>
@@ -276,7 +281,7 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null,
+              ) : null
           )}
 
           <li className="nav-item mt-4">
