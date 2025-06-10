@@ -119,7 +119,7 @@ const TabelleCantieri = () => {
               ricaviTotali: totaleRicavi || 0,
               esposizione: totaleRicavi - totaleCostiSenzaRicavi || 0,
             };
-          })
+          }),
         );
 
         const enriched = dati.map((c) => ({
@@ -267,8 +267,8 @@ const TabelleCantieri = () => {
                         r.esposizione < 0
                           ? "red"
                           : r.esposizione >= 0
-                          ? "#ff9800"
-                          : "#2e7d32",
+                            ? "#ff9800"
+                            : "#2e7d32",
                     }}
                   >
                     €{" "}
@@ -376,7 +376,7 @@ function DashboardTabsPanoramica() {
             parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
           esposizione:
             parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, "")
+              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
             ) || 0,
         }));
 
@@ -447,7 +447,7 @@ function DashboardTabsPanoramica() {
           try {
             avanzamenti = await getTotaliCostiERicavi(
               c.IdCantiere,
-              c.NomeCantiere
+              c.NomeCantiere,
             );
           } catch (err) {
             console.error("Errore avanzamenti per", c.NomeCantiere, err);
@@ -460,10 +460,10 @@ function DashboardTabsPanoramica() {
             EsposizioneEconomica: Number(
               (
                 avanzamenti.totaleRicavi - avanzamenti.totaleCostiSenzaRicavi
-              ).toFixed(2)
+              ).toFixed(2),
             ),
           };
-        })
+        }),
       );
 
       const filtrateAgg = aggiornate
@@ -538,14 +538,14 @@ function DashboardTabsPanoramica() {
 
   const totaleSal = filteredCommesse.reduce((acc, c) => {
     const salValue = parseFloat(
-      (c.salTotali || "0").toString().replace(/[^\d.-]/g, "")
+      (c.salTotali || "0").toString().replace(/[^\d.-]/g, ""),
     );
     return acc + (isNaN(salValue) ? 0 : salValue);
   }, 0);
 
   const totaleSil = filteredCommesse.reduce((acc, c) => {
     const silValue = parseFloat(
-      (c.siltotali || "0").toString().replace(/[^\d.-]/g, "")
+      (c.siltotali || "0").toString().replace(/[^\d.-]/g, ""),
     );
     return acc + (isNaN(silValue) ? 0 : silValue);
   }, 0);
@@ -592,11 +592,11 @@ function DashboardTabsPanoramica() {
   });
   const totaleCosti30gg = commesse.reduce(
     (acc, c) => acc + (c.TotaleCosti || 0),
-    0
+    0,
   );
   const totaleLavoriAFinire = filteredCommesse.reduce(
     (acc, c) => acc + (parseFloat(c.lavoriResidui) || 0),
-    0
+    0,
   );
 
   const dashboardCards = useMemo(() => {
@@ -679,7 +679,7 @@ function DashboardTabsPanoramica() {
       const idCliente = clienteRes.return;
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.codice
+        datiGenerali.codice,
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -722,7 +722,7 @@ function DashboardTabsPanoramica() {
     const margini = commesse
       .map((c) => {
         const valore = parseFloat(
-          (c.Margine || "").toString().replace("%", "").replace(",", ".")
+          (c.Margine || "").toString().replace("%", "").replace(",", "."),
         );
         return isNaN(valore) ? null : valore;
       })
@@ -851,8 +851,8 @@ function DashboardTabsPanoramica() {
                       !commesse.some(
                         (c) =>
                           normalize(c.NomeCantiere) ===
-                          normalize(row.NomeCantiere)
-                      )
+                          normalize(row.NomeCantiere),
+                      ),
                   )
                   .map((row, idx) => {
                     const isChecked =
@@ -927,7 +927,7 @@ function DashboardTabsPanoramica() {
 
   filteredCommesse.forEach((c) => {
     const margine = parseFloat(
-      (c.Margine || "").toString().replace("%", "").replace(",", ".")
+      (c.Margine || "").toString().replace("%", "").replace(",", "."),
     );
     if (!isNaN(margine)) {
       if (margine > maxMargine) {
@@ -1120,7 +1120,7 @@ function DashboardTabsPanoramica() {
                         const dataAgg = new Date(c.DataAggiornamento);
                         const oggi = new Date();
                         const diffGiorni = Math.floor(
-                          (oggi - dataAgg) / (1000 * 60 * 60 * 24)
+                          (oggi - dataAgg) / (1000 * 60 * 60 * 24),
                         );
                         return diffGiorni <= 30 ? "green" : "red";
                       })(),
@@ -1129,7 +1129,7 @@ function DashboardTabsPanoramica() {
                   >
                     {c.DataAggiornamento
                       ? new Date(c.DataAggiornamento).toLocaleDateString(
-                          "it-IT"
+                          "it-IT",
                         )
                       : ""}
                   </td>

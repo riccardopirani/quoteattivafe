@@ -17,8 +17,8 @@ const BasicTable = lazy(() => import("./tables/BasicTable"));
 const Error404 = lazy(() => import("./error-pages/Error404"));
 const Error500 = lazy(() => import("./error-pages/Error500"));
 const Login = lazy(() => import("./user-pages/Login"));
-const GestioneCommessaUI = lazy(() =>
-  import("./produzione/GestioneCommessaUI")
+const GestioneCommessaUI = lazy(
+  () => import("./produzione/GestioneCommessaUI"),
 );
 class AppRoutes extends Component {
   render() {

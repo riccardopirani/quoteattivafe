@@ -52,7 +52,7 @@ const Cordinamento = () => {
   useEffect(() => {
     const startOfWeek = moment().startOf("isoWeek");
     const days = Array.from({ length: 7 }, (_, i) =>
-      startOfWeek.clone().add(i, "days").format("ddd D MMMM")
+      startOfWeek.clone().add(i, "days").format("ddd D MMMM"),
     );
     setWeekDays(days);
   }, []);

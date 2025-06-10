@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from "react";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
-import ApprovvigionamentoService from "../services/approvigionamenti";
-import CDPService from "../services/cdp";
-import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/it";
-
+import { BASE_URL } from "../services/api";
 import "sweetalert2/dist/sweetalert2.min.css";
 
 import { Approvvigionamenti, CDP } from "../commerciale/Gestione";
@@ -307,7 +304,15 @@ export default function GestioneCommessaUI() {
   );
 }
 
-function CommessaSilo() {
+function convertHHMMToDecimal(hhmm) {
+  const [hours, minutes] = hhmm.split(":").map(Number);
+  return hours + minutes / 60;
+}
+
+function CommessaSilo({ commessa }) {
+  const [manodopera, setManodopera] = useState([]);
+  const [noleggi, setNoleggi] = useState([]);
+  const [aziende, setAziende] = useState([]);
   const tableStyle = {
     width: "100%",
     borderCollapse: "collapse",
@@ -327,29 +332,83 @@ function CommessaSilo() {
   const tdStyle = {
     padding: "8px",
     border: "1px solid #ccc",
-    fontSize: "14px",
+    fontSize: "12px",
   };
 
-  const redText = { color: "red", fontWeight: "bold", fontSize: "13px" };
-  const grayText = { color: "gray" };
   const sectionTitleStyle = {
     backgroundColor: "#ecf5ec",
     fontWeight: "bold",
     fontSize: "18px",
+    with: "100%",
     padding: "10px",
     marginTop: "40px",
     border: "1px solid #ccc",
   };
 
-  const blockBtn = {
-    backgroundColor: "#ffc107",
-    color: "#333",
-    fontWeight: "bold",
-    padding: "10px 20px",
-    borderRadius: "4px",
-    float: "right",
-    marginTop: "-50px",
-  };
+  function formatTimeFromISOString(isoString) {
+    const date = new Date(isoString);
+    const hours = date.getUTCHours().toString().padStart(2, "0");
+    const minutes = date.getUTCMinutes().toString().padStart(2, "0");
+    return `${minutes}:${hours}`;
+  }
+  useEffect(() => {
+    async function caricaRisorse() {
+      try {
+        const tutteRisorse = await CantiereService.caricaRisorse({
+          IdCantiere: commessa.IdCantiere,
+        });
+
+        // Recupera i costi interni degli utenti
+        const utentiRes = await fetch(
+          `${BASE_URL}/RisorseUmane/CaricaRisorse`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+        if (!utentiRes.ok)
+          throw new Error(`HTTP error! status: ${utentiRes.status}`);
+
+        const utenti = await utentiRes.json();
+
+        // Crea una mappa per accedere rapidamente al costo interno
+        const mappaCostoInterno = new Map();
+        utenti.forEach((utente) =>
+          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno)
+        );
+
+        // Suddividi le risorse in categorie e assegna i costi interni
+        const manodoperaFiltrata = tutteRisorse
+          .filter((r) => ["Attiv.A", "Manodopera"].includes(r.Tipologia))
+          .map((r) => {
+            const costo = mappaCostoInterno.get(r.IdUtente) ?? 0;
+            const ore = formatTimeFromISOString(r.OreFine); // es. "01:30"
+            const oreDecimali = convertHHMMToDecimal(ore); // es. 1.5
+            return {
+              ...r,
+              PUnit: costo,
+              OreFormattate: ore, // solo se vuoi visualizzarla
+              PTot: (costo * oreDecimali).toFixed(2),
+            };
+          });
+        const noleggiFiltrati = tutteRisorse.filter(
+          (r) => r.Tipologia === "Noleggio"
+        );
+        const aziendeFiltrate = tutteRisorse.filter(
+          (r) => r.Tipologia === "Aziende"
+        );
+
+        setManodopera(manodoperaFiltrata);
+        setNoleggi(noleggiFiltrati);
+        setAziende(aziendeFiltrate);
+      } catch (err) {
+        console.error("Errore nel caricamento risorse:", err);
+      }
+    }
+
+    if (commessa?.IdCantiere) caricaRisorse();
+  }, [commessa]);
 
   return (
     <div style={{ padding: "20px" }}>
@@ -380,48 +439,23 @@ function CommessaSilo() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={tdStyle}>10-07-25</td>
-            <td style={tdStyle}>11-07-25</td>
-            <td style={tdStyle}>Manodopera</td>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>Nicola Coem</td>
-            <td style={tdStyle}>Smontato ponteggio</td>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>€ 25,00</td>
-            <td style={tdStyle}>€ 25,00</td>
-            <td style={tdStyle}>A.05</td>
-            <td style={tdStyle}>Visualizza/modifica</td>
-            <td style={tdStyle}>In attesa</td>
-            <td style={tdStyle}>Registra</td>
-          </tr>
-          <tr>
-            <td style={tdStyle}>
-              <span style={{ color: "red", fontWeight: "bold" }}>Attiv.A</span>
-            </td>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>Carmelo</td>
-            <td style={tdStyle}>Smontato ponteggio</td>
-
-            <td style={tdStyle}>
-              <span style={grayText}>€ 25,00</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Calcolo</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Da elenco</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Foto modificabile</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Automatico</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Da cliccare</span>
-            </td>
-          </tr>
+          {manodopera.map((r, i) => (
+            <tr key={i}>
+              <td style={tdStyle}>{r.Data}</td>
+              <td style={tdStyle}>{r.Data}</td>
+              <td style={tdStyle}>{r.Tipologia}</td>
+              <td style={tdStyle}>{r.IdUtente}</td>
+              <td style={tdStyle}>{r.Nome + " " + r.Cognome}</td>
+              <td style={tdStyle}>{r.Descrizione}</td>
+              <td style={tdStyle}>{formatTimeFromISOString(r.OreFine)}</td>
+              <td style={tdStyle}>{r.PUnit}</td>
+              <td style={tdStyle}>{r.PTot}</td>
+              <td style={tdStyle}>{r.WBS}</td>
+              <td style={tdStyle}>Visualizza/Modifica DDT</td>
+              <td style={tdStyle}>{r.Stato ? r.Stato : "INATTESA"}</td>
+              <td style={tdStyle}>Registro</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
@@ -451,44 +485,22 @@ function CommessaSilo() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={tdStyle}>10-07-25</td>
-            <td style={tdStyle}>11-07-25</td>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>Baschieri</td>
-            <td style={tdStyle}>Piattaforma aerea</td>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>€ 25,00</td>
-            <td style={tdStyle}>€ 25,00</td>
-            <td style={tdStyle}>A.05</td>
-            <td style={tdStyle}>Visualizza/modifica/crea</td>
-            <td style={tdStyle}>In attesa</td>
-            <td style={tdStyle}>Registra</td>
-          </tr>
-          <tr>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>Baschieri</td>
-            <td style={tdStyle}>Piattaforma aerea</td>
-
-            <td style={tdStyle}>
-              <span style={grayText}>€ 25,00</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Calcolo</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Da elenco</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Foto modificabile</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Automatico</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Da cliccare</span>
-            </td>
-          </tr>
+          {noleggi.map((r, i) => (
+            <tr key={i}>
+              <td style={tdStyle}>{r.DataInserimento}</td>
+              <td style={tdStyle}>{r.DataRapportino}</td>
+              <td style={tdStyle}>{r.Noleggiatore}</td>
+              <td style={tdStyle}>{r.Nome}</td>
+              <td style={tdStyle}>{r.Descrizione}</td>
+              <td style={tdStyle}>{r.Ore}</td>
+              <td style={tdStyle}>{r.PUnit}</td>
+              <td style={tdStyle}>{r.PTot}</td>
+              <td style={tdStyle}>{r.WBS}</td>
+              <td style={tdStyle}>{r.DDT}</td>
+              <td style={tdStyle}>{r.Stato}</td>
+              <td style={tdStyle}>{r.Azione}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
@@ -515,32 +527,19 @@ function CommessaSilo() {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={tdStyle}>10-07-25</td>
-            <td style={tdStyle}>11-07-25</td>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>Lodi</td>
-            <td style={tdStyle}>Montato finestre</td>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>Visualizza/modifica/crea</td>
-            <td style={tdStyle}>In attesa</td>
-            <td style={tdStyle}>Registra DDT</td>
-          </tr>
-          <tr>
-            <td style={tdStyle}>1</td>
-            <td style={tdStyle}>Lodi</td>
-            <td style={tdStyle}>Montato finestre</td>
-
-            <td style={tdStyle}>
-              <span style={redText}>Foto modificabile</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Automatico</span>
-            </td>
-            <td style={tdStyle}>
-              <span style={redText}>Da cliccare</span>
-            </td>
-          </tr>
+          {aziende.map((r, i) => (
+            <tr key={i}>
+              <td style={tdStyle}>{r.DataInserimento}</td>
+              <td style={tdStyle}>{r.DataRapportino}</td>
+              <td style={tdStyle}>{r.Azienda}</td>
+              <td style={tdStyle}>{r.Nome}</td>
+              <td style={tdStyle}>{r.Descrizione}</td>
+              <td style={tdStyle}>{r.Ore}</td>
+              <td style={tdStyle}>{r.DDT}</td>
+              <td style={tdStyle}>{r.Stato}</td>
+              <td style={tdStyle}>{r.Azione}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
