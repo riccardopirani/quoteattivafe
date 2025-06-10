@@ -84,27 +84,44 @@ const styles = {
   },
 };
 export default function GestioneCommessaUI() {
-  const [gestioneContrattoAperta, setGestioneContrattoAperta] = useState(false);
-
-  const [parametriIniziali, setParametriIniziali] = useState(null);
-  const [hasLoadedCommessaIniziale, setHasLoadedCommessaIniziale] =
-    useState(false);
-
-  const [datiProduzione, setDatiProduzione] = useState({
-    percentualeAvanzamento: "0.00",
-    totaleProduzione: 0,
-    produzioneResidua: 0,
-  });
-  const [allCommesse, setAllCommesse] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredOptions, setFilteredOptions] = useState([]);
   const [selectedCommessa, setSelectedCommessa] = useState(null);
-  const [isModalitaNuova, setIsModalitaNuova] = useState(false);
   const [selectedTab, setSelectedTab] = useState("GeneraCantiere");
 
-  const [datiCommessa, setDatiCommessa] = useState(null);
-  const [contratti, setContratti] = useState([]);
-  const [datiContratti, setDatiContratti] = useState([]);
+  const [datiGenerali2, setDatiGenerali2] = useState({
+    statoDinamico: "BLOCCATO",
+  });
+
+  useEffect(() => {
+    const fetchStato = async () => {
+      if (selectedCommessa?.IdCantiere) {
+        try {
+          const result = await CantiereService.statoCommessa({
+            Codice: selectedCommessa.NomeCantiere,
+          });
+
+          const statoGrezzo = result;
+          const statoPulito = statoGrezzo.trim().toUpperCase();
+
+          let statoLabel = "BLOCCATO";
+          if (statoPulito.includes("A")) statoLabel = "APERTO";
+          else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
+          else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
+
+          setDatiGenerali2((prev) => ({
+            ...prev,
+            statoDinamico: statoLabel,
+          }));
+        } catch (error) {
+          console.error("Errore nel recupero dello stato cantiere:", error);
+        }
+      }
+    };
+
+    fetchStato();
+  }, [selectedCommessa?.IdCantiere]);
+
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (searchTerm.trim().length >= 2) {
@@ -185,7 +202,7 @@ export default function GestioneCommessaUI() {
                 setSelectedCommessa(commessa);
                 localStorage.setItem(
                   "ultimaCommessa",
-                  JSON.stringify(commessa)
+                  JSON.stringify(commessa),
                 );
                 setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                 setFilteredOptions([]);
@@ -204,16 +221,32 @@ export default function GestioneCommessaUI() {
         </div>
       )}
 
-      {selectedCommessa && (
-        <div style={styles.header}>
-          Cod. {selectedCommessa?.NomeCantiere}{" "}
-          <b>{selectedCommessa?.RagioneSociale}</b>{" "}
-          {selectedCommessa?.Indirizzo ? selectedCommessa.Indirizzo : ""}
-          <button style={styles.blockedButton}>
-            {(selectedCommessa?.StatoDinamico || "BLOCCATO").toUpperCase()}
-          </button>
-        </div>
-      )}
+      {selectedCommessa &&
+        selectedTab !== "Approvvigionamenti" &&
+        selectedTab !== "C.D.P." && (
+          <div style={styles.header}>
+            Cod. {selectedCommessa?.NomeCantiere}{" "}
+            <b>{selectedCommessa?.RagioneSociale}</b>{" "}
+            {selectedCommessa?.Indirizzo ? selectedCommessa.Indirizzo : ""}
+            <span
+              style={{
+                float: "right",
+                backgroundColor: (() => {
+                  const stato = datiGenerali2?.statoDinamico || "";
+                  if (stato === "CHIUSO") return "#d32f2f";
+                  if (stato === "APERTO") return "#388e3c";
+                  return "#fbc02d";
+                })(),
+                color: "white",
+                padding: "0.3rem 1rem",
+                fontWeight: "bold",
+                borderRadius: 4,
+              }}
+            >
+              {datiGenerali2?.statoDinamico || "BLOCCATO"}
+            </span>
+          </div>
+        )}
 
       {selectedTab === "GeneraCantiere" && selectedCommessa && (
         <>
@@ -315,6 +348,9 @@ function CommessaSilo({ commessa }) {
   const [aziende, setAziende] = useState([]);
   const [wbsOptions, setWbsOptions] = useState([]);
 
+  const [datiGenerali2, setDatiGenerali2] = useState({
+    statoDinamico: "BLOCCATO",
+  });
   const tableStyle = {
     width: "100%",
     borderCollapse: "collapse",
@@ -365,7 +401,7 @@ function CommessaSilo({ commessa }) {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
         if (!utentiRes.ok)
           throw new Error(`HTTP error! status: ${utentiRes.status}`);
@@ -373,7 +409,7 @@ function CommessaSilo({ commessa }) {
 
         const mappaCostoInterno = new Map();
         utenti.forEach((utente) =>
-          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno)
+          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno),
         );
 
         const manodoperaFiltrata = tutteRisorse
@@ -391,10 +427,10 @@ function CommessaSilo({ commessa }) {
           });
 
         const noleggiFiltrati = tutteRisorse.filter(
-          (r) => r.Tipologia === "Noleggio"
+          (r) => r.Tipologia === "Noleggio",
         );
         const aziendeFiltrate = tutteRisorse.filter(
-          (r) => r.Tipologia === "Aziende"
+          (r) => r.Tipologia === "Aziende",
         );
 
         setManodopera(manodoperaFiltrata);
@@ -463,8 +499,8 @@ function CommessaSilo({ commessa }) {
                     const nuovoValore = e.target.value;
                     setManodopera((prev) =>
                       prev.map((item, idx) =>
-                        idx === i ? { ...item, WBS: nuovoValore } : item
-                      )
+                        idx === i ? { ...item, WBS: nuovoValore } : item,
+                      ),
                     );
                   }}
                   style={{ width: "100%" }}
@@ -529,8 +565,8 @@ function CommessaSilo({ commessa }) {
                     const nuovoValore = e.target.value;
                     setManodopera((prev) =>
                       prev.map((item, idx) =>
-                        idx === i ? { ...item, WBS: nuovoValore } : item
-                      )
+                        idx === i ? { ...item, WBS: nuovoValore } : item,
+                      ),
                     );
                   }}
                   style={{ width: "100%" }}
