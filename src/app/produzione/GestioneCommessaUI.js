@@ -293,10 +293,256 @@ export default function GestioneCommessaUI() {
           commessa={selectedCommessa}
         />
       )}
+      {selectedTab === "Reportcantiere" && selectedCommessa && (
+        <CommessaSilo
+          key={selectedCommessa?.IdCantiere}
+          commessa={selectedCommessa}
+        />
+      )}
 
       {selectedTab === "C.D.P." && selectedCommessa && (
         <CDP key={selectedCommessa?.IdCantiere} commessa={selectedCommessa} />
       )}
+    </div>
+  );
+}
+
+function CommessaSilo() {
+  const tableStyle = {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontFamily: "Arial, sans-serif",
+    marginBottom: "40px",
+  };
+
+  const thStyle = {
+    backgroundColor: "#ecf5ec",
+    padding: "8px",
+    border: "1px solid #ccc",
+    fontWeight: "bold",
+    fontSize: "14px",
+    textAlign: "left",
+  };
+
+  const tdStyle = {
+    padding: "8px",
+    border: "1px solid #ccc",
+    fontSize: "14px",
+  };
+
+  const redText = { color: "red", fontWeight: "bold", fontSize: "13px" };
+  const grayText = { color: "gray" };
+  const sectionTitleStyle = {
+    backgroundColor: "#ecf5ec",
+    fontWeight: "bold",
+    fontSize: "18px",
+    padding: "10px",
+    marginTop: "40px",
+    border: "1px solid #ccc",
+  };
+
+  const blockBtn = {
+    backgroundColor: "#ffc107",
+    color: "#333",
+    fontWeight: "bold",
+    padding: "10px 20px",
+    borderRadius: "4px",
+    float: "right",
+    marginTop: "-50px",
+  };
+
+  return (
+    <div style={{ padding: "20px" }}>
+      {/* MANODOPERA */}
+      <div style={sectionTitleStyle}>MANODOPERA</div>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            {[
+              "Data inserimento",
+              "Data rapportino",
+              "Tipo",
+              "Operatore",
+              "Nome",
+              "Descrizione",
+              "Ore",
+              "P. Unit.",
+              "P. Tot.",
+              "WBS",
+              "D.D.T.",
+              "Stato",
+              "Azione",
+            ].map((header) => (
+              <th key={header} style={thStyle}>
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={tdStyle}>10-07-25</td>
+            <td style={tdStyle}>11-07-25</td>
+            <td style={tdStyle}>Manodopera</td>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>Nicola Coem</td>
+            <td style={tdStyle}>Smontato ponteggio</td>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>€ 25,00</td>
+            <td style={tdStyle}>€ 25,00</td>
+            <td style={tdStyle}>A.05</td>
+            <td style={tdStyle}>Visualizza/modifica</td>
+            <td style={tdStyle}>In attesa</td>
+            <td style={tdStyle}>Registra</td>
+          </tr>
+          <tr>
+            <td style={tdStyle}>
+              <span style={{ color: "red", fontWeight: "bold" }}>Attiv.A</span>
+            </td>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>Carmelo</td>
+            <td style={tdStyle}>Smontato ponteggio</td>
+
+            <td style={tdStyle}>
+              <span style={grayText}>€ 25,00</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Calcolo</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Da elenco</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Foto modificabile</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Automatico</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Da cliccare</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* NOLEGGI */}
+      <div style={sectionTitleStyle}>NOLEGGI</div>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            {[
+              "Data inserimento",
+              "Data rapportino",
+              "Noleggiatore",
+              "Nome",
+              "Descrizione",
+              "Ore",
+              "P. Unit.",
+              "P. Tot.",
+              "WBS",
+              "D.D.T.",
+              "Stato",
+              "Azione",
+            ].map((header) => (
+              <th key={header} style={thStyle}>
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={tdStyle}>10-07-25</td>
+            <td style={tdStyle}>11-07-25</td>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>Baschieri</td>
+            <td style={tdStyle}>Piattaforma aerea</td>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>€ 25,00</td>
+            <td style={tdStyle}>€ 25,00</td>
+            <td style={tdStyle}>A.05</td>
+            <td style={tdStyle}>Visualizza/modifica/crea</td>
+            <td style={tdStyle}>In attesa</td>
+            <td style={tdStyle}>Registra</td>
+          </tr>
+          <tr>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>Baschieri</td>
+            <td style={tdStyle}>Piattaforma aerea</td>
+
+            <td style={tdStyle}>
+              <span style={grayText}>€ 25,00</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Calcolo</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Da elenco</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Foto modificabile</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Automatico</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Da cliccare</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* AZIENDE */}
+      <div style={sectionTitleStyle}>AZIENDE</div>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            {[
+              "Data inserimento",
+              "Data rapportino",
+              "Azienda",
+              "Nome",
+              "Descrizione",
+              "Ore",
+              "D.D.T.",
+              "Stato",
+              "Azione",
+            ].map((header) => (
+              <th key={header} style={thStyle}>
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={tdStyle}>10-07-25</td>
+            <td style={tdStyle}>11-07-25</td>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>Lodi</td>
+            <td style={tdStyle}>Montato finestre</td>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>Visualizza/modifica/crea</td>
+            <td style={tdStyle}>In attesa</td>
+            <td style={tdStyle}>Registra DDT</td>
+          </tr>
+          <tr>
+            <td style={tdStyle}>1</td>
+            <td style={tdStyle}>Lodi</td>
+            <td style={tdStyle}>Montato finestre</td>
+
+            <td style={tdStyle}>
+              <span style={redText}>Foto modificabile</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Automatico</span>
+            </td>
+            <td style={tdStyle}>
+              <span style={redText}>Da cliccare</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
