@@ -313,6 +313,8 @@ function CommessaSilo({ commessa }) {
   const [manodopera, setManodopera] = useState([]);
   const [noleggi, setNoleggi] = useState([]);
   const [aziende, setAziende] = useState([]);
+  const [wbsOptions, setWbsOptions] = useState([]);
+
   const tableStyle = {
     width: "100%",
     borderCollapse: "collapse",
@@ -358,7 +360,6 @@ function CommessaSilo({ commessa }) {
           IdCantiere: commessa.IdCantiere,
         });
 
-        // Recupera i costi interni degli utenti
         const utentiRes = await fetch(
           `${BASE_URL}/RisorseUmane/CaricaRisorse`,
           {
@@ -366,32 +367,29 @@ function CommessaSilo({ commessa }) {
             headers: { "Content-Type": "application/json" },
           }
         );
-
         if (!utentiRes.ok)
           throw new Error(`HTTP error! status: ${utentiRes.status}`);
-
         const utenti = await utentiRes.json();
 
-        // Crea una mappa per accedere rapidamente al costo interno
         const mappaCostoInterno = new Map();
         utenti.forEach((utente) =>
           mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno)
         );
 
-        // Suddividi le risorse in categorie e assegna i costi interni
         const manodoperaFiltrata = tutteRisorse
           .filter((r) => ["Attiv.A", "Manodopera"].includes(r.Tipologia))
           .map((r) => {
             const costo = mappaCostoInterno.get(r.IdUtente) ?? 0;
-            const ore = formatTimeFromISOString(r.OreFine); // es. "01:30"
-            const oreDecimali = convertHHMMToDecimal(ore); // es. 1.5
+            const ore = formatTimeFromISOString(r.OreFine);
+            const oreDecimali = convertHHMMToDecimal(ore);
             return {
               ...r,
               PUnit: costo,
-              OreFormattate: ore, // solo se vuoi visualizzarla
+              OreFormattate: ore,
               PTot: (costo * oreDecimali).toFixed(2),
             };
           });
+
         const noleggiFiltrati = tutteRisorse.filter(
           (r) => r.Tipologia === "Noleggio"
         );
@@ -402,6 +400,14 @@ function CommessaSilo({ commessa }) {
         setManodopera(manodoperaFiltrata);
         setNoleggi(noleggiFiltrati);
         setAziende(aziendeFiltrate);
+
+        const dettagli = await CantiereService.nodidettagli({
+          Codice: commessa.NomeCantiere,
+        });
+        const opzioni = dettagli
+          .filter((d) => !d.CodiceNodo.startsWith("R"))
+          .map((d) => d.CodiceNodo);
+        setWbsOptions(opzioni);
       } catch (err) {
         console.error("Errore nel caricamento risorse:", err);
       }
@@ -450,7 +456,28 @@ function CommessaSilo({ commessa }) {
               <td style={tdStyle}>{formatTimeFromISOString(r.OreFine)}</td>
               <td style={tdStyle}>{r.PUnit}</td>
               <td style={tdStyle}>{r.PTot}</td>
-              <td style={tdStyle}>{r.WBS}</td>
+              <td style={tdStyle}>
+                <select
+                  value={r.WBS || ""}
+                  onChange={(e) => {
+                    const nuovoValore = e.target.value;
+                    setManodopera((prev) =>
+                      prev.map((item, idx) =>
+                        idx === i ? { ...item, WBS: nuovoValore } : item
+                      )
+                    );
+                  }}
+                  style={{ width: "100%" }}
+                >
+                  <option value="">Seleziona</option>
+                  {wbsOptions.map((wbs) => (
+                    <option key={wbs} value={wbs}>
+                      {wbs}
+                    </option>
+                  ))}
+                </select>
+              </td>
+
               <td style={tdStyle}>Visualizza/Modifica DDT</td>
               <td style={tdStyle}>{r.Stato ? r.Stato : "INATTESA"}</td>
               <td style={tdStyle}>Registro</td>
