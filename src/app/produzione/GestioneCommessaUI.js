@@ -185,7 +185,7 @@ export default function GestioneCommessaUI() {
                 setSelectedCommessa(commessa);
                 localStorage.setItem(
                   "ultimaCommessa",
-                  JSON.stringify(commessa),
+                  JSON.stringify(commessa)
                 );
                 setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                 setFilteredOptions([]);
@@ -365,7 +365,7 @@ function CommessaSilo({ commessa }) {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-          },
+          }
         );
         if (!utentiRes.ok)
           throw new Error(`HTTP error! status: ${utentiRes.status}`);
@@ -373,7 +373,7 @@ function CommessaSilo({ commessa }) {
 
         const mappaCostoInterno = new Map();
         utenti.forEach((utente) =>
-          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno),
+          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno)
         );
 
         const manodoperaFiltrata = tutteRisorse
@@ -391,10 +391,10 @@ function CommessaSilo({ commessa }) {
           });
 
         const noleggiFiltrati = tutteRisorse.filter(
-          (r) => r.Tipologia === "Noleggio",
+          (r) => r.Tipologia === "Noleggio"
         );
         const aziendeFiltrate = tutteRisorse.filter(
-          (r) => r.Tipologia === "Aziende",
+          (r) => r.Tipologia === "Aziende"
         );
 
         setManodopera(manodoperaFiltrata);
@@ -463,8 +463,8 @@ function CommessaSilo({ commessa }) {
                     const nuovoValore = e.target.value;
                     setManodopera((prev) =>
                       prev.map((item, idx) =>
-                        idx === i ? { ...item, WBS: nuovoValore } : item,
-                      ),
+                        idx === i ? { ...item, WBS: nuovoValore } : item
+                      )
                     );
                   }}
                   style={{ width: "100%" }}
@@ -514,18 +514,39 @@ function CommessaSilo({ commessa }) {
         <tbody>
           {noleggi.map((r, i) => (
             <tr key={i}>
-              <td style={tdStyle}>{r.DataInserimento}</td>
-              <td style={tdStyle}>{r.DataRapportino}</td>
-              <td style={tdStyle}>{r.Noleggiatore}</td>
-              <td style={tdStyle}>{r.Nome}</td>
+              <td style={tdStyle}>{r.Data}</td>
+              <td style={tdStyle}>{r.Data}</td>
+              <td style={tdStyle}>{r.IdUtente}</td>
+              <td style={tdStyle}>{r.Nome + " " + r.Cognome}</td>
               <td style={tdStyle}>{r.Descrizione}</td>
-              <td style={tdStyle}>{r.Ore}</td>
+              <td style={tdStyle}>{formatTimeFromISOString(r.OreFine)}</td>
               <td style={tdStyle}>{r.PUnit}</td>
               <td style={tdStyle}>{r.PTot}</td>
-              <td style={tdStyle}>{r.WBS}</td>
-              <td style={tdStyle}>{r.DDT}</td>
-              <td style={tdStyle}>{r.Stato}</td>
-              <td style={tdStyle}>{r.Azione}</td>
+              <td style={tdStyle}>
+                <select
+                  value={r.WBS || ""}
+                  onChange={(e) => {
+                    const nuovoValore = e.target.value;
+                    setManodopera((prev) =>
+                      prev.map((item, idx) =>
+                        idx === i ? { ...item, WBS: nuovoValore } : item
+                      )
+                    );
+                  }}
+                  style={{ width: "100%" }}
+                >
+                  <option value="">Seleziona</option>
+                  {wbsOptions.map((wbs) => (
+                    <option key={wbs} value={wbs}>
+                      {wbs}
+                    </option>
+                  ))}
+                </select>
+              </td>
+
+              <td style={tdStyle}>Visualizza/Modifica DDT</td>
+              <td style={tdStyle}>{r.Stato ? r.Stato : "INATTESA"}</td>
+              <td style={tdStyle}>Registro</td>
             </tr>
           ))}
         </tbody>
@@ -556,15 +577,16 @@ function CommessaSilo({ commessa }) {
         <tbody>
           {aziende.map((r, i) => (
             <tr key={i}>
-              <td style={tdStyle}>{r.DataInserimento}</td>
-              <td style={tdStyle}>{r.DataRapportino}</td>
-              <td style={tdStyle}>{r.Azienda}</td>
-              <td style={tdStyle}>{r.Nome}</td>
+              <td style={tdStyle}>{r.Data}</td>
+              <td style={tdStyle}>{r.Data}</td>
+              <td style={tdStyle}>{r.IdUtente}</td>
+              <td style={tdStyle}>{r.Nome + " " + r.Cognome}</td>
               <td style={tdStyle}>{r.Descrizione}</td>
-              <td style={tdStyle}>{r.Ore}</td>
-              <td style={tdStyle}>{r.DDT}</td>
-              <td style={tdStyle}>{r.Stato}</td>
-              <td style={tdStyle}>{r.Azione}</td>
+              <td style={tdStyle}>{formatTimeFromISOString(r.OreFine)}</td>
+
+              <td style={tdStyle}>Visualizza/Modifica DDT</td>
+              <td style={tdStyle}>{r.Stato ? r.Stato : "INATTESA"}</td>
+              <td style={tdStyle}>Registro</td>
             </tr>
           ))}
         </tbody>
