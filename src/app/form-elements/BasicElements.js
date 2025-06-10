@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Drawer, Button } from "antd";
 import { Select, Input } from "antd";
 import CantiereService from "../services/cantiere";
-import ProduzioneService from "../services/produzione";
+import { useMemo } from "react";
+import { getTotaliCostiERicavi } from "../shared/Helper.js";
 const { Option } = Select;
 
 const cellHeaderStyle = {
@@ -38,33 +39,6 @@ const calcolaGiorniUltimoAgg = (data) => {
   return { text: "< 30 gg", color: "#2e7d32" };
 };
 
-const arricchisciCommessa = async (c) => {
-  const produzioni = await ProduzioneService.leggiProduzione(c.IdCantiere);
-  const sal = await ProduzioneService.leggiSal(c.IdCantiere);
-
-  const totaleProduzione = produzioni.reduce(
-    (sum, p) => sum + parseFloat(p.Importo || 0),
-    0,
-  );
-  const totaleFatture = sal.reduce(
-    (sum, s) => sum + parseFloat(s.ImportoFattura || 0),
-    0,
-  );
-  const totaleSAL = sal.reduce(
-    (sum, s) => sum + parseFloat(s.ImportoSAL || 0),
-    0,
-  );
-
-  return {
-    avanzamentoProduzione:
-      totaleProduzione > 0
-        ? ((totaleFatture / totaleProduzione) * 100).toFixed(2)
-        : "0.00",
-    salNonFatturati: (totaleSAL - totaleFatture).toFixed(2),
-    lavoriAFinire: (totaleProduzione - totaleFatture).toFixed(2),
-    deltaFatture: (totaleProduzione - totaleFatture).toFixed(2),
-  };
-};
 const parseData = (str) => {
   if (!str) return new Date(0);
   const [dd, mm, yyyy] = str.split("/");
@@ -109,6 +83,7 @@ const TabelleCantieri = () => {
   const [tabellaEsposizione, setTabellaEsposizione] = useState([]);
   const [visibleRowsGestione, setVisibleRowsGestione] = useState(10);
   const [visibleRowsEsposizione, setVisibleRowsEsposizione] = useState(10);
+  const [commesse, setCommesse] = useState([]);
 
   useEffect(() => {
     const fetchCommesse = async () => {
@@ -122,9 +97,7 @@ const TabelleCantieri = () => {
             commessa: c.Indirizzo || "-",
 
             ResponsabileUfficio: c.ResponsabileUfficio || "-",
-            costi60gg:
-              parseFloat((c.CostiUltimi60gg || "0").replace(/[^\d.-]/g, "")) ||
-              0,
+            costi60gg: c.TotaleCosti || 0,
             aggiornataDa: calcolaGiorniUltimoAgg(c.DataCreazioneCantiere),
             dataObj: parsedDate,
           };
@@ -132,17 +105,29 @@ const TabelleCantieri = () => {
 
         gestione.sort((a, b) => b.dataObj - a.dataObj);
 
-        const esposizione = dati.map((c) => ({
-          cod: c.NomeCantiere,
-          commessa: c.Indirizzo || "-",
-          ResponsabileUfficio: c.ResponsabileUfficio || "-",
-          costiSostenuti:
-            parseFloat((c.CostiSostenuti || "0").replace(/[^\d.-]/g, "")) || 0,
-          esposizione:
-            parseFloat(
-              (c.EsposizioneEconomica || "0").replace(/[^\d.-]/g, ""),
-            ) || 0,
+        const esposizione = await Promise.all(
+          dati.map(async (c) => {
+            const { totaleCostiSenzaRicavi, totaleRicavi } =
+              await getTotaliCostiERicavi(c.IdCantiere, c.NomeCantiere);
+
+            return {
+              cod: c.NomeCantiere,
+              NomeCantiere: c.NomeCantiere,
+              commessa: c.Indirizzo || "-",
+              ResponsabileUfficio: c.ResponsabileUfficio || "-",
+              TotaleCosti: c.TotaleCosti || 0,
+              ricaviTotali: totaleRicavi || 0,
+              esposizione: totaleRicavi - totaleCostiSenzaRicavi || 0,
+            };
+          }),
+        );
+
+        const enriched = dati.map((c) => ({
+          ...c,
+          Costi30gg:
+            parseFloat((c.Costi30gg || "0").replace(/[^\d.-]/g, "")) || 0,
         }));
+        setCommesse(enriched);
 
         setTabellaGestione(gestione);
         setTabellaEsposizione(esposizione);
@@ -203,7 +188,7 @@ const TabelleCantieri = () => {
                 "Cod.",
                 "Commessa",
                 "Resp. Ufficio",
-                "Costi ultimi 60 gg.",
+                "Costi ultimi 30 gg.",
                 "Aggiornata da",
               ].map((label, idx) => (
                 <th key={idx} style={cellHeaderStyle}>
@@ -273,15 +258,15 @@ const TabelleCantieri = () => {
                   <td style={cellStyle}>{r.cod}</td>
                   <td style={cellStyle}>{r.commessa}</td>
                   <td style={cellStyle}>{r.ResponsabileUfficio}</td>
-                  <td style={cellStyle}>€ {r.costiSostenuti.toFixed(2)}</td>
+                  <td style={cellStyle}>€ {r.TotaleCosti.toFixed(2)}</td>
                   <td
                     style={{
                       ...cellStyle,
                       fontWeight: "bold",
                       color:
-                        r.esposizione > 0
+                        r.esposizione < 0
                           ? "red"
-                          : r.esposizione === 0
+                          : r.esposizione >= 0
                             ? "#ff9800"
                             : "#2e7d32",
                     }}
@@ -440,25 +425,44 @@ function DashboardTabsPanoramica() {
 
     setFilteredCommesse(filtrate);
 
-    // Aggiorna in background lo StatoCantiere
-    const aggiornaStati = async () => {
+    // Aggiorna in background StatoCantiere + Avanzamenti
+    const aggiornaStatiEAvanzamenti = async () => {
       const aggiornate = await Promise.all(
         commesse.map(async (c) => {
+          let statoLabel = "BLOCCATO";
+          let avanzamenti = {};
+
           try {
             const result = await CantiereService.statoCommessa({
               Codice: c.NomeCantiere,
             });
             const statoPulito = result.trim().toUpperCase();
-            let statoLabel = "BLOCCATO";
             if (statoPulito.includes("A")) statoLabel = "APERTO";
             else if (statoPulito.includes("B")) statoLabel = "BLOCCATO";
             else if (statoPulito.includes("C")) statoLabel = "CHIUSO";
-
-            return { ...c, StatoCantiere: statoLabel };
           } catch (e) {
             console.error("Errore aggiornamento stato:", e);
-            return c;
           }
+
+          try {
+            avanzamenti = await getTotaliCostiERicavi(
+              c.IdCantiere,
+              c.NomeCantiere,
+            );
+          } catch (err) {
+            console.error("Errore avanzamenti per", c.NomeCantiere, err);
+          }
+
+          return {
+            ...c,
+            StatoCantiere: statoLabel,
+            ...avanzamenti,
+            EsposizioneEconomica: Number(
+              (
+                avanzamenti.totaleRicavi - avanzamenti.totaleCostiSenzaRicavi
+              ).toFixed(2),
+            ),
+          };
         }),
       );
 
@@ -490,7 +494,7 @@ function DashboardTabsPanoramica() {
       setFilteredCommesse(filtrateAgg);
     };
 
-    aggiornaStati();
+    aggiornaStatiEAvanzamenti();
   }, [filters, commesse]);
 
   useEffect(() => {
@@ -521,30 +525,6 @@ function DashboardTabsPanoramica() {
             bloccate++;
           }
         });
-        setSummaryCards([
-          { label: "Aperte", value: aperte, color: "#2e7d32" },
-          { label: "Bloccate", value: bloccate, color: "#ff9800" },
-          { label: "Chiuse", value: chiuse, color: "red" },
-          {
-            label: "Costi 30 gg.",
-            value: `€ ${totaleCosti30gg.toLocaleString("it-IT", {
-              maximumFractionDigits: 0,
-            })}`,
-            color: "#2e7d32",
-          },
-          {
-            label: "Lavori a finire",
-            value: `€ ${totaleLavoriAFinire.toLocaleString("it-IT", {
-              maximumFractionDigits: 0,
-            })}`,
-            color: "#2e7d32",
-          },
-          {
-            label: "Margine % medio",
-            value: `${mediaMargine}%`,
-            color: "#2e7d32",
-          },
-        ]);
       } catch (err) {
         console.error("Errore nel recupero delle commesse:", err);
       }
@@ -556,25 +536,42 @@ function DashboardTabsPanoramica() {
   const getEuroValue = (str) =>
     parseFloat((str || "0").replace(/[^\d.-]/g, "")) || 0;
 
-  const now = new Date();
-  const MILLISECONDS_IN_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+  const totaleSal = filteredCommesse.reduce((acc, c) => {
+    const salValue = parseFloat(
+      (c.salTotali || "0").toString().replace(/[^\d.-]/g, ""),
+    );
+    return acc + (isNaN(salValue) ? 0 : salValue);
+  }, 0);
 
-  const totaleSal = filteredCommesse.reduce(
-    (acc, c) => acc + getEuroValue(c.SalDaFatturare),
-    0,
-  );
-
-  const totaleSil = filteredCommesse.reduce(
-    (acc, c) => acc + (parseInt(c.SilDaSalizzare) || 0),
-    0,
-  );
+  const totaleSil = filteredCommesse.reduce((acc, c) => {
+    const silValue = parseFloat(
+      (c.siltotali || "0").toString().replace(/[^\d.-]/g, ""),
+    );
+    return acc + (isNaN(silValue) ? 0 : silValue);
+  }, 0);
 
   const commesseDaAggiornare = filteredCommesse.filter((c) => {
-    const dataAgg = c.DataCreazioneCantiere;
+    const dataAgg = c.DataAggiornamento;
+
     if (!dataAgg) return false;
-    const [day, month, year] = dataAgg.split("/");
-    const dateObj = new Date(`${year}-${month}-${day}`);
-    return now - dateObj > MILLISECONDS_IN_30_DAYS;
+
+    let dataObj;
+    if (typeof dataAgg === "string") {
+      if (dataAgg.includes("/")) {
+        const [dd, mm, yyyy] = dataAgg.split("/");
+        dataObj = new Date(`${yyyy}-${mm}-${dd}`);
+      } else {
+        // Assume ISO format
+        dataObj = new Date(dataAgg);
+      }
+    } else if (dataAgg instanceof Date) {
+      dataObj = dataAgg;
+    } else {
+      return false;
+    }
+
+    const giorni = Math.floor((new Date() - dataObj) / (1000 * 60 * 60 * 24));
+    return giorni > 30;
   }).length;
 
   let commessaMigliore = null;
@@ -593,56 +590,54 @@ function DashboardTabsPanoramica() {
       commessaPeggiore = c;
     }
   });
-  const totaleCosti30gg = filteredCommesse.reduce(
-    (acc, c) => acc + getEuroValue(c.Costi30gg),
+  const totaleCosti30gg = commesse.reduce(
+    (acc, c) => acc + (c.TotaleCosti || 0),
     0,
   );
-
   const totaleLavoriAFinire = filteredCommesse.reduce(
-    (acc, c) => acc + getEuroValue(c.LavoriAFinire),
+    (acc, c) => acc + (parseFloat(c.lavoriResidui) || 0),
     0,
   );
 
-  const marginiValidi = filteredCommesse
-    .map((c) => getEuroValue(c.MarginePercentuale))
-    .filter((v) => !isNaN(v));
-
-  const mediaMargine =
-    marginiValidi.length > 0
-      ? (
-          marginiValidi.reduce((acc, val) => acc + val, 0) /
-          marginiValidi.length
-        ).toFixed(1)
-      : "0";
-
-  const dashboardCards = [
-    { label: "Commesse gestite", value: filteredCommesse.length },
-    {
-      label: "Sal da fatturare",
-      value: `€ ${totaleSal.toLocaleString("it-IT", {
-        maximumFractionDigits: 0,
-      })}`,
-      highlight: true,
-    },
-    {
-      label: "Sil da salizzare",
-      value: totaleSil,
-    },
-    {
-      label: "Commesse da aggiornare",
-      value: commesseDaAggiornare,
-    },
-    {
-      label: "Commessa migliore",
-      value: commessaMigliore ? `Cod ${commessaMigliore.IdCantiere}` : "-",
-      highlight: true,
-    },
-    {
-      label: "Commessa peggiore",
-      value: commessaPeggiore ? `Cod ${commessaPeggiore.IdCantiere}` : "-",
-      highlight: true,
-    },
-  ];
+  const dashboardCards = useMemo(() => {
+    return [
+      { label: "Commesse gestite", value: filteredCommesse.length },
+      {
+        label: "Sal da fatturare",
+        value: `€ ${totaleSal.toLocaleString("it-IT", {
+          maximumFractionDigits: 0,
+        })}`,
+        highlight: true,
+      },
+      {
+        label: "Sil da salizzare",
+        value: `€ ${totaleSil.toLocaleString("it-IT", {
+          maximumFractionDigits: 0,
+        })}`,
+      },
+      {
+        label: "Commesse da aggiornare",
+        value: commesseDaAggiornare,
+      },
+      {
+        label: "Commessa migliore",
+        value: commessaMigliore ? `Cod ${commessaMigliore.NomeCantiere}` : "-",
+        highlight: true,
+      },
+      {
+        label: "Commessa peggiore",
+        value: commessaPeggiore ? `Cod ${commessaPeggiore.NomeCantiere}` : "-",
+        highlight: true,
+      },
+    ];
+  }, [
+    filteredCommesse.length,
+    totaleSal,
+    totaleSil,
+    commesseDaAggiornare,
+    commessaMigliore,
+    commessaPeggiore,
+  ]);
 
   const handleCommessaSelection = (value) => {
     setCommessaOption(value);
@@ -674,8 +669,8 @@ function DashboardTabsPanoramica() {
       anagraficaProgettista: "",
     };
 
-    const dataInizio = new Date(); // o derivata da UI
-    const dataFine = new Date(); // o derivata da UI
+    const dataInizio = new Date();
+    const dataFine = new Date();
 
     try {
       const clienteRes = await CantiereService.creaCliente({
@@ -684,7 +679,7 @@ function DashboardTabsPanoramica() {
       const idCliente = clienteRes.return;
       const cantiereRes = await CantiereService.creaCantiere(
         idCliente,
-        datiGenerali.codice, // <-- questo è il codice della commessa selezionata
+        datiGenerali.codice,
       );
       const idCantiere = cantiereRes[0]?.IdCantiere;
 
@@ -723,6 +718,23 @@ function DashboardTabsPanoramica() {
       console.error("Errore durante la creazione della commessa:", error);
     }
   };
+  const calcolaMargineMedio = (commesse) => {
+    const margini = commesse
+      .map((c) => {
+        const valore = parseFloat(
+          (c.Margine || "").toString().replace("%", "").replace(",", "."),
+        );
+        return isNaN(valore) ? null : valore;
+      })
+      .filter((v) => v !== null);
+
+    if (margini.length === 0) return "0";
+
+    const sommaMargini = margini.reduce((acc, val) => acc + val, 0);
+    return (sommaMargini / margini.length).toFixed(1);
+  };
+
+  const mediaMargine = calcolaMargineMedio(filteredCommesse);
   const normalize = (str) =>
     str
       ?.toString()
@@ -730,6 +742,49 @@ function DashboardTabsPanoramica() {
       .replace(/\s+/g, "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
+  useEffect(() => {
+    // Conta commesse aperte, chiuse, bloccate
+    let aperte = 0,
+      chiuse = 0,
+      bloccate = 0;
+    filteredCommesse.forEach((c) => {
+      const stato = (c.StatoCantiere || "").toLowerCase();
+      if (stato.includes("chiuso")) chiuse++;
+      else if (
+        stato === "incorso" ||
+        stato.includes("lavoro terminato") ||
+        stato.includes("aperto")
+      )
+        aperte++;
+      else bloccate++;
+    });
+
+    setSummaryCards([
+      { label: "Aperte", value: aperte, color: "#2e7d32" },
+      { label: "Bloccate", value: bloccate, color: "#ff9800" },
+      { label: "Chiuse", value: chiuse, color: "red" },
+      {
+        label: "Costi 30 gg.",
+        value: `€ ${totaleCosti30gg.toLocaleString("it-IT", {
+          maximumFractionDigits: 0,
+        })}`,
+        color: "#2e7d32",
+      },
+      {
+        label: "Lavori a finire",
+        value: `€ ${totaleLavoriAFinire.toLocaleString("it-IT", {
+          maximumFractionDigits: 0,
+        })}`,
+        color: "#2e7d32",
+      },
+      {
+        label: "Margine % medio",
+        value: `${mediaMargine}%`,
+        color: "#2e7d32",
+      },
+    ]);
+  }, [filteredCommesse, totaleCosti30gg, totaleLavoriAFinire, mediaMargine]);
+
   const renderDrawer = () => (
     <Drawer
       title="Aggancia a Commessa Esistente"
@@ -859,6 +914,7 @@ function DashboardTabsPanoramica() {
                 backgroundColor: "#2e7d32",
                 border: "none",
                 fontWeight: "bold",
+                color: "white",
               }}
             >
               Genera Commessa
@@ -870,14 +926,18 @@ function DashboardTabsPanoramica() {
   );
 
   filteredCommesse.forEach((c) => {
-    const margine = getEuroValue(c.MarginePercentuale); // assume e.g., "20%" or "0%"
-    if (margine > maxMargine) {
-      maxMargine = margine;
-      commessaMigliore = c;
-    }
-    if (margine < minMargine) {
-      minMargine = margine;
-      commessaPeggiore = c;
+    const margine = parseFloat(
+      (c.Margine || "").toString().replace("%", "").replace(",", "."),
+    );
+    if (!isNaN(margine)) {
+      if (margine > maxMargine) {
+        maxMargine = margine;
+        commessaMigliore = c;
+      }
+      if (margine < minMargine) {
+        minMargine = margine;
+        commessaPeggiore = c;
+      }
     }
   });
 
@@ -1015,7 +1075,7 @@ function DashboardTabsPanoramica() {
                   "Indirizzo",
                   "Resp. Ufficio",
                   "Stato",
-                  "Delta costi Fatture",
+                  "Esposizione",
                   "Costi 30 gg.",
                   "Avanz. %",
                   "Lavori a finire",
@@ -1042,15 +1102,31 @@ function DashboardTabsPanoramica() {
                       ? "APERTA"
                       : c.StatoCantiere}
                   </td>
-                  <td style={cellStyle}></td>
-                  <td style={cellStyle}>€ {c.deltaFatture}</td>
-                  <td style={cellStyle}>€ 0</td>
-                  <td style={cellStyle}>{c.avanzamentoProduzione}%</td>
-                  <td style={cellStyle}>€ {c.lavoriAFinire}</td>
-
-                  <td style={cellStyle}>€ {c.salNonFatturati}</td>
-                  <td style={cellStyle}>{c.Margine}%</td>
+                  <td style={cellStyle}>€{c.EsposizioneEconomica}</td>
+                  <td style={cellStyle}>€ {c.TotaleCosti}</td>
                   <td style={cellStyle}>
+                    %{c.percentualeAvanzamentoProduzioneReale}
+                  </td>
+                  <td style={cellStyle}>€ {c.lavoriResidui}</td>
+                  <td style={cellStyle}>€ {c.siltotali}</td>
+
+                  <td style={cellStyle}>€ {c.salTotali}</td>
+                  <td style={cellStyle}>{c.Margine}%</td>
+                  <td
+                    style={{
+                      ...cellStyle,
+                      color: (() => {
+                        if (!c.DataAggiornamento) return "#000";
+                        const dataAgg = new Date(c.DataAggiornamento);
+                        const oggi = new Date();
+                        const diffGiorni = Math.floor(
+                          (oggi - dataAgg) / (1000 * 60 * 60 * 24),
+                        );
+                        return diffGiorni <= 30 ? "green" : "red";
+                      })(),
+                      fontWeight: "bold",
+                    }}
+                  >
                     {c.DataAggiornamento
                       ? new Date(c.DataAggiornamento).toLocaleDateString(
                           "it-IT",

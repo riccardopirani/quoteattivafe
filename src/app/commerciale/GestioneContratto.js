@@ -25,6 +25,7 @@ const parseFloatSafe = (value) => {
   const num = parseFloat(value);
   return isNaN(num) ? 0 : num;
 };
+
 const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   const [datiGenerali2, setDatiGenerali2] = useState({
     statoDinamico: "BLOCCATO",
@@ -343,7 +344,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   useEffect(() => {
     const totale = datiContratti.reduce(
       (sum, c) => sum + produzioneResidua(c.Descrizione),
-      0
+      0,
     );
 
     CantiereService.aggiornaCustom({

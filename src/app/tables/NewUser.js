@@ -282,6 +282,8 @@ const UserManagementDrawer = () => {
                 "Email",
                 "Telefono",
                 "Residente",
+                "CostoInterno",
+                "CostoFatturazione",
               ]
                 .filter(Boolean)
                 .map((field) => (

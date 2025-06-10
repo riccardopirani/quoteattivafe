@@ -15,7 +15,7 @@ import dayjs from "dayjs";
 import moment from "moment";
 import "moment/locale/it";
 import { BarChart, Bar } from "recharts";
-
+import { getTotaliCostiERicavi } from "../shared/Helper.js";
 import "sweetalert2/dist/sweetalert2.min.css";
 moment.locale("it");
 
@@ -103,7 +103,6 @@ const CruscottoCommessa = ({
             totaleRicavi > 0
               ? (((totaleCosti - totaleRicavi) / totaleCosti) * 100).toFixed(2)
               : "0.00";
-          setTotalRicavi(totaleRicavi);
           setCostiTotali(totaleCostiSenzaRicavi);
           setMargineVal(margine);
           setMarginePerc(perc);
@@ -119,6 +118,21 @@ const CruscottoCommessa = ({
           setChartData(chart);
         })
         .catch((err) => console.error("Errore caricamento dati grafico:", err));
+
+      getTotaliCostiERicavi(commessa.IdCantiere, commessa.NomeCantiere)
+        .then(({ totaleCostiSenzaRicavi, totaleRicavi }) => {
+          const esposizione = totaleRicavi - totaleCostiSenzaRicavi;
+          console.log(totaleCostiSenzaRicavi, totaleRicavi);
+          setCostiTotali(totaleCostiSenzaRicavi);
+          setTotalRicavi(totaleRicavi);
+          setMargineVal(esposizione);
+          setMarginePerc(
+            totaleRicavi > 0
+              ? ((esposizione / totaleRicavi) * 100).toFixed(2)
+              : "0.00"
+          );
+        })
+        .catch((err) => console.error("Errore nel calcolo costi/ricavi:", err));
     }
   }, [commessa]);
   useEffect(() => {
@@ -447,7 +461,7 @@ const CruscottoCommessa = ({
             }}
           >
             €{" "}
-            {(costiTotali - ricaviTotali).toLocaleString("it-IT", {
+            {costiTotali.toLocaleString("it-IT", {
               minimumFractionDigits: 2,
             })}
           </div>

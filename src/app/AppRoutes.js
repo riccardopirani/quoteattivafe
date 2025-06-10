@@ -10,14 +10,16 @@ const Dropdowns = lazy(() => import("./basic-ui/Dropdowns"));
 const GareUpcoming = lazy(() => import("./basic-ui/GareUpcoming"));
 const DashboardPanoramica = lazy(() => import("./form-elements/BasicElements"));
 const GestioneCommesse = lazy(() => import("./commerciale/Gestione"));
+const DashboardOre = lazy(() => import("./produzione/DashboardOre"));
+const PanoramicaDashboard = lazy(() => import("./produzione/DashboardOre"));
+const Cordinamento = lazy(() => import("./commerciale/Cordinamento"));
 const BasicTable = lazy(() => import("./tables/BasicTable"));
-const Mdi = lazy(() => import("./icons/Mdi"));
-const ChartJs = lazy(() => import("./charts/ChartJs"));
 const Error404 = lazy(() => import("./error-pages/Error404"));
 const Error500 = lazy(() => import("./error-pages/Error500"));
 const Login = lazy(() => import("./user-pages/Login"));
-const Register1 = lazy(() => import("./user-pages/Register"));
-
+const GestioneCommessaUI = lazy(
+  () => import("./produzione/GestioneCommessaUI"),
+);
 class AppRoutes extends Component {
   render() {
     const isLoggedIn = localStorage.getItem("isLogin");
@@ -25,26 +27,28 @@ class AppRoutes extends Component {
     return (
       <Suspense fallback={<Spinner />}>
         <Switch>
-          {/* Login e Registrazione accessibili sempre */}
           <Route path="/user-pages/login-1" component={Login} />
-
-          {/* Se non loggato, redirect alla login */}
           {!isLoggedIn && <Redirect to="/user-pages/login-1" />}
-
-          {/* Tutte le altre rotte (protette) */}
           <Route exact path="/dashboard" component={Dashboard} />
           <Route path="/basic-ui/buttons" component={Buttons} />
           <Route path="/basic-ui/dropdowns" component={Dropdowns} />
           <Route path="/gare/upcoming" component={GareUpcoming} />
           <Route path="/gestione/commesse" component={GestioneCommesse} />
+          <Route path="/gestione/dashboard" component={DashboardOre} />
           <Route path="/tecnico/dashboard" component={DashboardPanoramica} />
+          <Route path="/produzione/cordinamento" component={Cordinamento} />
+          <Route path="/produzione/dashboard" component={PanoramicaDashboard} />
+          <Route
+            path="/produzione/gestionecommessa"
+            component={GestioneCommessaUI}
+          />
+
           <Route path="/tables/basic-table" component={BasicTable} />
           <Route path="/icons/mdi" component={BasicTable} />
           <Route path="/charts/chart-js" component={BasicTable} />
           <Route path="/error-pages/error-404" component={Error404} />
           <Route path="/error-pages/error-500" component={Error500} />
           <Route path="/basic-ui/newsuer" component={UserManagementDrawer} />
-          {/* Default redirect se il path non è riconosciuto */}
           <Redirect to="/user-pages/login-1" />
         </Switch>
       </Suspense>

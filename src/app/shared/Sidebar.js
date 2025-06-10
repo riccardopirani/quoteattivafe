@@ -20,14 +20,26 @@ const permessiPersonalizzati = [
     icon: "mdi mdi-crosshairs-gps",
   },
   {
-    label: " Tecnico",
+    label: "Tecnico",
     key: "AccessoCantieri",
-    route: "/form-elements",
+    route: "/tecnico/dashboard",
     subMenu: [
       { label: "Dashboard", to: "/tecnico/dashboard" },
       { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
     ],
     menuKey: "tecnicoMenuOpen",
+    icon: "mdi mdi-format-list-bulleted",
+  },
+  {
+    label: "Produzione",
+    key: "AccessoArticoli",
+    route: "/produzione/dashboard",
+    subMenu: [
+      { label: "Cordinamento", to: "/produzione/cordinamento" },
+      { label: "Dashboard", to: "/produzione/dashboard" },
+      { label: "Gestione Commessa", to: "/produzione/gestionecommessa" },
+    ],
+    menuKey: "ProduzioneMenuOpen",
     icon: "mdi mdi-format-list-bulleted",
   },
   {
@@ -57,7 +69,7 @@ const permessiPersonalizzati = [
   {
     label: "Anagrafica",
     key: "AccessoArticoli",
-    route: "/form-elements",
+    route: "/basic-ui/newsuer",
     subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
     menuKey: "gestioneMenuOpen",
     icon: "mdi mdi-account-box-outline",
@@ -224,25 +236,29 @@ class Sidebar extends Component {
                   }
                 >
                   {subMenu.length > 0 ? (
-                    <div
+                    <Link
+                      to={route}
                       className={
                         menuStates[menuKey]
                           ? "nav-link menu-expanded green-hover"
                           : "nav-link green-hover"
                       }
-                      onClick={() => {
+                      onClick={(e) => {
+                        // Permette il redirect + toggle del menu
+                        e.preventDefault(); // evita doppia navigazione istantanea
                         this.toggleMenuState(menuKey);
                         const cleanLabel = label.replace(/^Accesso\s+/i, "");
                         localStorage.setItem("selectedMenuLabel", cleanLabel);
                         window.dispatchEvent(
                           new Event("selectedMenuLabelChanged"),
                         );
+                        this.props.history.push(route); // naviga esplicitamente
                       }}
                     >
                       <i className={`${icon} menu-icon`}></i>
                       <span className="menu-title text-green">{label}</span>
                       <i className="menu-arrow"></i>
-                    </div>
+                    </Link>
                   ) : (
                     <Link className="nav-link green-hover" to={route}>
                       <i className={`${icon} menu-icon`}></i>
