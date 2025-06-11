@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import moment from "moment";
 import "moment/locale/it";
+import axios from "axios";
 import { BASE_URL } from "../services/api";
 import CantiereService from "../services/cantiere";
 moment.locale("it");
@@ -78,57 +79,95 @@ const Cordinamento = () => {
   };
 
   useEffect(() => {
-    const fetchUtenti = async () => {
-      try {
-        const res = await fetch(BASE_URL + `/RisorseUmane/CaricaRisorse`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        const data = await res.json();
-        setUtenti(data);
-      } catch (error) {
-        console.error("Errore nel caricamento utenti:", error);
-      }
-    };
-
-    const fetchCommesse = async () => {
-      try {
-        const dati = await CantiereService.ricercaCantieri({});
-        const datiRisorse = await CantiereService.caricaAttivita({});
-        setCommesse(dati);
-        console.log(datiRisorse);
-        setRisorseGlobali(datiRisorse);
-      } catch (error) {
-        console.error("Errore nel caricamento commesse:", error);
-      }
-    };
-
     fetchUtenti();
     fetchCommesse();
   }, []);
 
-  const handleCommessaChange = (userId, dayIndex, value) => {
-    setAssegnazioni((prev) => ({
-      ...prev,
-      [`${userId}-${dayIndex}`]: value,
-    }));
+  const fetchUtenti = async () => {
+    try {
+      const res = await fetch(BASE_URL + `/RisorseUmane/CaricaRisorse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      setUtenti(data);
+    } catch (error) {
+      console.error("Errore nel caricamento utenti:", error);
+    }
   };
 
-  const renderCommessaDropdown = (userId, dayIndex) => (
-    <select
-      style={dropdownStyle}
-      value={assegnazioni[`${userId}-${dayIndex}`] || ""}
-      onChange={(e) => handleCommessaChange(userId, dayIndex, e.target.value)}
-    >
-      <option value="">-- Seleziona --</option>
-      {commesse.map((c) => (
-        <option key={c.IdCantiere} value={c.IdCantiere}>
-          {c.NomeCantiere} - {c.RagioneSociale}
-        </option>
-      ))}
-    </select>
-  );
+  const fetchCommesse = async () => {
+    try {
+      const dati = await CantiereService.ricercaCantieri({});
+      const datiRisorse = await CantiereService.caricaAttivita({});
+      setCommesse(dati);
+      console.log(datiRisorse);
+      setRisorseGlobali(datiRisorse);
+    } catch (error) {
+      console.error("Errore nel caricamento commesse:", error);
+    }
+  };
+  const renderCommessaDropdown = (userId, dayIndex) => {
+    const handleDropdownChange = async (e) => {
+      const value = e.target.value;
+      const key = `${userId}-${dayIndex}`;
+      const selectedDate = moment()
+        .startOf("isoWeek")
+        .add(dayIndex, "days")
+        .format("YYYY-MM-DD");
+
+      setAssegnazioni((prev) => ({
+        ...prev,
+        [key]: value,
+      }));
+
+      if (value) {
+        try {
+          const idUser = localStorage.getItem("userId"); // <-- Corretto: get, non set
+
+          await axios.post(
+            `${BASE_URL}/attivita/add`,
+            {
+              IdCantiere: parseInt(value),
+              IdUtente: userId,
+              DataInizio: selectedDate,
+              DataFine: selectedDate,
+              Descrizione: "Assegnazione da frontend",
+              IdUtenteSend: idUser,
+            },
+            {
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+
+          console.log(
+            `Assegnazione salvata per utente ${userId} al giorno ${selectedDate}`
+          );
+
+          // 🔁 REFRESH DATI
+          await fetchCommesse();
+        } catch (err) {
+          console.error("Errore salvataggio attività:", err);
+        }
+      }
+    };
+
+    return (
+      <select
+        style={dropdownStyle}
+        value={assegnazioni[`${userId}-${dayIndex}`] || ""}
+        onChange={handleDropdownChange}
+      >
+        <option value="">-- Seleziona --</option>
+        {commesse.map((c) => (
+          <option key={c.IdCantiere} value={c.IdCantiere}>
+            {c.NomeCantiere} - {c.RagioneSociale}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 20 }}>
