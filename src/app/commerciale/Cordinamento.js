@@ -52,7 +52,7 @@ const Cordinamento = () => {
   useEffect(() => {
     const startOfWeek = moment().startOf("isoWeek");
     const days = Array.from({ length: 7 }, (_, i) =>
-      startOfWeek.clone().add(i, "days").format("ddd D MMMM"),
+      startOfWeek.clone().add(i, "days").format("ddd D MMMM")
     );
     setWeekDays(days);
   }, []);
@@ -67,8 +67,8 @@ const Cordinamento = () => {
             act.DataInizio,
             act.DataFine,
             "day",
-            "[]",
-          ),
+            "[]"
+          )
       );
 
     if (!activity) return null;
@@ -177,21 +177,30 @@ const Cordinamento = () => {
                     <td style={cellStyle}>
                       {user.Nome} {user.Cognome}
                     </td>
-                    {weekDays.map((day, j) => (
-                      <td key={j} style={j >= 5 ? redCellStyle : cellStyle}>
-                        {renderCommessaDropdown(user.IdUtente, j)}
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "green",
-                            fontWeight: "normal",
-                            marginTop: 4,
-                          }}
-                        >
-                          {getNomeCantiereForUserDay(user.IdUtente, day)}
-                        </div>
-                      </td>
-                    ))}
+                    {weekDays.map((day, j) => {
+                      const nomeCantiere = getNomeCantiereForUserDay(
+                        user.IdUtente,
+                        day
+                      );
+                      return (
+                        <td key={j} style={j >= 5 ? redCellStyle : cellStyle}>
+                          {!nomeCantiere &&
+                            renderCommessaDropdown(user.IdUtente, j)}
+                          {nomeCantiere && (
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "green",
+                                fontWeight: "normal",
+                                marginTop: 4,
+                              }}
+                            >
+                              {nomeCantiere}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
