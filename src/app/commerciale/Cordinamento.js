@@ -48,14 +48,34 @@ const Cordinamento = () => {
   ]);
   const [commesse, setCommesse] = useState([]);
   const [assegnazioni, setAssegnazioni] = useState({});
-
+  const [risorseGlobal, setRisorseGlobali] = useState({});
   useEffect(() => {
     const startOfWeek = moment().startOf("isoWeek");
     const days = Array.from({ length: 7 }, (_, i) =>
-      startOfWeek.clone().add(i, "days").format("ddd D MMMM"),
+      startOfWeek.clone().add(i, "days").format("ddd D MMMM")
     );
     setWeekDays(days);
   }, []);
+
+  const getNomeCantiereForUserDay = (userId, date) => {
+    const activity = Object.values(risorseGlobal)
+      .flat()
+      .find(
+        (act) =>
+          act.IdUtente === userId &&
+          moment(date, "ddd D MMMM").isBetween(
+            act.DataInizio,
+            act.DataFine,
+            "day",
+            "[]"
+          )
+      );
+
+    if (!activity) return null;
+
+    const commessa = commesse.find((c) => c.IdCantiere === activity.IdCantiere);
+    return commessa ? "Presenza in: " + commessa.NomeCantiere : null;
+  };
 
   useEffect(() => {
     const fetchUtenti = async () => {
@@ -75,7 +95,10 @@ const Cordinamento = () => {
     const fetchCommesse = async () => {
       try {
         const dati = await CantiereService.ricercaCantieri({});
+        const datiRisorse = await CantiereService.caricaAttivita({});
         setCommesse(dati);
+        console.log(datiRisorse);
+        setRisorseGlobali(datiRisorse);
       } catch (error) {
         console.error("Errore nel caricamento commesse:", error);
       }
@@ -154,9 +177,19 @@ const Cordinamento = () => {
                     <td style={cellStyle}>
                       {user.Nome} {user.Cognome}
                     </td>
-                    {weekDays.map((_, j) => (
+                    {weekDays.map((day, j) => (
                       <td key={j} style={j >= 5 ? redCellStyle : cellStyle}>
                         {renderCommessaDropdown(user.IdUtente, j)}
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "green",
+                            fontWeight: "normal",
+                            marginTop: 4,
+                          }}
+                        >
+                          {getNomeCantiereForUserDay(user.IdUtente, day)}
+                        </div>
                       </td>
                     ))}
                   </tr>

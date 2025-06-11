@@ -53,7 +53,7 @@ const permessiPersonalizzati = [
   {
     label: "Gestione",
     key: "AccessoArticoli",
-    route: "/form-elements",
+    route: "/basic-ui/newsuer",
     subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
     menuKey: "gestioneMenuOpen",
     icon: "mdi mdi-account-box-outline",
