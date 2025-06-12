@@ -53,7 +53,7 @@ const Cordinamento = () => {
   useEffect(() => {
     const startOfWeek = moment().startOf("isoWeek");
     const days = Array.from({ length: 7 }, (_, i) =>
-      startOfWeek.clone().add(i, "days").format("ddd D MMMM")
+      startOfWeek.clone().add(i, "days").format("ddd D MMMM"),
     );
     setWeekDays(days);
   }, []);
@@ -68,8 +68,8 @@ const Cordinamento = () => {
             act.DataInizio,
             act.DataFine,
             "day",
-            "[]"
-          )
+            "[]",
+          ),
       );
 
     if (!activity) return null;
@@ -138,11 +138,11 @@ const Cordinamento = () => {
             },
             {
               headers: { "Content-Type": "application/json" },
-            }
+            },
           );
 
           console.log(
-            `Assegnazione salvata per utente ${userId} al giorno ${selectedDate}`
+            `Assegnazione salvata per utente ${userId} al giorno ${selectedDate}`,
           );
 
           // 🔁 REFRESH DATI
@@ -219,7 +219,7 @@ const Cordinamento = () => {
                     {weekDays.map((day, j) => {
                       const nomeCantiere = getNomeCantiereForUserDay(
                         user.IdUtente,
-                        day
+                        day,
                       );
                       return (
                         <td key={j} style={j >= 5 ? redCellStyle : cellStyle}>
