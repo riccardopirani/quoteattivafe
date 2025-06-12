@@ -92,6 +92,7 @@ export default function GestioneCommessaUI() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [editData, setEditData] = useState(null); // null = creazione
   const [isLoadingApprestamenti, setIsLoadingApprestamenti] = useState(false);
+  const [datiUtenze, setDatiUtenze] = useState([]);
 
   const [datiApprestamenti, setDatiApprestamenti] = useState([]);
 
@@ -99,16 +100,21 @@ export default function GestioneCommessaUI() {
     setIsLoadingApprestamenti(true);
     try {
       const dati = await DatiProduzioneService.carica();
-      console.log("Risposta DatiProduzioneService.carica():", dati);
       if (Array.isArray(dati)) {
-        const filtrati = dati.filter((d) => d.IdCantiere === IdCantiere);
-        setDatiApprestamenti(filtrati);
+        const filtratiApprestamenti = dati.filter(
+          (d) => d.IdCantiere === IdCantiere && d.Tipo === "APPRESTAMENTI",
+        );
+        const filtratiUtenze = dati.filter(
+          (d) => d.IdCantiere === IdCantiere && d.Tipo === "UTENZE",
+        );
+        setDatiApprestamenti(filtratiApprestamenti);
+        setDatiUtenze(filtratiUtenze);
       } else {
-        console.warn("La risposta non è un array:", dati);
-        setDatiApprestamenti([]); // fallback
+        setDatiApprestamenti([]);
+        setDatiUtenze([]);
       }
     } catch (err) {
-      console.error("Errore nel caricamento apprestamenti:", err);
+      console.error("Errore nel caricamento:", err);
     } finally {
       setIsLoadingApprestamenti(false);
     }
@@ -183,13 +189,17 @@ export default function GestioneCommessaUI() {
     const form = new FormData(e.target);
     const data = Object.fromEntries(form.entries());
 
+    // Esempio: valore determinato dinamicamente (può provenire da stato, form, ecc.)
+    const isApprestamento = data.Tipo === "APPRESTAMENTI"; // oppure da uno stato, es. `tipoSelezionato`
+
     const payload = {
       ...data,
       IdCantiere: selectedCommessa?.IdCantiere,
+      Tipo: isApprestamento ? "APPRESTAMENTI" : "UTENZE", // ✅ logica condizionale
     };
 
     try {
-      if (editData) {
+      if (editData && !editData.isNew) {
         await DatiProduzioneService.aggiorna({ ...editData, ...payload });
       } else {
         await DatiProduzioneService.inserisci(payload);
@@ -197,6 +207,7 @@ export default function GestioneCommessaUI() {
 
       setEditData(null); // reset pulito
       setShowDrawer(false);
+
       await caricaApprestamenti(selectedCommessa?.IdCantiere);
     } catch (err) {
       console.error("Errore salvataggio:", err);
@@ -445,9 +456,10 @@ export default function GestioneCommessaUI() {
 
       {selectedTab === "GeneraCantiere" && selectedCommessa && (
         <>
+          {/* Sezione Apprestamenti */}
           <div style={styles.sectionTitle}>APPRESTAMENTI DI CANTIERE</div>
           <button
-            onClick={() => openDrawer(null)}
+            onClick={() => openDrawer({ Tipo: "APPRESTAMENTI" })}
             style={{
               backgroundColor: "#00b050",
               color: "white",
@@ -485,6 +497,77 @@ export default function GestioneCommessaUI() {
               </thead>
               <tbody>
                 {datiApprestamenti.map((item, i) => (
+                  <tr key={i}>
+                    <td style={styles.td}>{item.Descrizione}</td>
+                    <td style={styles.td}>
+                      {item.DataInstallazione &&
+                        moment(item.DataInstallazione).format("YYYY-MM-DD")}
+                    </td>
+                    <td style={styles.td}>{item.Fornitore}</td>
+                    <td style={styles.td}>{item.Quantita}</td>
+                    <td style={styles.td}>{item.ArchivioCDP}</td>
+                    <td style={styles.td}>
+                      {item.Dal && moment(item.Dal).format("YYYY-MM-DD")}
+                    </td>
+                    <td style={styles.td}>
+                      {item.Al && moment(item.Al).format("YYYY-MM-DD")}
+                    </td>
+                    <td style={styles.td}>{item.WBS}</td>
+                    <td style={styles.td}>
+                      <button
+                        onClick={() => openDrawer(item)}
+                        style={styles.greenButton}
+                      >
+                        Modifica
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {/* Sezione Utenze */}
+          <div style={styles.sectionTitle}>UTENZE DI CANTIERE</div>
+          <button
+            onClick={() => openDrawer({ Tipo: "UTENZE", isNew: true })}
+            style={{
+              backgroundColor: "#00b050",
+              color: "white",
+              padding: "10px",
+              marginBottom: "10px",
+            }}
+          >
+            + Nuova Utenza
+          </button>
+
+          {isLoadingApprestamenti ? (
+            <div
+              style={{
+                padding: "1rem",
+                textAlign: "center",
+                fontStyle: "italic",
+              }}
+            >
+              Caricamento in corso...
+            </div>
+          ) : (
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>DESCRIZIONE</th>
+                  <th style={styles.th}>DATA INSTALLAZIONE</th>
+                  <th style={styles.th}>FORNITORE</th>
+                  <th style={styles.th}>Q.TÀ</th>
+                  <th style={styles.th}>ARCHIVIO CDP</th>
+                  <th style={styles.th}>DAL</th>
+                  <th style={styles.th}>AL</th>
+                  <th style={styles.th}>WBS</th>
+                  <th style={styles.th}>AZIONI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {datiUtenze.map((item, i) => (
                   <tr key={i}>
                     <td style={styles.td}>{item.Descrizione}</td>
                     <td style={styles.td}>
