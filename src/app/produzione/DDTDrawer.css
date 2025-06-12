@@ -1,0 +1,57 @@
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 100%;
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 500px;
+  max-width: 90%;
+  background-color: #fff;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.drawer-close {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  float: right;
+  cursor: pointer;
+}
+
+.ddt-preview {
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+}
+
+.annotation-canvas {
+  border: 1px solid #999;
+  width: 100%;
+  max-width: 500px;
+  background-color: #f9f9f9;
+  cursor: crosshair;
+}
+
+.canvas-controls {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+.canvas-controls button {
+  padding: 8px 16px;
+  font-weight: bold;
+  border: none;
+  background-color: #00b050;
+  color: white;
+  cursor: pointer;
+}

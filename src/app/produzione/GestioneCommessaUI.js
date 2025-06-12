@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
 import DatiProduzioneService from "../services/datiproduzione";
@@ -6,7 +6,8 @@ import moment from "moment";
 import "moment/locale/it";
 import { BASE_URL } from "../services/api";
 import "sweetalert2/dist/sweetalert2.min.css";
-
+import "./DDTDrawer.css";
+import { ReactSketchCanvas } from "react-sketch-canvas";
 import { Approvvigionamenti, CDP } from "../commerciale/Gestione";
 moment.locale("it");
 
@@ -86,6 +87,160 @@ const styles = {
     fontWeight: "bold",
   },
 };
+
+function hexToBase64(hexString) {
+  const hex = hexString.toString().replace(/\r|\n/g, "");
+  const binary = hex
+    .match(/.{1,2}/g)
+    .map((byte) => String.fromCharCode(parseInt(byte, 16)))
+    .join("");
+  return btoa(binary);
+}
+function DDTDrawer({ open, onClose, base64DDT, onSaveDDT }) {
+  const canvasRef = useRef(null);
+  const isDrawing = useRef(false);
+
+  useEffect(() => {
+    if (!open) {
+      clearCanvas();
+    }
+  }, [open]);
+
+  const startDrawing = (e) => {
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.beginPath();
+    ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    isDrawing.current = true;
+  };
+
+  const draw = (e) => {
+    if (!isDrawing.current) return;
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    isDrawing.current = false;
+  };
+
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const handleSave = () => {
+    const canvas = canvasRef.current;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const compositeCanvas = document.createElement("canvas");
+    compositeCanvas.width = width;
+    compositeCanvas.height = height;
+    const ctx = compositeCanvas.getContext("2d");
+
+    const img = new Image();
+    img.onload = () => {
+      // 1. Disegna l'immagine originale come sfondo
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // 2. Disegna sopra ciò che è stato tracciato nel canvas
+      ctx.drawImage(canvas, 0, 0);
+
+      // 3. Estrai il risultato finale in base64
+      const mergedBase64 = compositeCanvas.toDataURL("image/jpeg"); // o "image/png" se preferisci
+
+      const cleanBase64 = mergedBase64.replace(/^data:image\/jpeg;base64,/, "");
+
+      if (typeof onSaveDDT === "function") {
+        onSaveDDT(cleanBase64);
+      }
+
+      onClose();
+    };
+
+    img.onerror = () => {
+      console.error("Errore nel caricamento dell'immagine DDT.");
+    };
+
+    // Carica l’immagine originale dal base64
+    img.src = `data:image/jpeg;base64,${base64DDT}`;
+  };
+
+
+  if (!open) return null;
+
+  return (
+    <div className="drawer-overlay">
+      <div className="drawer-panel">
+        <button className="drawer-close" onClick={onClose}>
+          ✕
+        </button>
+        <h2>Visualizza DDT</h2>
+
+        <div
+          className="ddt-preview-wrapper"
+          style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: "100%",
+            height: "300px",
+            border: "1px solid #ccc",
+            marginBottom: "20px",
+          }}
+        >
+          {typeof base64DDT === "string" && base64DDT.length > 100 ? (
+            <>
+              <img
+                src={`data:image/jpeg;base64,${base64DDT}`}
+                alt="DDT"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+              <canvas
+                ref={canvasRef}
+                width={500}
+                height={300}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "auto",
+                }}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
+            </>
+          ) : (
+            <p style={{ color: "red" }}>DDT non disponibile o non valido.</p>
+          )}
+        </div>
+
+        <div
+          className="canvas-controls"
+          style={{ display: "flex", gap: "10px" }}
+        >
+          <button onClick={clearCanvas}>Pulisci</button>
+          <button onClick={handleSave}>Salva</button>
+          <button onClick={onClose}>Chiudi</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GestioneCommessaUI() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredOptions, setFilteredOptions] = useState([]);
@@ -757,7 +912,37 @@ function CommessaSilo({ commessa }) {
   const [noleggi, setNoleggi] = useState([]);
   const [aziende, setAziende] = useState([]);
   const [wbsOptions, setWbsOptions] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [ddtData, setDdtData] = useState(null);
+  const [sigPad, setSigPad] = useState(null);
 
+  const apriDrawerDDT = (base64) => {
+    console.log("DDT cliccato. Base64 ricevuto:", base64?.substring(0, 30));
+
+    if (base64 && typeof base64 === "string" && base64.length > 100) {
+      setDdtData(base64);
+      setDrawerOpen(true);
+    } else {
+      console.warn("Base64 non valido o assente");
+    }
+  };
+
+  const [canvasRef, setCanvasRef] = useState(null);
+
+  const salvaAnnotazione = async () => {
+    if (canvasRef) {
+      const image = await canvasRef.exportImage("png");
+      console.log("Annotazione salvata:", image);
+      // Salva o invia l'immagine al backend
+    }
+  };
+
+  const getDdtCellStyle = (ddt) => ({
+    color: "white",
+    backgroundColor: ddt ? "green" : "red",
+    textAlign: "center",
+    cursor: ddt ? "pointer" : "default",
+  });
   const [datiGenerali2, setDatiGenerali2] = useState({
     statoDinamico: "BLOCCATO",
   });
@@ -818,8 +1003,22 @@ function CommessaSilo({ commessa }) {
         mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno),
       );
 
-      const manodoperaFiltrata = tutteRisorse
-        .filter((r) => ["Attiv.A", "Manodopera"].includes(r.Tipologia))
+      const manodoperaFiltrata = tutteRisorse.map((r) => {
+        const costo = mappaCostoInterno.get(r.IdUtente) ?? 0;
+        const ore = formatTimeFromISOString(r.OreFine);
+        const oreDecimali = convertHHMMToDecimal(ore);
+        return {
+          ...r,
+          PUnit: costo,
+          OreFormattate: ore,
+          PTot: (costo * oreDecimali).toFixed(2),
+          IdRisorseUmane: r.IdRisorseUmane, // ← Assicurati che esista
+          WBS: r.WBS, // ← Questa è cruciale per visualizzare il valore nel select
+        };
+      });
+
+      const noleggiFiltrati = tutteRisorse
+        .filter((r) => r.Tipologia === "Noleggio")
         .map((r) => {
           const costo = mappaCostoInterno.get(r.IdUtente) ?? 0;
           const ore = formatTimeFromISOString(r.OreFine);
@@ -834,9 +1033,6 @@ function CommessaSilo({ commessa }) {
           };
         });
 
-      const noleggiFiltrati = tutteRisorse.filter(
-        (r) => r.Tipologia === "Noleggio",
-      );
       const aziendeFiltrate = tutteRisorse.filter(
         (r) => r.Tipologia === "Aziende",
       );
@@ -901,6 +1097,7 @@ function CommessaSilo({ commessa }) {
               <td style={tdStyle}>{formatTimeFromISOString(r.OreFine)}</td>
               <td style={tdStyle}>{r.PUnit}</td>
               <td style={tdStyle}>{r.PTot}</td>
+
               <td style={tdStyle}>
                 <select
                   value={r.WBS || ""}
@@ -910,6 +1107,7 @@ function CommessaSilo({ commessa }) {
                       CantiereService.aggiornaWBS({
                         IdRisorsa: r.IdRisorseUmane,
                         WBS: nuovoValore,
+                        DDT: r.ddt
                       })
                         .then(async () => {
                           await caricaRisorse();
@@ -933,7 +1131,12 @@ function CommessaSilo({ commessa }) {
                 </select>
               </td>
 
-              <td style={tdStyle}>Visualizza/Modifica DDT</td>
+              <td
+                style={getDdtCellStyle(r.ddt)}
+                onClick={() => r.ddt && apriDrawerDDT(r.ddt)}
+              >
+                Visualizza/ModificaDDT
+              </td>
               <td style={tdStyle}>{r.Stato ? r.Stato : "INATTESA"}</td>
               <td style={tdStyle}>Registro</td>
             </tr>
@@ -980,13 +1183,24 @@ function CommessaSilo({ commessa }) {
               <td style={tdStyle}>
                 <select
                   value={r.WBS || ""}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const nuovoValore = e.target.value;
-                    setManodopera((prev) =>
-                      prev.map((item, idx) =>
-                        idx === i ? { ...item, WBS: nuovoValore } : item,
-                      ),
-                    );
+                    if (r.IdRisorseUmane && nuovoValore) {
+                      CantiereService.aggiornaWBS({
+                        IdRisorsa: r.IdRisorseUmane,
+                        WBS: nuovoValore,
+                        DDT: r.ddt
+                      })
+                        .then(async () => {
+                          await caricaRisorse();
+                        })
+                        .catch((err) =>
+                          console.error(
+                            "Errore durante aggiornamento WBS:",
+                            err,
+                          ),
+                        );
+                    }
                   }}
                   style={{ width: "100%" }}
                 >
@@ -999,7 +1213,12 @@ function CommessaSilo({ commessa }) {
                 </select>
               </td>
 
-              <td style={tdStyle}>Visualizza/Modifica DDT</td>
+              <td
+                style={getDdtCellStyle(r.ddt)}
+                onClick={() => r.ddt && apriDrawerDDT(r.ddt)}
+              >
+                Visualizza/Modifica DDT
+              </td>
               <td style={tdStyle}>{r.Stato ? r.Stato : "INATTESA"}</td>
               <td style={tdStyle}>Registro</td>
             </tr>
@@ -1039,13 +1258,54 @@ function CommessaSilo({ commessa }) {
               <td style={tdStyle}>{r.Descrizione}</td>
               <td style={tdStyle}>{formatTimeFromISOString(r.OreFine)}</td>
 
-              <td style={tdStyle}>Visualizza/Modifica DDT</td>
+              <td
+                style={getDdtCellStyle(r.ddt)}
+                onClick={() => r.ddt && apriDrawerDDT(r.ddt)}
+              >
+                Visualizza/Modifica DDT
+              </td>
               <td style={tdStyle}>{r.Stato ? r.Stato : "INATTESA"}</td>
               <td style={tdStyle}>Registro</td>
             </tr>
           ))}
         </tbody>
       </table>
+      {drawerOpen &&
+        ddtData &&
+        typeof ddtData === "string" &&
+        ddtData.length > 100 && (
+              <DDTDrawer
+                  open={drawerOpen}
+                  onClose={() => setDrawerOpen(false)}
+                  base64DDT={ddtData}
+                  onSaveDDT={async (newBase64Image) => {
+                    try {
+                      // Trova la riga da aggiornare (manodopera, noleggi o aziende)
+                      const allRecords = [...manodopera, ...noleggi, ...aziende];
+                      const risorsa = allRecords.find((r) => r.ddt === ddtData);
+
+                      if (!risorsa) {
+                        console.warn("Nessuna risorsa trovata per DDT");
+                        return;
+                      }
+
+                      await CantiereService.aggiornaWBS({
+                        IdRisorsa: risorsa.IdRisorseUmane,
+                        WBS: risorsa.WBS,
+                        DDT: newBase64Image, // aggiorniamo DDT!
+                      });
+
+                      // Ricarica i dati
+                      await caricaRisorse();
+                      setDrawerOpen(false);
+                      setDdtData(null);
+                    } catch (err) {
+                      console.error("Errore durante salvataggio DDT:", err);
+                    }
+                  }}
+              />
+
+          )}
     </div>
   );
 }
