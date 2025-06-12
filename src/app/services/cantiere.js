@@ -2,16 +2,16 @@ import axios from "axios";
 import { BASE_URL } from "./api";
 
 const CantiereService = {
-  aggionawbs: async (data) => {
+  aggiornaWBS: async (data) => {
     try {
       const response = await axios.post(
-          `${BASE_URL}/risorse/aggionawbs`,
-          {},
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
+        `${BASE_URL}/risorse/aggionawbs`,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
           },
+        },
       );
 
       return response.data;

@@ -799,66 +799,65 @@ function CommessaSilo({ commessa }) {
     const minutes = date.getUTCMinutes().toString().padStart(2, "0");
     return `${minutes}:${hours}`;
   }
-  useEffect(() => {
-    async function caricaRisorse() {
-      try {
-        const tutteRisorse = await CantiereService.caricaRisorse({
-          IdCantiere: commessa.IdCantiere,
+  async function caricaRisorse() {
+    try {
+      const tutteRisorse = await CantiereService.caricaRisorse({
+        IdCantiere: commessa.IdCantiere,
+      });
+
+      const utentiRes = await fetch(`${BASE_URL}/RisorseUmane/CaricaRisorse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!utentiRes.ok)
+        throw new Error(`HTTP error! status: ${utentiRes.status}`);
+      const utenti = await utentiRes.json();
+
+      const mappaCostoInterno = new Map();
+      utenti.forEach((utente) =>
+        mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno),
+      );
+
+      const manodoperaFiltrata = tutteRisorse
+        .filter((r) => ["Attiv.A", "Manodopera"].includes(r.Tipologia))
+        .map((r) => {
+          const costo = mappaCostoInterno.get(r.IdUtente) ?? 0;
+          const ore = formatTimeFromISOString(r.OreFine);
+          const oreDecimali = convertHHMMToDecimal(ore);
+          return {
+            ...r,
+            PUnit: costo,
+            OreFormattate: ore,
+            PTot: (costo * oreDecimali).toFixed(2),
+            IdRisorseUmane: r.IdRisorseUmane, // ← Assicurati che esista
+            WBS: r.WBS, // ← Questa è cruciale per visualizzare il valore nel select
+          };
         });
 
-        const utentiRes = await fetch(
-          `${BASE_URL}/RisorseUmane/CaricaRisorse`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-        if (!utentiRes.ok)
-          throw new Error(`HTTP error! status: ${utentiRes.status}`);
-        const utenti = await utentiRes.json();
+      const noleggiFiltrati = tutteRisorse.filter(
+        (r) => r.Tipologia === "Noleggio",
+      );
+      const aziendeFiltrate = tutteRisorse.filter(
+        (r) => r.Tipologia === "Aziende",
+      );
 
-        const mappaCostoInterno = new Map();
-        utenti.forEach((utente) =>
-          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno),
-        );
+      setManodopera(manodoperaFiltrata);
+      setNoleggi(noleggiFiltrati);
+      setAziende(aziendeFiltrate);
 
-        const manodoperaFiltrata = tutteRisorse
-          .filter((r) => ["Attiv.A", "Manodopera"].includes(r.Tipologia))
-          .map((r) => {
-            const costo = mappaCostoInterno.get(r.IdUtente) ?? 0;
-            const ore = formatTimeFromISOString(r.OreFine);
-            const oreDecimali = convertHHMMToDecimal(ore);
-            return {
-              ...r,
-              PUnit: costo,
-              OreFormattate: ore,
-              PTot: (costo * oreDecimali).toFixed(2),
-            };
-          });
-
-        const noleggiFiltrati = tutteRisorse.filter(
-          (r) => r.Tipologia === "Noleggio",
-        );
-        const aziendeFiltrate = tutteRisorse.filter(
-          (r) => r.Tipologia === "Aziende",
-        );
-
-        setManodopera(manodoperaFiltrata);
-        setNoleggi(noleggiFiltrati);
-        setAziende(aziendeFiltrate);
-
-        const dettagli = await CantiereService.nodidettagli({
-          Codice: commessa.NomeCantiere,
-        });
-        const opzioni = dettagli
-          .filter((d) => !d.CodiceNodo.startsWith("R"))
-          .map((d) => d.CodiceNodo);
-        setWbsOptions(opzioni);
-      } catch (err) {
-        console.error("Errore nel caricamento risorse:", err);
-      }
+      const dettagli = await CantiereService.nodidettagli({
+        Codice: commessa.NomeCantiere,
+      });
+      const opzioni = dettagli
+        .filter((d) => !d.CodiceNodo.startsWith("R"))
+        .map((d) => d.CodiceNodo);
+      setWbsOptions(opzioni);
+    } catch (err) {
+      console.error("Errore nel caricamento risorse:", err);
     }
+  }
 
+  useEffect(() => {
     if (commessa?.IdCantiere) caricaRisorse();
   }, [commessa]);
 
@@ -905,13 +904,23 @@ function CommessaSilo({ commessa }) {
               <td style={tdStyle}>
                 <select
                   value={r.WBS || ""}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const nuovoValore = e.target.value;
-                    setManodopera((prev) =>
-                      prev.map((item, idx) =>
-                        idx === i ? { ...item, WBS: nuovoValore } : item,
-                      ),
-                    );
+                    if (r.IdRisorseUmane && nuovoValore) {
+                      CantiereService.aggiornaWBS({
+                        IdRisorsa: r.IdRisorseUmane,
+                        WBS: nuovoValore,
+                      })
+                        .then(async () => {
+                          await caricaRisorse();
+                        })
+                        .catch((err) =>
+                          console.error(
+                            "Errore durante aggiornamento WBS:",
+                            err,
+                          ),
+                        );
+                    }
                   }}
                   style={{ width: "100%" }}
                 >
