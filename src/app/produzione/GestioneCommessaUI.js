@@ -9,6 +9,7 @@ import "sweetalert2/dist/sweetalert2.min.css";
 
 import { Approvvigionamenti, CDP } from "../commerciale/Gestione";
 moment.locale("it");
+
 const styles = {
   container: {
     fontFamily: "Arial, sans-serif",
@@ -34,15 +35,16 @@ const styles = {
     backgroundColor: "white",
   },
   th: {
-    border: "1px solid #ccc",
     padding: "8px",
-    backgroundColor: "#dff0d8",
+    border: "1px solid #ccc",
     textAlign: "left",
-    verticalAlign: "middle",
+    fontWeight: "bold",
+    fontSize: "13px",
   },
   td: {
-    border: "1px solid #ccc",
     padding: "8px",
+    border: "1px solid #ccc",
+    fontSize: "13px",
     verticalAlign: "middle",
   },
   greenButton: {
@@ -89,12 +91,29 @@ export default function GestioneCommessaUI() {
   const [filteredOptions, setFilteredOptions] = useState([]);
   const [selectedCommessa, setSelectedCommessa] = useState(null);
   const [selectedTab, setSelectedTab] = useState("GeneraCantiere");
+  const [wbsOptions, setWbsOptions] = useState([]);
   const [showDrawer, setShowDrawer] = useState(false);
   const [editData, setEditData] = useState(null); // null = creazione
   const [isLoadingApprestamenti, setIsLoadingApprestamenti] = useState(false);
   const [datiUtenze, setDatiUtenze] = useState([]);
+  const [selectedWBS, setSelectedWBS] = useState("");
 
   const [datiApprestamenti, setDatiApprestamenti] = useState([]);
+
+  const caricaWbsOptions = async (codiceCantiere) => {
+    try {
+      const dettagli = await CantiereService.nodidettagli({
+        Codice: codiceCantiere,
+      });
+      const opzioni = dettagli
+        .filter((d) => !d.CodiceNodo.startsWith("R")) // ignora nodi 'R'
+        .map((d) => d.CodiceNodo);
+      setWbsOptions(opzioni);
+    } catch (err) {
+      console.error("Errore nel caricamento WBS:", err);
+      setWbsOptions([]);
+    }
+  };
 
   const caricaApprestamenti = async (IdCantiere) => {
     setIsLoadingApprestamenti(true);
@@ -102,7 +121,7 @@ export default function GestioneCommessaUI() {
       const dati = await DatiProduzioneService.carica();
       if (Array.isArray(dati)) {
         const filtratiApprestamenti = dati.filter(
-          (d) => d.IdCantiere === IdCantiere && d.Tipo === "APPRESTAMENTI",
+          (d) => d.IdCantiere === IdCantiere && d.Tipo === "ACCANTIERAMENTO",
         );
         const filtratiUtenze = dati.filter(
           (d) => d.IdCantiere === IdCantiere && d.Tipo === "UTENZE",
@@ -126,8 +145,12 @@ export default function GestioneCommessaUI() {
     }
   }, [selectedCommessa]);
 
-  const openDrawer = (data) => {
-    setEditData(data); // se `null`, è una creazione
+  const openDrawer = async (data) => {
+    if (selectedCommessa?.NomeCantiere) {
+      await caricaWbsOptions(selectedCommessa.NomeCantiere);
+    }
+    setEditData(data);
+    setSelectedWBS(data?.WBS || ""); // <<<< Qui imposti il valore iniziale
     setShowDrawer(true);
   };
 
@@ -190,12 +213,13 @@ export default function GestioneCommessaUI() {
     const data = Object.fromEntries(form.entries());
 
     // Esempio: valore determinato dinamicamente (può provenire da stato, form, ecc.)
-    const isApprestamento = data.Tipo === "APPRESTAMENTI"; // oppure da uno stato, es. `tipoSelezionato`
+    const isApprestamento = data.Tipo === "ACCANTIERAMENTO"; // oppure da uno stato, es. `tipoSelezionato`
 
     const payload = {
       ...data,
       IdCantiere: selectedCommessa?.IdCantiere,
-      Tipo: isApprestamento ? "APPRESTAMENTI" : "UTENZE", // ✅ logica condizionale
+      Tipo: editData?.Tipo || "UTENZE", // fallback per sicurezza
+      WBS: selectedWBS,
     };
 
     try {
@@ -266,7 +290,6 @@ export default function GestioneCommessaUI() {
               { label: "Archivio CDP", name: "ArchivioCDP", type: "text" },
               { label: "Dal", name: "Dal", type: "date" },
               { label: "Al", name: "Al", type: "date" },
-              { label: "WBS", name: "WBS", type: "text" },
             ].map(({ label, name, type, required }) => (
               <div key={name} style={{ marginBottom: "1rem" }}>
                 <label style={{ display: "block", fontWeight: 600 }}>
@@ -291,9 +314,33 @@ export default function GestioneCommessaUI() {
                 />
               </div>
             ))}
+            <div>
+              <label style={{ display: "block", fontWeight: 600 }}>WBS</label>
+              <select
+                name="WBS"
+                value={selectedWBS}
+                onChange={(e) => setSelectedWBS(e.target.value)}
+                required
+                style={{
+                  width: "100%",
+                  padding: "0.6rem",
+                  borderRadius: 6,
+                  border: "1px solid #cde5d4",
+                  fontSize: "0.9rem",
+                }}
+              >
+                <option value="">Seleziona WBS</option>
+                {wbsOptions.map((wbs) => (
+                  <option key={wbs} value={wbs}>
+                    {wbs}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div
               style={{
+                marginTop: "50px",
                 display: "flex",
                 justifyContent: editData ? "space-between" : "flex-end",
                 gap: "0.5rem",
@@ -456,147 +503,227 @@ export default function GestioneCommessaUI() {
 
       {selectedTab === "GeneraCantiere" && selectedCommessa && (
         <>
-          {/* Sezione Apprestamenti */}
-          <div style={styles.sectionTitle}>APPRESTAMENTI DI CANTIERE</div>
-          <button
-            onClick={() => openDrawer({ Tipo: "APPRESTAMENTI" })}
-            style={{
-              backgroundColor: "#00b050",
-              color: "white",
-              padding: "10px",
-              marginBottom: "10px",
-            }}
-          >
-            + Nuovo
-          </button>
-
-          {isLoadingApprestamenti ? (
-            <div
+          <div style={{ marginBottom: "10px", display: "flex", gap: "20px" }}>
+            <button
+              onClick={() =>
+                openDrawer({ Tipo: "ACCANTIERAMENTO", isNew: true })
+              }
               style={{
-                padding: "1rem",
-                textAlign: "center",
-                fontStyle: "italic",
+                backgroundColor: "#00b050",
+                color: "white",
+                padding: "10px",
+                fontWeight: "bold",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
               }}
             >
-              Caricamento in corso...
-            </div>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>DESCRIZIONE</th>
-                  <th style={styles.th}>DATA INSTALLAZIONE</th>
-                  <th style={styles.th}>FORNITORE</th>
-                  <th style={styles.th}>Q.TÀ</th>
-                  <th style={styles.th}>ARCHIVIO CDP</th>
-                  <th style={styles.th}>DAL</th>
-                  <th style={styles.th}>AL</th>
-                  <th style={styles.th}>WBS</th>
-                  <th style={styles.th}>AZIONI</th>
-                </tr>
-              </thead>
-              <tbody>
-                {datiApprestamenti.map((item, i) => (
-                  <tr key={i}>
-                    <td style={styles.td}>{item.Descrizione}</td>
-                    <td style={styles.td}>
-                      {item.DataInstallazione &&
-                        moment(item.DataInstallazione).format("YYYY-MM-DD")}
-                    </td>
-                    <td style={styles.td}>{item.Fornitore}</td>
-                    <td style={styles.td}>{item.Quantita}</td>
-                    <td style={styles.td}>{item.ArchivioCDP}</td>
-                    <td style={styles.td}>
-                      {item.Dal && moment(item.Dal).format("YYYY-MM-DD")}
-                    </td>
-                    <td style={styles.td}>
-                      {item.Al && moment(item.Al).format("YYYY-MM-DD")}
-                    </td>
-                    <td style={styles.td}>{item.WBS}</td>
-                    <td style={styles.td}>
-                      <button
-                        onClick={() => openDrawer(item)}
-                        style={styles.greenButton}
-                      >
-                        Modifica
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+              + Nuovo ACCANTIERAMENTO
+            </button>
 
-          {/* Sezione Utenze */}
-          <div style={styles.sectionTitle}>UTENZE DI CANTIERE</div>
-          <button
-            onClick={() => openDrawer({ Tipo: "UTENZE", isNew: true })}
-            style={{
-              backgroundColor: "#00b050",
-              color: "white",
-              padding: "10px",
-              marginBottom: "10px",
-            }}
-          >
-            + Nuova Utenza
-          </button>
-
-          {isLoadingApprestamenti ? (
-            <div
+            <button
+              onClick={() => openDrawer({ Tipo: "UTENZE", isNew: true })}
               style={{
-                padding: "1rem",
-                textAlign: "center",
-                fontStyle: "italic",
+                backgroundColor: "#00b050",
+                color: "white",
+                padding: "10px",
+                fontWeight: "bold",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
               }}
             >
-              Caricamento in corso...
-            </div>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>DESCRIZIONE</th>
-                  <th style={styles.th}>DATA INSTALLAZIONE</th>
-                  <th style={styles.th}>FORNITORE</th>
-                  <th style={styles.th}>Q.TÀ</th>
-                  <th style={styles.th}>ARCHIVIO CDP</th>
-                  <th style={styles.th}>DAL</th>
-                  <th style={styles.th}>AL</th>
-                  <th style={styles.th}>WBS</th>
-                  <th style={styles.th}>AZIONI</th>
+              + Nuova Utenza
+            </button>
+          </div>
+
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontFamily: "Arial, sans-serif",
+            }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: "#f2f9f4" }}>
+                <th style={styles.th}>DESCRIZIONE</th>
+                <th style={styles.th}>DATA INSTALLAZIONE</th>
+                <th style={styles.th}>FORNITORE</th>
+                <th style={styles.th}>Q.TÀ</th>
+                <th style={styles.th}>ARCHIVIO CDP</th>
+                <th colSpan="3" style={{ ...styles.th, textAlign: "center" }}>
+                  GESTIONE NOLEGGI
+                </th>
+                <th style={styles.th}></th>
+              </tr>
+              <tr style={{ backgroundColor: "#f2f9f4" }}>
+                <th colSpan="5"></th>
+                <th style={styles.th}>DAL</th>
+                <th style={styles.th}>AL</th>
+                <th style={styles.th}>WBS</th>
+                <th style={styles.th}>GENERA CDP</th>
+              </tr>
+            </thead>
+
+            {/* Sezione 1: Accantieramento */}
+            <tbody>
+              <tr>
+                <td
+                  colSpan="9"
+                  style={{
+                    fontWeight: "bold",
+                    backgroundColor: "#ddd",
+                    padding: "8px",
+                    fontSize: "16px",
+                  }}
+                >
+                  <span style={{ fontSize: "18px", fontWeight: 600 }}>1) </span>
+                  <span
+                    style={{
+                      backgroundColor: "#f4e2e2",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    ACCANTIERAMENTO
+                  </span>
+                </td>
+              </tr>
+              {datiApprestamenti.map((item, i) => (
+                <tr key={i}>
+                  <td style={styles.td}>{item.Descrizione}</td>
+                  <td style={styles.td}>
+                    {moment(item.DataInstallazione).format("D MMMM YYYY")}
+                  </td>
+                  <td style={styles.td}>{item.Fornitore}</td>
+                  <td style={styles.td}>{item.Quantita}</td>
+                  <td style={styles.td}>{item.ArchivioCDP || "…"}</td>
+                  <td style={styles.td}>
+                    {moment(item.Dal).format("D MMMM YYYY")}
+                  </td>
+                  <td style={styles.td}>
+                    {moment(item.Al).format("D MMMM YYYY")}
+                  </td>
+                  <td style={styles.td}>{item.WBS}</td>
+                  <td style={styles.td}>
+                    <button
+                      style={{
+                        backgroundColor: "#00b050",
+                        color: "#fff",
+                        padding: "8px 12px",
+                        fontWeight: "bold",
+                        border: "none",
+                        width: "100%",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Genera CDP
+                    </button>
+                    <br></br>
+                    <button
+                      onClick={() => openDrawer(item)}
+                      style={{
+                        backgroundColor: "#00b050",
+                        marginTop: "10px",
+                        color: "#fff",
+                        padding: "8px 12px",
+                        fontWeight: "bold",
+                        border: "none",
+                        width: "100%",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Modifica
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {datiUtenze.map((item, i) => (
-                  <tr key={i}>
-                    <td style={styles.td}>{item.Descrizione}</td>
-                    <td style={styles.td}>
-                      {item.DataInstallazione &&
-                        moment(item.DataInstallazione).format("YYYY-MM-DD")}
-                    </td>
-                    <td style={styles.td}>{item.Fornitore}</td>
-                    <td style={styles.td}>{item.Quantita}</td>
-                    <td style={styles.td}>{item.ArchivioCDP}</td>
-                    <td style={styles.td}>
-                      {item.Dal && moment(item.Dal).format("YYYY-MM-DD")}
-                    </td>
-                    <td style={styles.td}>
-                      {item.Al && moment(item.Al).format("YYYY-MM-DD")}
-                    </td>
-                    <td style={styles.td}>{item.WBS}</td>
-                    <td style={styles.td}>
-                      <button
-                        onClick={() => openDrawer(item)}
-                        style={styles.greenButton}
-                      >
-                        Modifica
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+              ))}
+              <tr>
+                <td
+                  colSpan="9"
+                  style={{ textAlign: "center", fontSize: "20px" }}
+                >
+                  …
+                </td>
+              </tr>
+            </tbody>
+
+            {/* Sezione 2: Utenze */}
+            <tbody>
+              <tr>
+                <td
+                  colSpan="9"
+                  style={{
+                    fontWeight: "bold",
+                    backgroundColor: "#ddd",
+                    padding: "8px",
+                    fontSize: "16px",
+                  }}
+                >
+                  <span style={{ fontSize: "18px", fontWeight: 600 }}>2) </span>
+                  <span style={{ fontWeight: "bold" }}>UTENZE DI CANTIERE</span>
+                </td>
+              </tr>
+              {datiUtenze.map((item, i) => (
+                <tr key={i}>
+                  <td style={styles.td}>{item.Descrizione}</td>
+                  <td style={styles.td}>
+                    {moment(item.DataInstallazione).format("D MMMM YYYY")}
+                  </td>
+                  <td style={styles.td}>{item.Fornitore}</td>
+                  <td style={styles.td}>{item.Quantita}</td>
+                  <td style={styles.td}>{item.ArchivioCDP || "…"}</td>
+                  <td style={styles.td}>
+                    {moment(item.Dal).format("D MMMM YYYY")}
+                  </td>
+                  <td style={styles.td}>
+                    {moment(item.Al).format("D MMMM YYYY")}
+                  </td>
+                  <td style={styles.td}>{item.WBS}</td>
+                  <td style={styles.td}>
+                    <button
+                      style={{
+                        backgroundColor: "#00b050",
+                        color: "#fff",
+                        padding: "8px 12px",
+                        fontWeight: "bold",
+                        border: "none",
+                        width: "100%",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Genera CDP
+                    </button>
+                    <br></br>
+                    <button
+                      onClick={() => openDrawer(item)}
+                      style={{
+                        backgroundColor: "#00b050",
+                        marginTop: "10px",
+                        color: "#fff",
+                        padding: "8px 12px",
+                        fontWeight: "bold",
+                        border: "none",
+                        width: "100%",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Modifica
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td
+                  colSpan="9"
+                  style={{ textAlign: "center", fontSize: "20px" }}
+                >
+                  …
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </>
       )}
 
