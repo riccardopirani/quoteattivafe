@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
+import DatiProduzioneService from "../services/datiproduzione";
 import moment from "moment";
 import "moment/locale/it";
 import { BASE_URL } from "../services/api";
@@ -88,6 +89,41 @@ export default function GestioneCommessaUI() {
   const [filteredOptions, setFilteredOptions] = useState([]);
   const [selectedCommessa, setSelectedCommessa] = useState(null);
   const [selectedTab, setSelectedTab] = useState("GeneraCantiere");
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [editData, setEditData] = useState(null); // null = creazione
+  const [isLoadingApprestamenti, setIsLoadingApprestamenti] = useState(false);
+
+  const [datiApprestamenti, setDatiApprestamenti] = useState([]);
+
+  const caricaApprestamenti = async (IdCantiere) => {
+    setIsLoadingApprestamenti(true);
+    try {
+      const dati = await DatiProduzioneService.carica();
+      console.log("Risposta DatiProduzioneService.carica():", dati);
+      if (Array.isArray(dati)) {
+        const filtrati = dati.filter((d) => d.IdCantiere === IdCantiere);
+        setDatiApprestamenti(filtrati);
+      } else {
+        console.warn("La risposta non è un array:", dati);
+        setDatiApprestamenti([]); // fallback
+      }
+    } catch (err) {
+      console.error("Errore nel caricamento apprestamenti:", err);
+    } finally {
+      setIsLoadingApprestamenti(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedCommessa?.IdCantiere) {
+      caricaApprestamenti(selectedCommessa.IdCantiere);
+    }
+  }, [selectedCommessa]);
+
+  const openDrawer = (data) => {
+    setEditData(data); // se `null`, è una creazione
+    setShowDrawer(true);
+  };
 
   const [datiGenerali2, setDatiGenerali2] = useState({
     statoDinamico: "BLOCCATO",
@@ -142,8 +178,167 @@ export default function GestioneCommessaUI() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    const data = Object.fromEntries(form.entries());
+
+    const payload = {
+      ...data,
+      IdCantiere: selectedCommessa?.IdCantiere,
+    };
+
+    try {
+      if (editData) {
+        await DatiProduzioneService.aggiorna({ ...editData, ...payload });
+      } else {
+        await DatiProduzioneService.inserisci(payload);
+      }
+
+      setEditData(null); // reset pulito
+      setShowDrawer(false);
+      await caricaApprestamenti(selectedCommessa?.IdCantiere);
+    } catch (err) {
+      console.error("Errore salvataggio:", err);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await DatiProduzioneService.elimina(editData.ID);
+      setEditData(null);
+      await caricaApprestamenti(selectedCommessa?.IdCantiere);
+      setShowDrawer(false);
+    } catch (err) {
+      console.error("Errore eliminazione:", err);
+    }
+  };
+
   return (
     <div style={styles.container}>
+      {showDrawer && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            height: "100%",
+            width: "100%",
+            maxWidth: "60%",
+            backgroundColor: "#f7fdf8",
+            boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+            padding: "1.5rem",
+            zIndex: 999,
+            overflowY: "auto",
+            borderLeft: "1px solid #d0e5d6",
+          }}
+        >
+          <h2 style={{ color: "#2e7d32", marginBottom: "1rem" }}>
+            {editData ? "Modifica Apprestamento" : "Nuovo Apprestamento"}
+          </h2>
+
+          <form onSubmit={handleSubmit}>
+            {[
+              {
+                label: "Descrizione",
+                name: "Descrizione",
+                type: "text",
+                required: true,
+              },
+              {
+                label: "Data Installazione",
+                name: "DataInstallazione",
+                type: "date",
+              },
+              { label: "Fornitore", name: "Fornitore", type: "text" },
+              { label: "Quantità", name: "Quantita", type: "number" },
+              { label: "Archivio CDP", name: "ArchivioCDP", type: "text" },
+              { label: "Dal", name: "Dal", type: "date" },
+              { label: "Al", name: "Al", type: "date" },
+              { label: "WBS", name: "WBS", type: "text" },
+            ].map(({ label, name, type, required }) => (
+              <div key={name} style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", fontWeight: 600 }}>
+                  {label}
+                </label>
+                <input
+                  name={name}
+                  type={type}
+                  defaultValue={
+                    type === "date" && editData?.[name]
+                      ? moment(editData[name]).format("YYYY-MM-DD")
+                      : editData?.[name] || ""
+                  }
+                  required={required}
+                  style={{
+                    width: "100%",
+                    padding: "0.6rem",
+                    borderRadius: 6,
+                    border: "1px solid #cde5d4",
+                    fontSize: "0.9rem",
+                  }}
+                />
+              </div>
+            ))}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: editData ? "space-between" : "flex-end",
+                gap: "0.5rem",
+              }}
+            >
+              {editData && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  style={{
+                    backgroundColor: "#ffebee",
+                    color: "#d32f2f",
+                    padding: "0.7rem",
+                    borderRadius: 6,
+                    border: "1px solid #ffcdd2",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Elimina
+                </button>
+              )}
+              <button
+                type="submit"
+                style={{
+                  backgroundColor: "#2e7d32",
+                  color: "white",
+                  padding: "0.7rem",
+                  borderRadius: 6,
+                  border: "none",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Salva
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDrawer(false)}
+                style={{
+                  backgroundColor: "#e0f2f1",
+                  color: "#2e7d32",
+                  padding: "0.7rem",
+                  borderRadius: 6,
+                  border: "1px solid #b2dfdb",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Chiudi
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div style={styles.topBar}>
         <button
           style={styles.grayButton}
@@ -251,72 +446,77 @@ export default function GestioneCommessaUI() {
       {selectedTab === "GeneraCantiere" && selectedCommessa && (
         <>
           <div style={styles.sectionTitle}>APPRESTAMENTI DI CANTIERE</div>
+          <button
+            onClick={() => openDrawer(null)}
+            style={{
+              backgroundColor: "#00b050",
+              color: "white",
+              padding: "10px",
+              marginBottom: "10px",
+            }}
+          >
+            + Nuovo
+          </button>
 
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>DESCRIZIONE</th>
-                <th style={styles.th}>DATA INSTALLAZIONE</th>
-                <th style={styles.th}>FORNITORE</th>
-                <th style={styles.th}>Q.TÀ</th>
-                <th style={styles.th}>ARCHIVIO CDP</th>
-                <th style={styles.th}>DAL</th>
-                <th style={styles.th}>AL</th>
-                <th style={styles.th}>WBS</th>
-                <th style={styles.th}>GENERA CDP</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={styles.tableTitleRow}>
-                <td colSpan={9}>1) ACCANTIERAMENTO</td>
-              </tr>
-              {[
-                ["Ponteggio", "100 ponteggi srl", "100 Mq", "A01"],
-                ["Baracca di cantiere", "Baschieri srl", "Cad. 1", "A02"],
-                ["Wc chimico", "Sebach", "Cad. 1", "A03"],
-                ["Quadro elettrico", "Attiv A Srl", "Cad. 1", "A04"],
-                ["Gru edile", "Martin gru srl", "Cad. 1", "A05"],
-              ].map(([desc, fornitore, qta, wbs], i) => (
-                <tr key={i}>
-                  <td style={styles.td}>{desc}</td>
-                  <td style={styles.td}>1 gennaio 2025</td>
-                  <td style={styles.td}>{fornitore}</td>
-                  <td style={styles.td}>{qta}</td>
-                  <td style={styles.td}>…</td>
-                  <td style={styles.td}>1 febbraio 2025</td>
-                  <td style={styles.td}>28 febbraio 2025</td>
-                  <td style={styles.td}>{wbs}</td>
-                  <td style={styles.td}>
-                    <button style={styles.greenButton}>Genera CDP</button>
-                  </td>
+          {isLoadingApprestamenti ? (
+            <div
+              style={{
+                padding: "1rem",
+                textAlign: "center",
+                fontStyle: "italic",
+              }}
+            >
+              Caricamento in corso...
+            </div>
+          ) : (
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>DESCRIZIONE</th>
+                  <th style={styles.th}>DATA INSTALLAZIONE</th>
+                  <th style={styles.th}>FORNITORE</th>
+                  <th style={styles.th}>Q.TÀ</th>
+                  <th style={styles.th}>ARCHIVIO CDP</th>
+                  <th style={styles.th}>DAL</th>
+                  <th style={styles.th}>AL</th>
+                  <th style={styles.th}>WBS</th>
+                  <th style={styles.th}>AZIONI</th>
                 </tr>
-              ))}
-
-              <tr style={styles.tableTitleRow}>
-                <td colSpan={9}>2) UTENZE DI CANTIERE</td>
-              </tr>
-              {[
-                ["Luce", "ENEL", "A06"],
-                ["Acqua", "SORGEEA", "A06"],
-              ].map(([desc, fornitore, wbs], i) => (
-                <tr key={i + 10}>
-                  <td style={styles.td}>{desc}</td>
-                  <td style={styles.td}>1 gennaio 2025</td>
-                  <td style={styles.td}>{fornitore}</td>
-                  <td style={styles.td}>…</td>
-                  <td style={styles.td}>1 febbraio 2025</td>
-                  <td style={styles.td}>28 febbraio 2025</td>
-                  <td style={styles.td}></td>
-                  <td style={styles.td}>{wbs}</td>
-                  <td style={styles.td}>
-                    <button style={styles.greenButton}>Genera CDP</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {datiApprestamenti.map((item, i) => (
+                  <tr key={i}>
+                    <td style={styles.td}>{item.Descrizione}</td>
+                    <td style={styles.td}>
+                      {item.DataInstallazione &&
+                        moment(item.DataInstallazione).format("YYYY-MM-DD")}
+                    </td>
+                    <td style={styles.td}>{item.Fornitore}</td>
+                    <td style={styles.td}>{item.Quantita}</td>
+                    <td style={styles.td}>{item.ArchivioCDP}</td>
+                    <td style={styles.td}>
+                      {item.Dal && moment(item.Dal).format("YYYY-MM-DD")}
+                    </td>
+                    <td style={styles.td}>
+                      {item.Al && moment(item.Al).format("YYYY-MM-DD")}
+                    </td>
+                    <td style={styles.td}>{item.WBS}</td>
+                    <td style={styles.td}>
+                      <button
+                        onClick={() => openDrawer(item)}
+                        style={styles.greenButton}
+                      >
+                        Modifica
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </>
       )}
+
       {selectedTab === "Approvvigionamenti" && selectedCommessa && (
         <Approvvigionamenti
           key={selectedCommessa?.IdCantiere}

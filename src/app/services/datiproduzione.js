@@ -4,7 +4,7 @@ import { BASE_URL } from "./api";
 const DatiProduzioneService = {
   carica: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/produzione/carica`);
+      const response = await axios.get(`${BASE_URL}/datiproduzione/carica`);
       return response.data;
     } catch (error) {
       console.error("Errore caricamento dati produzione:", error);
@@ -15,7 +15,7 @@ const DatiProduzioneService = {
   inserisci: async (dato) => {
     try {
       const response = await axios.post(
-        `${BASE_URL}/produzione/inserisci`,
+        `${BASE_URL}/datiproduzione/inserisci`,
         dato,
       );
       return response.data;
@@ -28,7 +28,7 @@ const DatiProduzioneService = {
   aggiorna: async (dato) => {
     try {
       const response = await axios.post(
-        `${BASE_URL}/produzione/aggiorna`,
+        `${BASE_URL}/datiproduzione/aggiorna`,
         dato,
       );
       return response.data;
@@ -40,7 +40,7 @@ const DatiProduzioneService = {
 
   elimina: async (id) => {
     try {
-      const response = await axios.post(`${BASE_URL}/produzione/elimina`, {
+      const response = await axios.post(`${BASE_URL}/datiproduzione/elimina`, {
         ID: id,
       });
       return response.data;
