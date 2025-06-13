@@ -39,16 +39,74 @@ const Cordinamento = () => {
   const [ListaAttivita, setListaAttivita] = useState([]);
   const [sezioneAttiva, setSezioneAttiva] = useState("organizzazione");
   const [showDrawer, setShowDrawer] = useState(false);
-  const [mezzi, setMezzi] = useState([
-    { id: 1, name: "Daily 1" },
-    { id: 2, name: "Kangoo 1" },
-  ]);
-  const [attrezzi, setAttrezzi] = useState([
-    { id: 1, name: "TRAPANO HILTY TE500" },
-    { id: 2, name: "MARTELLO MAKITA" },
-  ]);
+  const [mezzi, setMezzi] = useState([]);
+  const [attrezzi, setAttrezzi] = useState([]);
   const [commesse, setCommesse] = useState([]);
   const [assegnazioni, setAssegnazioni] = useState({});
+
+  const [showMezzoModal, setShowMezzoModal] = useState(false);
+  const [newMezzo, setNewMezzo] = useState({ name: "" });
+
+  const aggiungiMezzo = () => {
+    setNewMezzo({ name: "", descrizione: "" });
+    setShowMezzoModal(true);
+  };
+
+  const salvaMezzo = async () => {
+    const nome = newMezzo.name.trim();
+    if (!nome) return;
+
+    // Evita duplicati
+    const giàEsiste = mezzi.some(
+      (m) => m.name.trim().toLowerCase() === nome.toLowerCase(),
+    );
+    if (giàEsiste) {
+      alert("⚠️ Esiste già un mezzo con questo nome.");
+      return;
+    }
+
+    // Salva localmente
+    const nuovoId = Date.now();
+    setMezzi((prev) => [...prev, { id: nuovoId, name: nome }]);
+    setShowMezzoModal(false);
+
+    // Costruisci payload per inserisciattivita
+    const payload = {
+      IdCantiere: null, // Nessuna commessa ancora
+      IdUtente: null,
+      IdRisorsa: nuovoId,
+      Tipo: "Mezzo",
+      DataInizio: moment().startOf("isoWeek").format("YYYY-MM-DDT00:00:00"),
+      DataFine: moment().startOf("isoWeek").format("YYYY-MM-DDT00:00:00"),
+      Descrizione: nome,
+      IdUtenteSend: parseInt(localStorage.getItem("userId") || "0"),
+    };
+
+    try {
+      await CantiereService.inserisciattivita(payload);
+      console.log("✔️ Mezzo inserito come attività");
+    } catch (error) {
+      console.error("❌ Errore durante l'inserimento attività:", error);
+    }
+  };
+
+  const aggiungiAttrezzo = () => {
+    const nome = prompt("Inserisci il nome del nuovo attrezzo:");
+    if (!nome) return;
+
+    const nomeNormalizzato = nome.trim().toLowerCase();
+
+    const giàEsiste = attrezzi.some(
+      (a) => a.name.trim().toLowerCase() === nomeNormalizzato,
+    );
+
+    if (giàEsiste) {
+      alert("⚠️ Esiste già un attrezzo con questo nome.");
+      return;
+    }
+
+    setAttrezzi((prev) => [...prev, { id: Date.now(), name: nome.trim() }]);
+  };
 
   useEffect(() => {
     const startOfWeek = moment().startOf("isoWeek");
@@ -93,62 +151,116 @@ const Cordinamento = () => {
             "days",
           );
           if (giornoIndex >= 0 && giornoIndex <= 6) {
-            const key = `${att.IdUtente}-${giornoIndex}`;
-            assegnazioniIniziali[key] = att.IdCantiere;
+            if (att.Tipo === "Risorsa") {
+              const key = `risorsa-${att.IdUtente}-${giornoIndex}`;
+              assegnazioniIniziali[key] = att.IdCantiere;
+            } else if (att.Tipo === "Mezzo") {
+              const key = `mezzo-${att.IdRisorsa}-${giornoIndex}`;
+              assegnazioniIniziali[key] = att.IdCantiere;
+            } else if (att.Tipo === "Attrezzo") {
+              const key = `attrezzo-${att.IdRisorsa}-${giornoIndex}`;
+              assegnazioniIniziali[key] = att.IdCantiere;
+            }
           }
         });
 
+        const mezziUnici = [];
+        const descrizioniAggiunte = new Set();
+
+        dati.forEach((att) => {
+          if (
+            att.Tipo === "Mezzo" &&
+            att.Descrizione &&
+            !descrizioniAggiunte.has(att.Descrizione)
+          ) {
+            descrizioniAggiunte.add(att.Descrizione);
+            mezziUnici.push({
+              id: att.IdRisorsa,
+              name: att.Descrizione,
+            });
+          }
+        });
+        setMezzi(mezziUnici);
+
         setAssegnazioni(assegnazioniIniziali);
       } catch (error) {
-        console.error("Errore nel caricamento commesse:", error);
+        console.error("Errore nel caricamento attività:", error);
       }
     };
+
     fetchAttivita();
     fetchUtenti();
     fetchCommesse();
   }, []);
 
-  const handleCommessaChange = async (userId, dayIndex, value) => {
+  const handleCommessaChange = async (tipo, id, dayIndex, value) => {
+    const key = `${tipo}-${id}-${dayIndex}`;
+
     setAssegnazioni((prev) => ({
       ...prev,
-      [`${userId}-${dayIndex}`]: value,
+      [key]: value,
     }));
 
     if (!value) return;
 
     const selectedDate = moment().startOf("isoWeek").add(dayIndex, "days");
 
+    let descrizione = "risorsa";
+
+    if (tipo === "mezzo") {
+      const mezzo = mezzi.find(
+        (m) => `${m.id}` === `${id}` || `${m.name}` === `${id}`,
+      );
+      descrizione = mezzo?.name || "mezzo";
+    } else if (tipo === "attrezzo") {
+      const attrezzo = attrezzi.find((a) => `${a.id}` === `${id}`);
+      descrizione = attrezzo?.name || "attrezzo";
+    }
+
     const payload = {
       IdCantiere: parseInt(value),
-      IdUtente: userId,
+      IdUtente: tipo === "risorsa" ? id : null,
+      IdRisorsa: tipo !== "risorsa" ? id : null,
+      Tipo:
+        tipo === "risorsa"
+          ? "Risorsa"
+          : tipo === "mezzo"
+            ? "Mezzo"
+            : "Attrezzo",
       DataInizio: selectedDate.format("YYYY-MM-DDT00:00:00"),
       DataFine: selectedDate.format("YYYY-MM-DDT00:00:00"),
-      Descrizione: "Assegnazione da UI",
+      Descrizione: descrizione,
       IdUtenteSend: parseInt(localStorage.getItem("userId") || "0"),
     };
 
     try {
       await CantiereService.inserisciattivita(payload);
-      console.log("✔️ Attività salvata con successo");
+      window.location.reload();
     } catch (error) {
       console.error("❌ Errore nel salvataggio attività:", error);
     }
   };
 
-  const renderCommessaDropdown = (userId, dayIndex) => (
-    <select
-      style={dropdownStyle}
-      value={assegnazioni[`${userId}-${dayIndex}`] || ""}
-      onChange={(e) => handleCommessaChange(userId, dayIndex, e.target.value)}
-    >
-      <option value="">-- Seleziona --</option>
-      {commesse.map((c) => (
-        <option key={c.IdCantiere} value={c.IdCantiere}>
-          {c.NomeCantiere} - {c.RagioneSociale}
-        </option>
-      ))}
-    </select>
-  );
+  const renderCommessaDropdown = (tipo, id, dayIndex) => {
+    const key = `${tipo}-${id}-${dayIndex}`;
+
+    return (
+      <select
+        style={dropdownStyle}
+        value={assegnazioni[key] || ""}
+        onChange={(e) =>
+          handleCommessaChange(tipo, id, dayIndex, e.target.value)
+        }
+      >
+        <option value="">-- Seleziona --</option>
+        {commesse.map((c) => (
+          <option key={c.IdCantiere} value={c.IdCantiere}>
+            {c.NomeCantiere} - {c.RagioneSociale}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 20 }}>
@@ -176,43 +288,49 @@ const Cordinamento = () => {
       </div>
 
       {sezioneAttiva === "organizzazione" && (
-        <>
-          {" "}
-          <div style={{ marginTop: 20 }}>
-            <div style={sectionTitleStyle}>ORGANIZZAZIONE MAESTRANZE</div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={cellStyle}>Operatore</th>
-                  {weekDays.map((day, idx) => (
-                    <th key={idx} style={cellStyle}>
-                      {day}
-                    </th>
+        <div style={{ marginTop: 20 }}>
+          <div style={sectionTitleStyle}>ORGANIZZAZIONE MAESTRANZE</div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={cellStyle}>Operatore</th>
+                {weekDays.map((day, idx) => (
+                  <th key={idx} style={cellStyle}>
+                    {day}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {utenti.map((user) => (
+                <tr key={user.IdUtente}>
+                  <td style={cellStyle}>
+                    {user.Nome} {user.Cognome}
+                  </td>
+                  {weekDays.map((_, j) => (
+                    <td key={j} style={j >= 5 ? redCellStyle : cellStyle}>
+                      {renderCommessaDropdown("risorsa", user.IdUtente, j)}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {utenti.map((user) => (
-                  <tr key={user.IdUtente}>
-                    <td style={cellStyle}>
-                      {user.Nome} {user.Cognome}
-                    </td>
-                    {weekDays.map((_, j) => (
-                      <td key={j} style={j >= 5 ? redCellStyle : cellStyle}>
-                        {renderCommessaDropdown(user.IdUtente, j)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
           <div style={{ marginTop: 40 }}>
             <div style={sectionTitleStyle}>ORGANIZZAZIONE MEZZI</div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginBottom: 8,
+              }}
+            >
+              <button onClick={aggiungiMezzo}>➕ Aggiungi Mezzo</button>
+            </div>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <th style={cellStyle}>Operatore</th>
+                  <th style={cellStyle}>Mezzo</th>
                   {weekDays.map((day, idx) => (
                     <th key={idx} style={cellStyle}>
                       {day}
@@ -221,26 +339,63 @@ const Cordinamento = () => {
                 </tr>
               </thead>
               <tbody>
-                {mezzi.map((row, idx) => (
-                  <tr key={row.id}>
-                    <td style={cellStyle}>{row.name}</td>
-                    {weekDays.map((_, i) => (
-                      <td key={i} style={i >= 5 ? redCellStyle : cellStyle}>
-                        Operatore {idx + 1}
-                      </td>
-                    ))}
+                {mezzi.map((mezzo) => (
+                  <tr key={mezzo.name}>
+                    <td style={cellStyle}>{mezzo.name}</td>
+                    {weekDays.map((_, dayIndex) => {
+                      const att = ListaAttivita.find(
+                        (a) =>
+                          a.Tipo === "Mezzo" &&
+                          a.Descrizione === mezzo.name &&
+                          moment(a.DataInizio).isSame(
+                            moment().startOf("isoWeek").add(dayIndex, "days"),
+                            "day",
+                          ),
+                      );
+
+                      return (
+                        <td
+                          key={dayIndex}
+                          style={dayIndex >= 5 ? redCellStyle : cellStyle}
+                        >
+                          {att
+                            ? renderCommessaDropdown(
+                                "mezzo",
+                                mezzo.id,
+                                dayIndex,
+                              )
+                            : renderCommessaDropdown(
+                                "mezzo",
+                                mezzo.name,
+                                dayIndex,
+                              )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {/* ATTREZZI */}
+
           <div style={{ marginTop: 40 }}>
             <div style={sectionTitleStyle}>ORGANIZZAZIONE ATTREZZI</div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginBottom: 8,
+              }}
+            >
+              <button onClick={aggiungiAttrezzo}>
+                ➕ Aggiungi Attrezzatura
+              </button>
+            </div>
+
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <th style={cellStyle}>Operatore</th>
+                  <th style={cellStyle}>Attrezzo</th>
                   {weekDays.map((day, idx) => (
                     <th key={idx} style={cellStyle}>
                       {day}
@@ -249,12 +404,12 @@ const Cordinamento = () => {
                 </tr>
               </thead>
               <tbody>
-                {attrezzi.map((row, idx) => (
-                  <tr key={row.id}>
-                    <td style={cellStyle}>{row.name}</td>
+                {attrezzi.map((attrezzo) => (
+                  <tr key={attrezzo.id}>
+                    <td style={cellStyle}>{attrezzo.name}</td>
                     {weekDays.map((_, i) => (
                       <td key={i} style={i >= 5 ? redCellStyle : cellStyle}>
-                        Operatore {idx + 1}
+                        {renderCommessaDropdown("attrezzo", attrezzo.id, i)}
                       </td>
                     ))}
                   </tr>
@@ -262,7 +417,7 @@ const Cordinamento = () => {
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
       {sezioneAttiva === "riunione" && (
         <div style={{ marginTop: 20, position: "relative" }}>
@@ -413,6 +568,76 @@ const Cordinamento = () => {
               </form>
             </div>
           )}
+        </div>
+      )}
+      {showMezzoModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              padding: "24px",
+              borderRadius: "16px",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
+              width: "320px",
+            }}
+          >
+            <h3 style={{ marginBottom: "16px" }}>Nuovo Mezzo</h3>
+            <div style={{ marginBottom: "12px" }}>
+              <label>Nome</label>
+              <input
+                type="text"
+                value={newMezzo.name}
+                onChange={(e) => setNewMezzo({ name: e.target.value })}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowMezzoModal(false)}
+                style={{
+                  marginRight: "8px",
+                  background: "#eee",
+                  border: "none",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={salvaMezzo}
+                style={{
+                  background: "#4caf50",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                Salva
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
