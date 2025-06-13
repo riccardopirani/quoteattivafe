@@ -36,6 +36,7 @@ const dropdownStyle = {
 const Cordinamento = () => {
   const [weekDays, setWeekDays] = useState([]);
   const [utenti, setUtenti] = useState([]);
+  const [ListaAttivita, setListaAttivita] = useState([]);
   const [sezioneAttiva, setSezioneAttiva] = useState("organizzazione");
   const [showDrawer, setShowDrawer] = useState(false);
   const [mezzi, setMezzi] = useState([
@@ -80,16 +81,58 @@ const Cordinamento = () => {
         console.error("Errore nel caricamento commesse:", error);
       }
     };
+    const fetchAttivita = async () => {
+      try {
+        const dati = await CantiereService.caricattivita({});
+        setListaAttivita(dati);
+        const assegnazioniIniziali = {};
 
+        dati.forEach((att) => {
+          const giornoIndex = moment(att.DataInizio).diff(
+            moment().startOf("isoWeek"),
+            "days",
+          );
+          if (giornoIndex >= 0 && giornoIndex <= 6) {
+            const key = `${att.IdUtente}-${giornoIndex}`;
+            assegnazioniIniziali[key] = att.IdCantiere;
+          }
+        });
+
+        setAssegnazioni(assegnazioniIniziali);
+      } catch (error) {
+        console.error("Errore nel caricamento commesse:", error);
+      }
+    };
+    fetchAttivita();
     fetchUtenti();
     fetchCommesse();
   }, []);
 
-  const handleCommessaChange = (userId, dayIndex, value) => {
+  const handleCommessaChange = async (userId, dayIndex, value) => {
     setAssegnazioni((prev) => ({
       ...prev,
       [`${userId}-${dayIndex}`]: value,
     }));
+
+    if (!value) return;
+
+    const selectedDate = moment().startOf("isoWeek").add(dayIndex, "days");
+
+    const payload = {
+      IdCantiere: parseInt(value),
+      IdUtente: userId,
+      DataInizio: selectedDate.format("YYYY-MM-DDT00:00:00"),
+      DataFine: selectedDate.format("YYYY-MM-DDT00:00:00"),
+      Descrizione: "Assegnazione da UI",
+      IdUtenteSend: parseInt(localStorage.getItem("userId") || "0"),
+    };
+
+    try {
+      await CantiereService.inserisciattivita(payload);
+      console.log("✔️ Attività salvata con successo");
+    } catch (error) {
+      console.error("❌ Errore nel salvataggio attività:", error);
+    }
   };
 
   const renderCommessaDropdown = (userId, dayIndex) => (

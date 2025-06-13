@@ -185,7 +185,7 @@ export default function GestioneCommessaUI() {
                 setSelectedCommessa(commessa);
                 localStorage.setItem(
                   "ultimaCommessa",
-                  JSON.stringify(commessa)
+                  JSON.stringify(commessa),
                 );
                 setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                 setFilteredOptions([]);
@@ -365,7 +365,7 @@ function CommessaSilo({ commessa }) {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
         if (!utentiRes.ok)
           throw new Error(`HTTP error! status: ${utentiRes.status}`);
@@ -373,7 +373,7 @@ function CommessaSilo({ commessa }) {
 
         const mappaCostoInterno = new Map();
         utenti.forEach((utente) =>
-          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno)
+          mappaCostoInterno.set(utente.IdUtente, utente.CostoInterno),
         );
 
         const manodoperaFiltrata = tutteRisorse
@@ -391,10 +391,10 @@ function CommessaSilo({ commessa }) {
           });
 
         const noleggiFiltrati = tutteRisorse.filter(
-          (r) => r.Tipologia === "Noleggio"
+          (r) => r.Tipologia === "Noleggio",
         );
         const aziendeFiltrate = tutteRisorse.filter(
-          (r) => r.Tipologia === "Aziende"
+          (r) => r.Tipologia === "Aziende",
         );
 
         setManodopera(manodoperaFiltrata);
@@ -463,8 +463,8 @@ function CommessaSilo({ commessa }) {
                     const nuovoValore = e.target.value;
                     setManodopera((prev) =>
                       prev.map((item, idx) =>
-                        idx === i ? { ...item, WBS: nuovoValore } : item
-                      )
+                        idx === i ? { ...item, WBS: nuovoValore } : item,
+                      ),
                     );
                   }}
                   style={{ width: "100%" }}
@@ -529,8 +529,8 @@ function CommessaSilo({ commessa }) {
                     const nuovoValore = e.target.value;
                     setManodopera((prev) =>
                       prev.map((item, idx) =>
-                        idx === i ? { ...item, WBS: nuovoValore } : item
-                      )
+                        idx === i ? { ...item, WBS: nuovoValore } : item,
+                      ),
                     );
                   }}
                   style={{ width: "100%" }}

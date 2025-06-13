@@ -2,6 +2,84 @@ import axios from "axios";
 import { BASE_URL } from "./api";
 
 const CantiereService = {
+  inserisciattivita: async (data) => {
+    try {
+      const response = await axios.post(`${BASE_URL}/attivita/add`, data, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
+  caricattivita: async (data) => {
+    try {
+      const response = await axios.post(`${BASE_URL}/attivita/load`, data, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
+  inseriscimezzoattrezzo: async (data) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/articolo/inserimentocantiere`,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
+  ricercamezziattrezature: async (data) => {
+    try {
+      const response = await axios.post(`${BASE_URL}/articolo/ricerca`, data, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
+  creamezzoattrezzo: async (data) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/articolo/creazionearticolo`,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
   caricaRisorse: async (data) => {
     try {
       const response = await axios.post(
