@@ -2,7 +2,6 @@ import axios from "axios";
 import { BASE_URL } from "./api";
 
 const OrganizzazioneService = {
-  // ====== MEZZI ======
   creaMezzo: async (data) => {
     try {
       const response = await axios.post(`${BASE_URL}/mezzi/crea`, data);
@@ -46,8 +45,6 @@ const OrganizzazioneService = {
       throw error;
     }
   },
-
-  // ====== ATTREZZI ======
   creaAttrezzo: async (data) => {
     try {
       const response = await axios.post(`${BASE_URL}/attrezzi/crea`, data);
