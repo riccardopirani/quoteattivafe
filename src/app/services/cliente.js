@@ -1,8 +1,7 @@
 // src/services/garaService.js
 import axios from "axios";
-import { BASE_URL } from "./api"; // Assicurati di avere un file config.js con l'URL base
+import { BASE_URL } from "./api";
 const ClienteService = {
-  // Ricerca clienti (può accettare parametri opzionali)
   ricerca: async (params = {}) => {
     try {
       const response = await axios.post(`${BASE_URL}/cliente/ricerca`, params);

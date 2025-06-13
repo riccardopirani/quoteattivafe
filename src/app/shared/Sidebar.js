@@ -53,8 +53,8 @@ const permessiPersonalizzati = [
   {
     label: "Gestione",
     key: "AccessoArticoli",
-    route: "/form-elements",
-    subMenu: [],
+    route: "/basic-ui/newsuer",
+    subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
     menuKey: "gestioneMenuOpen",
     icon: "mdi mdi-account-box-outline",
   },
@@ -65,14 +65,6 @@ const permessiPersonalizzati = [
     subMenu: [],
     menuKey: "amministrazioneMenuOpen",
     icon: "mdi mdi-chart-line",
-  },
-  {
-    label: "Anagrafica",
-    key: "AccessoArticoli",
-    route: "/basic-ui/newsuer",
-    subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
-    menuKey: "gestioneMenuOpen",
-    icon: "mdi mdi-account-box-outline",
   },
 ];
 

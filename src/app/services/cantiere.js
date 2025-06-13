@@ -62,11 +62,30 @@ const CantiereService = {
       throw error;
     }
   },
-  creamezzoattrezzo: async (data) => {
+
+  attivitaADD: async (data) => {
     try {
       const response = await axios.post(
-        `${BASE_URL}/articolo/creazionearticolo`,
-        data,
+        `${BASE_URL}/attivita/load`,
+        {},
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Errore inserimento documento:", error);
+      throw error;
+    }
+  },
+  caricaAttivita: async (data) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/attivita/load`,
+        {},
         {
           headers: {
             "Content-Type": "application/json",
