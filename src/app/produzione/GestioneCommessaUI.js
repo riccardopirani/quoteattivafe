@@ -126,7 +126,6 @@ function DDTDrawer({ open, onClose, base64DDT, onSaveDDT }) {
     isDrawing.current = false;
   };
 
-
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -170,7 +169,6 @@ function DDTDrawer({ open, onClose, base64DDT, onSaveDDT }) {
     // Carica l’immagine originale dal base64
     img.src = `data:image/jpeg;base64,${base64DDT}`;
   };
-
 
   if (!open) return null;
 
@@ -1107,7 +1105,7 @@ function CommessaSilo({ commessa }) {
                       CantiereService.aggiornaWBS({
                         IdRisorsa: r.IdRisorseUmane,
                         WBS: nuovoValore,
-                        DDT: r.ddt
+                        DDT: r.ddt,
                       })
                         .then(async () => {
                           await caricaRisorse();
@@ -1189,7 +1187,7 @@ function CommessaSilo({ commessa }) {
                       CantiereService.aggiornaWBS({
                         IdRisorsa: r.IdRisorseUmane,
                         WBS: nuovoValore,
-                        DDT: r.ddt
+                        DDT: r.ddt,
                       })
                         .then(async () => {
                           await caricaRisorse();
@@ -1274,38 +1272,37 @@ function CommessaSilo({ commessa }) {
         ddtData &&
         typeof ddtData === "string" &&
         ddtData.length > 100 && (
-              <DDTDrawer
-                  open={drawerOpen}
-                  onClose={() => setDrawerOpen(false)}
-                  base64DDT={ddtData}
-                  onSaveDDT={async (newBase64Image) => {
-                    try {
-                      // Trova la riga da aggiornare (manodopera, noleggi o aziende)
-                      const allRecords = [...manodopera, ...noleggi, ...aziende];
-                      const risorsa = allRecords.find((r) => r.ddt === ddtData);
+          <DDTDrawer
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            base64DDT={ddtData}
+            onSaveDDT={async (newBase64Image) => {
+              try {
+                // Trova la riga da aggiornare (manodopera, noleggi o aziende)
+                const allRecords = [...manodopera, ...noleggi, ...aziende];
+                const risorsa = allRecords.find((r) => r.ddt === ddtData);
 
-                      if (!risorsa) {
-                        console.warn("Nessuna risorsa trovata per DDT");
-                        return;
-                      }
+                if (!risorsa) {
+                  console.warn("Nessuna risorsa trovata per DDT");
+                  return;
+                }
 
-                      await CantiereService.aggiornaWBS({
-                        IdRisorsa: risorsa.IdRisorseUmane,
-                        WBS: risorsa.WBS,
-                        DDT: newBase64Image, // aggiorniamo DDT!
-                      });
+                await CantiereService.aggiornaWBS({
+                  IdRisorsa: risorsa.IdRisorseUmane,
+                  WBS: risorsa.WBS,
+                  DDT: newBase64Image, // aggiorniamo DDT!
+                });
 
-                      // Ricarica i dati
-                      await caricaRisorse();
-                      setDrawerOpen(false);
-                      setDdtData(null);
-                    } catch (err) {
-                      console.error("Errore durante salvataggio DDT:", err);
-                    }
-                  }}
-              />
-
-          )}
+                // Ricarica i dati
+                await caricaRisorse();
+                setDrawerOpen(false);
+                setDdtData(null);
+              } catch (err) {
+                console.error("Errore durante salvataggio DDT:", err);
+              }
+            }}
+          />
+        )}
     </div>
   );
 }
