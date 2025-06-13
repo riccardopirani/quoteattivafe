@@ -3,7 +3,197 @@ import moment from "moment";
 import "moment/locale/it";
 import { BASE_URL } from "../services/api";
 import CantiereService from "../services/cantiere";
+import RiunioneCoordinamentoService from "../services/RiunioneCoordinamentoService";
 moment.locale("it");
+
+const CoordinamentoDrawer = ({
+  coordinamentoForm,
+  handleDrawerChange,
+  salvaRiunione,
+  setShowDrawer,
+  commesse,
+}) => {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        right: 0,
+        width: "360px",
+        height: "100%",
+        backgroundColor: "#f0faf4",
+        boxShadow: "-6px 0 16px rgba(0,0,0,0.1)",
+        padding: "28px 24px",
+        zIndex: 1000,
+        borderTopLeftRadius: "20px",
+        borderBottomLeftRadius: "20px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <h3 style={{ margin: 0 }}>Nuova Riunione</h3>
+        <button
+          onClick={() => setShowDrawer(false)}
+          style={{
+            background: "transparent",
+            border: "none",
+            fontSize: "20px",
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          salvaRiunione();
+        }}
+        style={{ flex: 1, overflowY: "auto" }}
+      >
+        {[
+          { label: "Responsabile Cantiere", name: "resp" },
+          { label: "Opere da Iniziare", name: "opere" },
+          { label: "Azienda", name: "azienda" },
+        ].map((field) => (
+          <div key={field.name} style={{ marginBottom: "14px" }}>
+            <label style={{ fontSize: "14px", fontWeight: 600 }}>
+              {field.label}
+            </label>
+            <input
+              type="text"
+              value={coordinamentoForm[field.name]}
+              onChange={(e) => handleDrawerChange(field.name, e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                marginTop: "6px",
+                borderRadius: "8px",
+                border: "1px solid #b2dfdb",
+                background: "#ffffff",
+              }}
+            />
+          </div>
+        ))}
+
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ fontSize: "14px", fontWeight: 600 }}>Cantiere</label>
+          <select
+            value={coordinamentoForm.cantiere}
+            onChange={(e) => handleDrawerChange("cantiere", e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              marginTop: "6px",
+              borderRadius: "8px",
+              border: "1px solid #b2dfdb",
+              background: "#ffffff",
+            }}
+          >
+            <option value="">-- Seleziona Cantiere --</option>
+            {commesse.map((c) => (
+              <option key={c.IdCantiere} value={c.NomeCantiere}>
+                {c.NomeCantiere} - {c.RagioneSociale}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ fontSize: "14px", fontWeight: 600 }}>
+            Attività Da / A
+          </label>
+          <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+            <input
+              type="date"
+              value={coordinamentoForm.attivitaDa}
+              onChange={(e) => handleDrawerChange("attivitaDa", e.target.value)}
+              style={{
+                flex: 1,
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #b2dfdb",
+              }}
+            />
+            <input
+              type="date"
+              value={coordinamentoForm.attivitaA}
+              onChange={(e) => handleDrawerChange("attivitaA", e.target.value)}
+              style={{
+                flex: 1,
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #b2dfdb",
+              }}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ fontSize: "14px", fontWeight: 600 }}>
+            Data Ingresso
+          </label>
+          <input
+            type="date"
+            value={coordinamentoForm.ingressoData}
+            onChange={(e) => handleDrawerChange("ingressoData", e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              marginTop: "6px",
+              borderRadius: "8px",
+              border: "1px solid #b2dfdb",
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ fontSize: "14px", fontWeight: 600 }}>Note</label>
+          <textarea
+            rows="3"
+            value={coordinamentoForm.note}
+            onChange={(e) => handleDrawerChange("note", e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              marginTop: "6px",
+              borderRadius: "8px",
+              border: "1px solid #b2dfdb",
+              background: "#ffffff",
+            }}
+          ></textarea>
+        </div>
+
+        <div style={{ textAlign: "right", marginTop: "20px" }}>
+          <button
+            type="submit"
+            style={{
+              background: "#4caf50",
+              color: "white",
+              padding: "10px 20px",
+              borderRadius: "8px",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "15px",
+            }}
+          >
+            Salva Riunione
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
 
 const cellStyle = {
   border: "1px solid #ccc",
@@ -46,6 +236,89 @@ const Cordinamento = () => {
 
   const [showMezzoModal, setShowMezzoModal] = useState(false);
   const [newMezzo, setNewMezzo] = useState({ name: "" });
+  const [riunioni, setRiunioni] = useState([]);
+  const [showDrawer2, setShowDrawer2] = useState(false);
+  const [nuovaRiunione, setNuovaRiunione] = useState({
+    ResponsabileCantiere: "",
+    Cantiere: "",
+    AttivitaDataDa: "",
+    AttivitaDataA: "",
+    OpereDaIniziare: "",
+    IngressoData: "",
+    IngressoAzienda: "",
+    Note: "",
+  });
+
+  const [coordinamentoForm, setCoordinamentoForm] = useState({
+    resp: "",
+    cantiere: "",
+    attivitaDa: "",
+    attivitaA: "",
+    opere: "",
+    ingressoData: "",
+    azienda: "",
+    note: "",
+  });
+  const handleDrawerChange = (field, value) => {
+    setCoordinamentoForm((prev) => ({ ...prev, [field]: value }));
+  };
+  useEffect(() => {
+    const fetchRiunioni = async () => {
+      try {
+        const res = await RiunioneCoordinamentoService.leggi();
+        setRiunioni(res);
+      } catch (err) {
+        console.error("Errore caricamento riunioni:", err);
+      }
+    };
+
+    fetchRiunioni();
+  }, []);
+
+  const salvaRiunione = async (e) => {
+    try {
+      await RiunioneCoordinamentoService.crea({
+        ResponsabileCantiere: coordinamentoForm.resp,
+        Cantiere: coordinamentoForm.cantiere,
+        AttivitaDataDa: coordinamentoForm.attivitaDa,
+        AttivitaDataA: coordinamentoForm.attivitaA,
+        OpereDaIniziare: coordinamentoForm.opere,
+        IngressoData: coordinamentoForm.ingressoData,
+        IngressoAzienda: coordinamentoForm.azienda,
+        Note: coordinamentoForm.note,
+      });
+
+      setShowDrawer(false);
+      setCoordinamentoForm({
+        resp: "",
+        cantiere: "",
+        attivitaDa: "",
+        attivitaA: "",
+        opere: "",
+        ingressoData: "",
+        azienda: "",
+        note: "",
+      });
+
+      const updated = await RiunioneCoordinamentoService.leggi();
+      setRiunioni(updated);
+    } catch (err) {
+      console.error("Errore salvataggio riunione:", err);
+    }
+  };
+
+  const eliminaRiunione = async (idRiunione) => {
+    if (!window.confirm("Sei sicuro di voler eliminare questa riunione?"))
+      return;
+
+    try {
+      await RiunioneCoordinamentoService.elimina(idRiunione);
+      const aggiornate = await RiunioneCoordinamentoService.leggi();
+      setRiunioni(aggiornate);
+    } catch (err) {
+      console.error("Errore eliminazione riunione:", err);
+    }
+  };
 
   const aggiungiMezzo = () => {
     setNewMezzo({ name: "", descrizione: "" });
@@ -462,153 +735,95 @@ const Cordinamento = () => {
       )}
       {sezioneAttiva === "riunione" && (
         <div style={{ marginTop: 20, position: "relative" }}>
-          <div style={sectionTitleStyle}>RIUNIONE DI COORDINAMENTO</div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th rowSpan="2" style={cellStyle}>
-                  Resp. Cantiere
-                </th>
-                <th rowSpan="2" style={cellStyle}>
-                  Cantiere
-                </th>
-                <th colSpan="2" style={cellStyle}>
-                  Attività settimana
-                </th>
-                <th rowSpan="2" style={cellStyle}>
-                  Opere da iniziare
-                </th>
-                <th colSpan="2" style={cellStyle}>
-                  Ingressi aziende
-                </th>
-                <th rowSpan="2" style={cellStyle}>
-                  Note
-                </th>
-              </tr>
-              <tr>
-                <th style={cellStyle}>Da</th>
-                <th style={cellStyle}>A</th>
-                <th style={cellStyle}>Data</th>
-                <th style={cellStyle}>Azienda</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...Array(4)].map((_, i) => (
-                <tr key={i}>
-                  {[...Array(8)].map((_, j) => (
-                    <td key={j} style={cellStyle}>
-                      {j === 7 ? "..." : ""}
-                    </td>
-                  ))}
+          <div style={{ padding: 20 }}>
+            <h2>Riunioni di Coordinamento</h2>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                marginTop: "20px",
+                backgroundColor: "#f7f7f7",
+              }}
+            >
+              <thead>
+                <tr style={{ backgroundColor: "#d6d6d6" }}>
+                  <th style={cellStyle}>Resp. Cantiere</th>
+                  <th style={cellStyle}>Cantiere</th>
+                  <th style={cellStyle}>
+                    Attività settimana
+                    <br />
+                    <span style={{ fontWeight: "normal" }}>Da</span>
+                  </th>
+                  <th style={cellStyle}>
+                    <br />
+                    <span style={{ fontWeight: "normal" }}>A</span>
+                  </th>
+                  <th style={cellStyle}>Opere da iniziare</th>
+                  <th style={cellStyle}>
+                    Ingressi azienda
+                    <br />
+                    <span style={{ fontWeight: "normal" }}>Data</span>
+                  </th>
+                  <th style={cellStyle}>
+                    <br />
+                    <span style={{ fontWeight: "normal" }}>Azienda</span>
+                  </th>
+                  <th style={cellStyle}>Note</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: 10, textAlign: "right", paddingRight: 10 }}>
-            <button
-              onClick={() => setShowDrawer(true)}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "26px",
-                cursor: "pointer",
-                color: "#4caf50", // verde elegante
-                transition: "transform 0.2s ease",
-              }}
-              onMouseOver={(e) =>
-                (e.currentTarget.style.transform = "scale(1.2)")
-              }
-              onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              aria-label="Aggiungi riga"
-            >
-              ⋯
-            </button>
-          </div>
-
-          {/* Drawer */}
-          {showDrawer && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                right: 0,
-                width: "340px",
-                height: "100%",
-                backgroundColor: "#e6f5ea", // verde soft
-                boxShadow: "-4px 0 16px rgba(0,0,0,0.1)",
-                padding: "24px",
-                zIndex: 1000,
-                borderTopLeftRadius: "20px",
-                borderBottomLeftRadius: "20px",
-                transition: "transform 0.3s ease",
-              }}
-            >
-              <h3>Nuova riga coordinamento</h3>
-              <form>
-                <div style={{ marginBottom: 10 }}>
-                  <label>Resp. Cantiere</label>
-                  <br />
-                  <input type="text" style={{ width: "100%" }} />
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label>Cantiere</label>
-                  <br />
-                  <input type="text" style={{ width: "100%" }} />
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label>Attività Da / A</label>
-                  <br />
-                  <input
-                    type="date"
-                    style={{ width: "48%", marginRight: "4%" }}
-                  />
-                  <input type="date" style={{ width: "48%" }} />
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label>Opere da iniziare</label>
-                  <br />
-                  <input type="text" style={{ width: "100%" }} />
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label>Data ingresso</label>
-                  <br />
-                  <input type="date" style={{ width: "100%" }} />
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label>Azienda</label>
-                  <br />
-                  <input type="text" style={{ width: "100%" }} />
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label>Note</label>
-                  <br />
-                  <textarea rows="3" style={{ width: "100%" }}></textarea>
-                </div>
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
-                >
-                  <button type="submit">Salva</button>
-
-                  <button
-                    onClick={() => setShowDrawer(false)}
+              </thead>
+              <tbody>
+                {riunioni.map((r, i) => (
+                  <tr
+                    key={i}
                     style={{
-                      position: "absolute",
-                      top: 10,
-                      right: 10,
-                      border: "none",
-                      background: "transparent",
-                      fontSize: "20px",
-                      cursor: "pointer",
+                      backgroundColor: i % 2 === 0 ? "#ffffff" : "#f1f1f1",
                     }}
-                    aria-label="Chiudi drawer"
                   >
-                    ✕
-                  </button>
-                </div>
-              </form>
+                    <td style={cellStyle}>{r.ResponsabileCantiere}</td>
+                    <td style={cellStyle}>{r.Cantiere}</td>
+                    <td style={cellStyle}>
+                      {moment(r.AttivitaDataDa).format("DD/MM/YYYY")}
+                    </td>
+                    <td style={cellStyle}>
+                      {moment(r.AttivitaDataA).format("DD/MM/YYYY")}
+                    </td>
+                    <td style={cellStyle}>{r.OpereDaIniziare}</td>
+                    <td style={cellStyle}>
+                      {moment(r.IngressoData).format("DD/MM/YYYY")}
+                    </td>
+                    <td style={cellStyle}>{r.IngressoAzienda}</td>
+                    <td style={cellStyle}>{r.Note || "…"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div style={{ textAlign: "right", marginTop: 20 }}>
+              <button
+                onClick={() => setShowDrawer(true)}
+                style={{
+                  background: "#4caf50",
+                  color: "white",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                ➕ Aggiungi Riunione
+              </button>
             </div>
-          )}
+
+            {showDrawer && (
+              <CoordinamentoDrawer
+                coordinamentoForm={coordinamentoForm}
+                handleDrawerChange={handleDrawerChange}
+                salvaRiunione={salvaRiunione}
+                setShowDrawer={setShowDrawer}
+                commesse={commesse}
+              />
+            )}
+          </div>
         </div>
       )}
       {showMezzoModal && (
