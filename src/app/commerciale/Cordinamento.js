@@ -89,23 +89,47 @@ const Cordinamento = () => {
       console.error("❌ Errore durante l'inserimento attività:", error);
     }
   };
+  const [showAttrezzoModal, setShowAttrezzoModal] = useState(false);
+  const [newAttrezzo, setNewAttrezzo] = useState({ name: "" });
 
   const aggiungiAttrezzo = () => {
-    const nome = prompt("Inserisci il nome del nuovo attrezzo:");
+    setNewAttrezzo({ name: "" });
+    setShowAttrezzoModal(true);
+  };
+
+  const salvaAttrezzo = async () => {
+    const nome = newAttrezzo.name.trim();
     if (!nome) return;
 
-    const nomeNormalizzato = nome.trim().toLowerCase();
-
     const giàEsiste = attrezzi.some(
-      (a) => a.name.trim().toLowerCase() === nomeNormalizzato,
+      (a) => a.name.trim().toLowerCase() === nome.toLowerCase(),
     );
-
     if (giàEsiste) {
       alert("⚠️ Esiste già un attrezzo con questo nome.");
       return;
     }
 
-    setAttrezzi((prev) => [...prev, { id: Date.now(), name: nome.trim() }]);
+    const nuovoId = Date.now();
+    setAttrezzi((prev) => [...prev, { id: nuovoId, name: nome }]);
+    setShowAttrezzoModal(false);
+
+    const payload = {
+      IdCantiere: null,
+      IdUtente: null,
+      IdRisorsa: nuovoId,
+      Tipo: "Attrezzo",
+      DataInizio: moment().startOf("isoWeek").format("YYYY-MM-DDT00:00:00"),
+      DataFine: moment().startOf("isoWeek").format("YYYY-MM-DDT00:00:00"),
+      Descrizione: nome,
+      IdUtenteSend: parseInt(localStorage.getItem("userId") || "0"),
+    };
+
+    try {
+      await CantiereService.inserisciattivita(payload);
+      console.log("✔️ Attrezzo inserito come attività");
+    } catch (error) {
+      console.error("❌ Errore durante l'inserimento attrezzo:", error);
+    }
   };
 
   useEffect(() => {
@@ -181,6 +205,23 @@ const Cordinamento = () => {
           }
         });
         setMezzi(mezziUnici);
+        const attrezziUnici = [];
+        const attrezziAggiunti = new Set();
+
+        dati.forEach((att) => {
+          if (
+            att.Tipo === "Attrezzo" &&
+            att.Descrizione &&
+            !attrezziAggiunti.has(att.Descrizione)
+          ) {
+            attrezziAggiunti.add(att.Descrizione);
+            attrezziUnici.push({
+              id: att.IdRisorsa,
+              name: att.Descrizione,
+            });
+          }
+        });
+        setAttrezzi(attrezziUnici);
 
         setAssegnazioni(assegnazioniIniziali);
       } catch (error) {
@@ -625,6 +666,76 @@ const Cordinamento = () => {
               </button>
               <button
                 onClick={salvaMezzo}
+                style={{
+                  background: "#4caf50",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                Salva
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showAttrezzoModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              padding: "24px",
+              borderRadius: "16px",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
+              width: "320px",
+            }}
+          >
+            <h3 style={{ marginBottom: "16px" }}>Nuovo Attrezzo</h3>
+            <div style={{ marginBottom: "12px" }}>
+              <label>Nome</label>
+              <input
+                type="text"
+                value={newAttrezzo.name}
+                onChange={(e) => setNewAttrezzo({ name: e.target.value })}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowAttrezzoModal(false)}
+                style={{
+                  marginRight: "8px",
+                  background: "#eee",
+                  border: "none",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={salvaAttrezzo}
                 style={{
                   background: "#4caf50",
                   color: "white",
