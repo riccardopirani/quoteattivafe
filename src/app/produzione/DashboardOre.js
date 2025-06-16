@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { PieChart, Pie, Cell } from "recharts";
-
+import CantiereService from "../services/cantiere";
 const COLORS = ["#1f77b4", "#ff7f0e"];
 
 const Card = ({ children }) => (
@@ -46,7 +46,7 @@ const aziendeData = [
 function RegistroProduzione() {
   return (
     <div className="p-4 space-y-8">
-      <Card>
+      {/*<Card>
         <CardContent>
           <h2 className="text-xl font-bold mb-4 text-center">
             Righe da registrare
@@ -76,7 +76,7 @@ function RegistroProduzione() {
             </tbody>
           </table>
         </CardContent>
-      </Card>
+      </Card>*/}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="flex flex-col space-y-4">
@@ -181,15 +181,19 @@ function RegistroProduzione() {
   );
 }
 
-const giorni = [
-  "11/10/25",
-  "12/10/25",
-  "13/10/25",
-  "14/10/25",
-  "15/10/25",
-  "16/10/25",
-  "17/10/25",
-];
+const getCurrentWeekDates = () => {
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay() + 1); // lunedì
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    return d.toLocaleDateString("it-IT"); // "gg/mm/aaaa"
+  });
+};
+
+const giorni = getCurrentWeekDates();
 
 const dataOre = [
   { giorno: "11/10/25", AttivA: 20, Manodopera: 34, Aziende: 16 },
@@ -202,6 +206,85 @@ const dataOre = [
 ];
 
 const DashboardOre = () => {
+  const [datiOreCommessa, setDatiOreCommessa] = useState([]);
+  const [datiOreSettimana, setDatiOreSettimana] = useState([]);
+  useEffect(() => {
+    const caricaDati = async () => {
+      try {
+        const dati = await CantiereService.caricarisorsedashboard({});
+        const dataAggregata = {};
+        const dettaglioCommessa = {};
+
+        dati.forEach((item) => {
+          const { OreInizio, NomeCantiere, Azienda } = item;
+          if (!OreInizio || !NomeCantiere || !Azienda) return;
+
+          const data = new Date(OreInizio);
+          const giorno = data.toLocaleDateString("it-IT");
+          const oreRaw = data.getHours() + data.getMinutes() / 60;
+          const ore = Math.round(oreRaw); // ⬅️ Arrotondamento a 0 decimali
+
+          // Aggregato per grafico
+          if (!dataAggregata[giorno]) {
+            dataAggregata[giorno] = {
+              giorno,
+              AttivA: 0,
+              Manodopera: 0,
+              Aziende: 0,
+            };
+          }
+          if (Azienda === "Attiva Costruzioni S.r.l.") {
+            dataAggregata[giorno].AttivA += ore;
+          } else if (Azienda === "Manodopera") {
+            dataAggregata[giorno].Manodopera += ore;
+          } else {
+            dataAggregata[giorno].Aziende += ore;
+          }
+
+          // Dettaglio per tabella
+          const key = `${NomeCantiere}|||${Azienda}`;
+          if (!dettaglioCommessa[key]) {
+            dettaglioCommessa[key] = {
+              NomeCantiere,
+              Azienda,
+            };
+          }
+
+          dettaglioCommessa[key][giorno] =
+            (dettaglioCommessa[key][giorno] || 0) + ore;
+        });
+
+        const weekDates = getCurrentWeekDates();
+
+        // Popola i dati per il grafico
+        const weekData = weekDates.map(
+          (g) =>
+            dataAggregata[g] || {
+              giorno: g,
+              AttivA: 0,
+              Manodopera: 0,
+              Aziende: 0,
+            }
+        );
+        setDatiOreSettimana(weekData);
+
+        // Normalizza i dati per la tabella
+        const tabellaCommessa = Object.values(dettaglioCommessa).map((r) => {
+          const riga = { ...r };
+          weekDates.forEach((g) => {
+            riga[g] = r[g] || 0;
+          });
+          return riga;
+        });
+        setDatiOreCommessa(tabellaCommessa);
+      } catch (err) {
+        console.error("Errore caricamento dati dashboard:", err);
+      }
+    };
+
+    caricaDati();
+  }, []);
+
   const cellStyle = {
     border: "1px solid #ccc",
     padding: "6px",
@@ -228,7 +311,7 @@ const DashboardOre = () => {
     return entry
       ? Object.values(entry).reduce(
           (a, b) => a + (typeof b === "number" ? b : 0),
-          0,
+          0
         )
       : 0;
   };
@@ -259,14 +342,14 @@ const DashboardOre = () => {
             {giorni.map((_, i) => {
               if (i === 5) {
                 return (
-                  <th key={"dal"} style={{ ...headerStyle, color: "gray" }}>
+                  <th key="dal" style={{ ...headerStyle, color: "gray" }}>
                     DaL.
                   </th>
                 );
               }
               if (i === 6) {
                 return (
-                  <th key={"al"} style={{ ...headerStyle, color: "gray" }}>
+                  <th key="al" style={{ ...headerStyle, color: "gray" }}>
                     Al
                   </th>
                 );
@@ -276,45 +359,47 @@ const DashboardOre = () => {
           </tr>
         </thead>
         <tbody>
-          {["Cod. 365 Bunge", "Cod. 364 Pir"].map((commessa) =>
-            tipologie.map((tipo, idx) => (
-              <tr key={`${commessa}-${tipo}`}>
-                {idx === 0 && (
-                  <td rowSpan={3} style={{ ...cellStyle, fontWeight: "bold" }}>
-                    {commessa}
-                  </td>
-                )}
-                <td
-                  style={{
-                    ...cellStyle,
-                    backgroundColor:
-                      tipo === "Attiv.A"
-                        ? "#4CAF50"
-                        : tipo === "Manodopera"
-                          ? "#FFC107"
-                          : "#90CAF9",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {tipo}
+          {datiOreCommessa.map((riga, idx) => (
+            <tr key={idx}>
+              <td style={cellStyle}>{riga.NomeCantiere}</td>
+              <td
+                style={{
+                  ...cellStyle,
+                  fontWeight: "bold",
+                  backgroundColor:
+                    riga.Azienda === "Attiva Costruzioni S.r.l."
+                      ? "#4CAF50" // verde
+                      : riga.Azienda === "Manodopera"
+                      ? "#FFC107" // giallo
+                      : "#FF8A80", // rosso
+                  color: "#000",
+                }}
+              >
+                {riga.Azienda}
+              </td>
+
+              {giorni.map((g) => (
+                <td key={g} style={cellStyle}>
+                  {riga[g] || 0}
                 </td>
-                {giorni.map((g) => (
-                  <td key={g} style={cellStyle}>
-                    {commessa === "Cod. 365 Bunge" ? getOre(g, tipo) : 0}
-                  </td>
-                ))}
-              </tr>
-            )),
-          )}
+              ))}
+            </tr>
+          ))}
           <tr>
-            <td style={{ ...cellStyle, fontWeight: "bold" }} colSpan={2}>
+            <td colSpan={2} style={{ ...cellStyle, fontWeight: "bold" }}>
               Totale ore lavorate
             </td>
-            {giorni.map((g) => (
-              <td key={g} style={{ ...cellStyle, fontWeight: "bold" }}>
-                {totaleGiorno(g)}
-              </td>
-            ))}
+            {giorni.map((g, idx) => {
+              const totale = datiOreCommessa.reduce(
+                (sum, r) => sum + (r[g] || 0),
+                0
+              );
+              return (
+                <td key={idx} style={{ ...cellStyle, fontWeight: "bold" }}>
+                  {totale}
+                </td>
+              );
+            })}
           </tr>
         </tbody>
       </table>
@@ -322,7 +407,7 @@ const DashboardOre = () => {
       <h3 style={{ marginBottom: 10 }}>Grafico ore lavorate</h3>
       <div style={{ width: "100%", height: 300 }}>
         <ResponsiveContainer>
-          <BarChart data={dataOre}>
+          <BarChart data={datiOreSettimana}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="giorno" />
             <YAxis />

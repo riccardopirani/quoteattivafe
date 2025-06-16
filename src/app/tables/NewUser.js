@@ -307,12 +307,18 @@ const UserManagementDrawer = () => {
 
               <Form.Group className="mb-3">
                 <Form.Label>Azienda</Form.Label>
-                <Form.Control
+                <p></p>
+                <Form.Select
                   name="Azienda"
-                  value="Attiva Costruzioni SRL"
-                  readOnly
-                  disabled
-                />
+                  value={form.Azienda}
+                  onChange={handleChange}
+                >
+                  <option value="Attiva Costruzioni SRL">
+                    Attiva Costruzioni SRL
+                  </option>
+                  <option value="Manodopera">Manodopera</option>
+                  <option value="Aziende">Aziende</option>
+                </Form.Select>
               </Form.Group>
 
               <h6 style={{ marginTop: 20 }}>Permessi</h6>

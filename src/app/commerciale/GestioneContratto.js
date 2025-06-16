@@ -43,7 +43,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   const [datiContratti, setDatiContratti] = useState([]);
   const totaleImportiManuali = datiContratti.reduce(
     (sum, c) => sum + Number(c.CostoTemp2 || 0),
-    0
+    0,
   );
 
   const produzioneTotalePerLavoro = (descrizione) => {
@@ -51,7 +51,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
 
     const righe = righeFatture.filter(
       (r) =>
-        r.Lavoro?.trim().toLowerCase() === descrizione?.trim().toLowerCase()
+        r.Lavoro?.trim().toLowerCase() === descrizione?.trim().toLowerCase(),
     );
     if (righe.length > 0) {
       return righe.reduce((sum, r) => {
@@ -68,7 +68,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
 
   const totaleProduzioneTotale = datiContratti.reduce(
     (sum, c) => sum + produzioneTotalePerLavoro(c.Descrizione),
-    0
+    0,
   );
 
   const produzioneNonFatturata =
@@ -85,7 +85,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
     const fetchProduzione = async () => {
       try {
         const data = await ProduzioneService.leggiProduzione(
-          commessa.IdCantiere
+          commessa.IdCantiere,
         );
         const produzioniPulite = (data || []).map((item) => ({
           IdProduzione: item.IdProduzione,
@@ -155,7 +155,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   const righeConSalNonFatturato = righeFatture.map((r) => {
     const salNonFatturato = Math.max(
       Number(r.Importo2 || 0) - Number(r.Importo || 0),
-      0
+      0,
     );
     return { ...r, salNonFatturato };
   });
@@ -213,7 +213,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
     ];
 
     const sezioniMap = Object.fromEntries(
-      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }])
+      sezioniBase.map((s) => [s.nodo, { ...s, sotto: [] }]),
     );
 
     for (const nodo of datiExternal) {
@@ -342,7 +342,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
           console.error("❌ Errore salvataggio automatico:", err);
         }
       }, 1000),
-    [commessa?.IdCantiere]
+    [commessa?.IdCantiere],
   );
 
   useEffect(() => {
@@ -352,7 +352,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   useEffect(() => {
     const totale = datiContratti.reduce(
       (sum, c) => sum + produzioneResidua(c.Descrizione),
-      0
+      0,
     );
 
     CantiereService.aggiornaCustom({
@@ -364,7 +364,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
 
   const totaleImportiFatture = righeFatture.reduce(
     (sum, r) => sum + Number(r.Importo || 0),
-    0
+    0,
   );
   let residuoFatturare = totaleProduzioneTotale - totaleImportiFatture;
   const produzioneFatturata = (descrizione) => {
@@ -392,11 +392,11 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
 
   const sommaImporto = righeFatture.reduce(
     (sum, r) => sum + parseFloatSafe(r.Importo),
-    0
+    0,
   );
   const sommaImporto2 = righeFatture.reduce(
     (sum, r) => sum + parseFloatSafe(r.Importo2),
-    0
+    0,
   );
 
   const avanzamentoPercentuale =
@@ -421,7 +421,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
           (p) =>
             p.IdProduzione === contratto.IdProduzione &&
             p.Descrizione === contratto.Descrizione &&
-            p.Data === contratto.Data
+            p.Data === contratto.Data,
         );
 
         const payload = {
@@ -442,7 +442,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
           if (isModificato) {
             await ProduzioneService.aggiornaProduzione(
               contratto.IdProduzione,
-              payload
+              payload,
             );
             return true;
           } else {
@@ -474,7 +474,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
       });
 
       const aggiornate = await ProduzioneService.leggiProduzione(
-        commessa.IdCantiere
+        commessa.IdCantiere,
       );
       const produzioniPulite = (aggiornate || []).map((item) => ({
         IdProduzione: item.IdProduzione,
@@ -504,7 +504,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
 
     try {
       const salEsistenti = await ProduzioneService.leggiSal(
-        commessa.IdCantiere
+        commessa.IdCantiere,
       );
 
       const righeConvertite = (salEsistenti || [])
@@ -537,12 +537,12 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
   useEffect(() => {
     const totaleProduzione = datiContratti.reduce(
       (sum, c) => sum + produzioneTotalePerLavoro(c.Descrizione),
-      0
+      0,
     );
 
     const residuo = datiContratti.reduce(
       (sum, c) => sum + produzioneResidua(c.Descrizione),
-      0
+      0,
     );
 
     onProduzioneUpdate({
@@ -853,7 +853,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
                 <td style={cellStyle}>
                   €{" "}
                   {produzioneTotalePerLavoro(
-                    contratto.Descrizione
+                    contratto.Descrizione,
                   ).toLocaleString("it-IT", {
                     minimumFractionDigits: 2,
                   })}
@@ -862,7 +862,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
                 <td style={cellStyle}>
                   €{" "}
                   {Number(
-                    produzioneResidua(contratto.Descrizione) || 0
+                    produzioneResidua(contratto.Descrizione) || 0,
                   ).toLocaleString("it-IT", {
                     minimumFractionDigits: 2,
                   })}
@@ -872,7 +872,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
                     onClick={async () => {
                       try {
                         await ProduzioneService.eliminaProduzione(
-                          contratto.IdProduzione
+                          contratto.IdProduzione,
                         );
 
                         const nuovi = [...datiContratti];
@@ -882,14 +882,14 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
                         Swal.fire(
                           "Eliminato!",
                           "La produzione è stata eliminata.",
-                          "success"
+                          "success",
                         );
                       } catch (err) {
                         console.error("❌ Errore eliminazione:", err);
                         Swal.fire(
                           "Errore",
                           "Impossibile eliminare la produzione.",
-                          "error"
+                          "error",
                         );
                       }
                     }}
@@ -1099,7 +1099,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
                     handleRigaFatturaChange(
                       i,
                       "Importo2",
-                      Number(e.target.value)
+                      Number(e.target.value),
                     )
                   }
                   style={{ width: "100%" }}
