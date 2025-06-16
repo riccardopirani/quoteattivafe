@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "react-datepicker/dist/react-datepicker.css";
 import CantiereService from "../services/cantiere";
 import ApprovvigionamentoService from "../services/approvigionamenti";
@@ -144,6 +144,9 @@ const CommessaTecnico = () => {
     });
   };
 
+  const handleProduzioneUpdate = useCallback((data) => {
+    setDatiProduzione(data);
+  }, []);
   return (
     <div style={{ backgroundColor: "white", minHeight: "100vh" }}>
       <div style={{ padding: "1.5rem" }}>
@@ -245,7 +248,7 @@ const CommessaTecnico = () => {
                   setSelectedCommessa(commessa);
                   localStorage.setItem(
                     "ultimaCommessa",
-                    JSON.stringify(commessa),
+                    JSON.stringify(commessa)
                   );
                   setSearchTerm(" "); // Forza valore unico per consentire successivo retyping
                   setFilteredOptions([]);
@@ -273,12 +276,12 @@ const CommessaTecnico = () => {
         )}
         {selectedTab === "Gestione contratto" && (
           <GestioneContratto
-            key={selectedCommessa?.IdCantiere}
+            key={`${selectedTab}-${selectedCommessa?.IdCantiere || "no"}`}
             commessa={selectedCommessa}
             contratti={contratti}
             datiContratti={datiContratti}
             setDatiContratti={setDatiContratti}
-            onProduzioneUpdate={(dati) => setDatiProduzione(dati)}
+            onProduzioneUpdate={handleProduzioneUpdate}
           />
         )}
 
@@ -680,7 +683,7 @@ const Approvvigionamenti = ({ commessa }) => {
       ApprovvigionamentoService.leggi(commessa.IdCantiere)
         .then((data) => setRighe(data))
         .catch((err) =>
-          console.error("Errore nel caricamento approvvigionamenti:", err),
+          console.error("Errore nel caricamento approvvigionamenti:", err)
         );
     }
   }, [commessa?.IdCantiere]);
@@ -995,15 +998,15 @@ const Approvvigionamenti = ({ commessa }) => {
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Sei sicuro di voler eliminare questo approvvigionamento?",
+                          "Sei sicuro di voler eliminare questo approvvigionamento?"
                         )
                       ) {
                         try {
                           await ApprovvigionamentoService.elimina(
-                            editingItem.Numero,
+                            editingItem.Numero
                           );
                           const updated = await ApprovvigionamentoService.leggi(
-                            commessa?.IdCantiere,
+                            commessa?.IdCantiere
                           );
                           setRighe(updated);
                           chiudiDrawer();
