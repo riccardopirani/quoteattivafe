@@ -1076,7 +1076,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
                 {r.Nodo}
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                {r.Numero1}
+                {i + 1}
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
                 {r.Data1 || ""}
@@ -1086,14 +1086,7 @@ const GestioneContratto = ({ commessa, onProduzioneUpdate }) => {
               </td>
 
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
-                <input
-                  type="text"
-                  value={r.Numero2 || ""}
-                  onChange={(e) =>
-                    handleRigaFatturaChange(i, "Numero2", e.target.value)
-                  }
-                  style={{ width: "100%" }}
-                />
+                {i + 1}
               </td>
               <td style={{ padding: "8px", border: "1px solid #ccc" }}>
                 <input
