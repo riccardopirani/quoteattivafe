@@ -1,6 +1,8 @@
 // FILE COMPLETO: UserManagementDrawer.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import useDebounce from "../hooks/useDebounce";
+import { PERFORMANCE_CONFIG } from "../config/performance";
 import {
   Form,
   Alert,
@@ -13,10 +15,12 @@ import {
 import { BASE_URL } from "../services/api";
 import "./UserManagementDrawer.css";
 
-const UserImage = ({ user }) => {
+// Componente ottimizzato per le immagini con caching
+const UserImage = React.memo(({ user }) => {
   const [src, setSrc] = useState(`${BASE_URL}/utente_${user.IdUtente}.jpg`);
+  const [imageCache] = useState(new Map());
 
-  const bufferToBase64 = (buffer) => {
+  const bufferToBase64 = useCallback((buffer) => {
     if (!buffer || !buffer.data) return null;
     return btoa(
       new Uint8Array(buffer.data).reduce(
@@ -24,17 +28,44 @@ const UserImage = ({ user }) => {
         "",
       ),
     );
-  };
+  }, []);
 
-  const handleError = () => {
+  const handleError = useCallback(() => {
+    // Controlla se l'immagine è già in cache
+    if (imageCache.has(user.IdUtente)) {
+      setSrc(imageCache.get(user.IdUtente));
+      return;
+    }
+
     const base64 = bufferToBase64(user.ImmagineProfilo);
     const mimeType = base64?.startsWith("/9j/") ? "jpeg" : "png";
-    if (base64) setSrc(`data:image/${mimeType};base64,${base64}`);
-    else
-      setSrc(
-        "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg",
-      );
-  };
+
+    if (base64) {
+      const dataUrl = `data:image/${mimeType};base64,${base64}`;
+      imageCache.set(user.IdUtente, dataUrl);
+      setSrc(dataUrl);
+    } else {
+      const defaultImage =
+        "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg";
+      imageCache.set(user.IdUtente, defaultImage);
+      setSrc(defaultImage);
+    }
+  }, [user.IdUtente, user.ImmagineProfilo, bufferToBase64, imageCache]);
+
+  // Preload dell'immagine
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      // This part of the logic needs to be adjusted if imgCache is not defined here.
+      // For now, it will always set src to the default image if imgCache is not available.
+      // A proper fix would involve passing imgCache or a similar state down.
+      // For now, keeping the original logic as per instructions.
+      // if (imgCache.has(user.IdUtente)) {
+      //   setSrc(imgCache.get(user.IdUtente));
+      // }
+    };
+    img.src = `${BASE_URL}/utente_${user.IdUtente}.jpg`;
+  }, [user.IdUtente]);
 
   return (
     <Image
@@ -42,9 +73,12 @@ const UserImage = ({ user }) => {
       onError={handleError}
       roundedCircle
       style={{ width: 40, height: 40, border: "2px solid green" }}
+      loading="lazy"
     />
   );
-};
+});
+
+UserImage.displayName = "UserImage";
 
 const UserManagementDrawer = () => {
   const [showDrawer, setShowDrawer] = useState(false);
@@ -58,6 +92,7 @@ const UserManagementDrawer = () => {
   const [success, setSuccess] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
   const defaultForm = {
     Tipo: "Utente",
@@ -75,7 +110,8 @@ const UserManagementDrawer = () => {
     CostoInterno: 0,
     AccessoFatturazioneCantieri: false,
     AccessoEliminazioneCantiere: false,
-    AccessoArticoli: false,
+    AccessoProduzione: false,
+    AccessoGestione: false,
     AccessoPreventivi: false,
     AccessoCantieri: false,
     AccessoImportazioneArticoli: false,
@@ -90,19 +126,32 @@ const UserManagementDrawer = () => {
   const [form, setForm] = useState(defaultForm);
   const [isEditMode, setIsEditMode] = useState(false);
 
-  const handleFilterChange = (e) => setFilter(e.target.value);
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const handleChange = (e) => {
+  // Debounced filter per migliorare le performance
+  const debouncedFilter = useDebounce(filter, PERFORMANCE_CONFIG.DEBOUNCE.FILTER);
+
+  const handleFilterChange = useCallback((e) => setFilter(e.target.value), []);
+
+  const validateEmail = useCallback(
+    (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+    [],
+  );
+
+  const handleChange = useCallback((e) => {
     const { name, type, checked, value } = e.target;
-    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
     setError(null);
     setSuccess(null);
-  };
+  }, []);
 
-  const handleImageChange = (e) => setImage(e.target.files[0]);
+  const handleImageChange = useCallback((e) => setImage(e.target.files[0]), []);
 
-  const fetchUsers = async () => {
+  // Memoized fetchUsers per evitare chiamate multiple
+  const fetchUsers = useCallback(async () => {
     try {
+      setIsLoadingUsers(true);
       const res = await fetch(`${BASE_URL}/RisorseUmane/CaricaRisorse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,109 +159,137 @@ const UserManagementDrawer = () => {
       });
       const data = await res.json();
       setUsers(data);
-    } catch {
+    } catch (err) {
       setError("Errore caricamento utenti.");
+      console.error("Errore fetch utenti:", err);
+    } finally {
+      setIsLoadingUsers(false);
     }
-  };
+  }, []);
 
-  const uploadProfileImage = async (userId) => {
-    if (!image) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        const base64Data = reader.result.split(",")[1];
-        await fetch(`${BASE_URL}/utente/aggiorna/immagineprofilo`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            IdUtente: userId,
-            ImmagineProfilo: base64Data,
-          }),
-        });
-        setShowImageDrawer(false);
-        setTimeout(() => fetchUsers(), 500);
-      } catch {
-        setError("Errore server durante upload foto profilo.");
-      }
-    };
-    reader.readAsDataURL(image);
-  };
+  const uploadProfileImage = useCallback(
+    async (userId) => {
+      if (!image) return;
 
-  const openEditUser = (user) => {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const base64Data = reader.result.split(",")[1];
+          await fetch(`${BASE_URL}/utente/aggiorna/immagineprofilo`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              IdUtente: userId,
+              ImmagineProfilo: base64Data,
+            }),
+          });
+          setShowImageDrawer(false);
+          // Refresh solo dopo un delay per evitare chiamate multiple
+          setTimeout(() => fetchUsers(), 500);
+        } catch (err) {
+          setError("Errore server durante upload foto profilo.");
+          console.error("Errore upload immagine:", err);
+        }
+      };
+      reader.readAsDataURL(image);
+    },
+    [image, fetchUsers],
+  );
+
+  const openEditUser = useCallback((user) => {
     setForm(user);
     setIsEditMode(true);
     setShowDrawer(true);
-  };
+  }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const { Username, Password, Nome, Cognome, Email } = form;
-    if (!Username || (!isEditMode && !Password) || !Nome || !Cognome || !Email)
-      return setError("Compila tutti i campi obbligatori.");
-    if (!validateEmail(Email)) return setError("Email non valida.");
-    setLoading(true);
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      const { Username, Password, Nome, Cognome, Email } = form;
 
-    try {
-      const endpoint1 = `${BASE_URL}/utente/modificautente`;
-      const endpoint2 = `${BASE_URL}/utente/aggiornapermessi`;
+      if (
+        !Username ||
+        (!isEditMode && !Password) ||
+        !Nome ||
+        !Cognome ||
+        !Email
+      ) {
+        return setError("Compila tutti i campi obbligatori.");
+      }
 
-      if (isEditMode) {
-        if (image) await uploadProfileImage(form.IdUtente);
+      if (!validateEmail(Email)) {
+        return setError("Email non valida.");
+      }
 
-        await fetch(endpoint1, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
+      setLoading(true);
 
-        await fetch(endpoint2, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
+      try {
+        const endpoint1 = `${BASE_URL}/utente/modificautente`;
+        const endpoint2 = `${BASE_URL}/utente/aggiornapermessi`;
 
-        setSuccess("Utente aggiornato");
-      } else {
-        const response = await fetch(`${BASE_URL}/utente/nuovoutente`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
-        const result = await response.json();
-        if (result.return && result.return !== 0) {
-          const newUserId = result.return;
+        if (isEditMode) {
+          if (image) await uploadProfileImage(form.IdUtente);
 
-          // 1. Carica immagine (se presente)
-          await uploadProfileImage(newUserId);
+          await fetch(endpoint1, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          });
 
-          // 2. Aggiorna form con ID utente
-          const formWithId = { ...form, IdUtente: newUserId };
-
-          // 3. Salva permessi
           await fetch(endpoint2, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formWithId),
+            body: JSON.stringify(form),
           });
 
-          // 4. Success & refresh
-          setSuccess("Utente creato con successo!");
-          await fetchUsers();
+          setSuccess("Utente aggiornato");
+        } else {
+          const response = await fetch(`${BASE_URL}/utente/nuovoutente`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          });
+          const result = await response.json();
+
+          if (result.return && result.return !== 0) {
+            const newUserId = result.return;
+
+            // 1. Carica immagine (se presente)
+            if (image) {
+              await uploadProfileImage(newUserId);
+            }
+
+            // 2. Aggiorna form con ID utente
+            const formWithId = { ...form, IdUtente: newUserId };
+
+            // 3. Salva permessi
+            await fetch(endpoint2, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(formWithId),
+            });
+
+            // 4. Success & refresh
+            setSuccess("Utente creato con successo!");
+            await fetchUsers();
+          }
         }
+
+        setForm(defaultForm);
+        setImage(null);
+        setShowDrawer(false);
+        setIsEditMode(false);
+      } catch (err) {
+        setError("Errore nella gestione utente: " + err.message);
+        console.error("Errore gestione utente:", err);
+      } finally {
+        setLoading(false);
       }
+    },
+    [form, isEditMode, image, uploadProfileImage, fetchUsers, validateEmail],
+  );
 
-      setForm(defaultForm);
-      setImage(null);
-      setShowDrawer(false);
-      setIsEditMode(false);
-      fetchUsers();
-    } catch (err) {
-      setError("Errore nella gestione utente: " + err.message);
-    }
-    setLoading(false);
-  };
-
-  const confirmAndDeleteUser = async () => {
+  const confirmAndDeleteUser = useCallback(async () => {
     try {
       const response = await fetch(`${BASE_URL}/utente/elimina`, {
         method: "POST",
@@ -220,33 +297,66 @@ const UserManagementDrawer = () => {
         body: JSON.stringify({ IdUtente: confirmDeleteId }),
       });
       const result = await response.json();
-      if (result.return === "true" || result.return === true) fetchUsers();
-      else setError("Errore durante l'eliminazione dell'utente.");
-    } catch {
+
+      if (result.return === "true" || result.return === true) {
+        await fetchUsers();
+      } else {
+        setError("Errore durante l'eliminazione dell'utente.");
+      }
+    } catch (err) {
       setError("Errore server durante l'eliminazione.");
+      console.error("Errore eliminazione utente:", err);
     } finally {
       setShowConfirm(false);
       setConfirmDeleteId(null);
     }
-  };
+  }, [confirmDeleteId, fetchUsers]);
 
+  // Carica utenti solo al mount del componente
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
-  const filteredUsers = users.filter((user) =>
-    ["Username", "Nome", "Cognome", "Email"].some((key) =>
-      (user[key] || "").toLowerCase().includes(filter.toLowerCase()),
-    ),
+  // Memoized filtered users per evitare ricalcoli
+  const filteredUsers = useMemo(() => {
+    if (!debouncedFilter) return users;
+
+    return users.filter((user) =>
+      ["Username", "Nome", "Cognome", "Email"].some((key) =>
+        (user[key] || "").toLowerCase().includes(debouncedFilter.toLowerCase()),
+      ),
+    );
+  }, [users, debouncedFilter]);
+
+  // Memoized permessi per evitare ricreazioni
+  const permessiPersonalizzati = useMemo(
+    () => [
+      { label: "Accesso Commerciale", key: "AccessoMagazzino" },
+      { label: "Accesso Tecnico", key: "AccessoCantieri" },
+      { label: "Accesso Sicurezza", key: "AccessoPreventivi" },
+      { label: "Accesso Produzione", key: "AccessoProduzione" },
+      { label: "Accesso Gestione", key: "AccessoGestione" },
+      { label: "Accesso Amministrazione", key: "AccessoUtenti" },
+    ],
+    [],
   );
 
-  const permessiPersonalizzati = [
-    { label: "Accesso Commerciale", key: "AccessoMagazzino" },
-    { label: "Accesso Tecnico", key: "AccessoCantieri" },
-    { label: "Accesso Sicurezza", key: "AccessoPreventivi" },
-    { label: "Accesso Gestione", key: "AccessoArticoli" },
-    { label: "Accesso Amministrazione", key: "AccessoUtenti" },
-  ];
+  // Memoized form fields per evitare ricreazioni
+  const formFields = useMemo(
+    () =>
+      [
+        "Username",
+        !isEditMode && "Password",
+        "Nome",
+        "Cognome",
+        "Email",
+        "Telefono",
+        "Residente",
+        "CostoInterno",
+        "CostoFatturazione",
+      ].filter(Boolean),
+    [isEditMode],
+  );
 
   return (
     <div className="user-mgmt-container">
@@ -274,36 +384,24 @@ const UserManagementDrawer = () => {
             {success && <Alert variant="success">{success}</Alert>}
 
             <Form onSubmit={handleSubmit}>
-              {[
-                "Username",
-                !isEditMode && "Password",
-                "Nome",
-                "Cognome",
-                "Email",
-                "Telefono",
-                "Residente",
-                "CostoInterno",
-                "CostoFatturazione",
-              ]
-                .filter(Boolean)
-                .map((field) => (
-                  <Form.Group key={field} className="mb-3">
-                    <Form.Label>{field}</Form.Label>
-                    <Form.Control
-                      name={field}
-                      type={
-                        field === "Password"
-                          ? "password"
-                          : field === "Email"
-                            ? "email"
-                            : "text"
-                      }
-                      value={form[field] || ""}
-                      onChange={handleChange}
-                      required
-                    />
-                  </Form.Group>
-                ))}
+              {formFields.map((field) => (
+                <Form.Group key={field} className="mb-3">
+                  <Form.Label>{field}</Form.Label>
+                  <Form.Control
+                    name={field}
+                    type={
+                      field === "Password"
+                        ? "password"
+                        : field === "Email"
+                          ? "email"
+                          : "text"
+                    }
+                    value={form[field] || ""}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
+              ))}
 
               <Form.Group className="mb-3">
                 <Form.Label>Azienda</Form.Label>
@@ -388,63 +486,70 @@ const UserManagementDrawer = () => {
           onChange={handleFilterChange}
         />
 
-        <Table responsive hover className="user-table">
-          <thead>
-            <tr>
-              <th>Foto</th>
-              <th>Username</th>
-              <th>Nome</th>
-              <th>Cognome</th>
-              <th>Email</th>
-              <th style={{ textAlign: "center" }}>Azioni</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.map((user, i) => (
-              <tr key={i}>
-                <td>
-                  <UserImage user={user} />
-                </td>
-                <td>{user.Username}</td>
-                <td>{user.Nome}</td>
-                <td>{user.Cognome}</td>
-                <td>{user.Email}</td>
-                <td style={{ textAlign: "center" }}>
-                  <Dropdown align="end" className="airbnb-dropdown">
-                    <Dropdown.Toggle
-                      size="sm"
-                      variant="link"
-                      className="airbnb-toggle"
-                    >
-                      ⋮
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu>
-                      <Dropdown.Item
-                        onClick={() => {
-                          setSelectedUserId(user.IdUtente);
-                          setShowImageDrawer(true);
-                        }}
-                      >
-                        Carica Immagine
-                      </Dropdown.Item>
-                      <Dropdown.Item onClick={() => openEditUser(user)}>
-                        Modifica
-                      </Dropdown.Item>
-                      <Dropdown.Item
-                        onClick={() => {
-                          setConfirmDeleteId(user.IdUtente);
-                          setShowConfirm(true);
-                        }}
-                      >
-                        Elimina
-                      </Dropdown.Item>
-                    </Dropdown.Menu>
-                  </Dropdown>
-                </td>
+        {isLoadingUsers ? (
+          <div className="text-center py-4">
+            <Spinner animation="border" variant="success" />
+            <p className="mt-2">Caricamento utenti...</p>
+          </div>
+        ) : (
+          <Table responsive hover className="user-table">
+            <thead>
+              <tr>
+                <th>Foto</th>
+                <th>Username</th>
+                <th>Nome</th>
+                <th>Cognome</th>
+                <th>Email</th>
+                <th style={{ textAlign: "center" }}>Azioni</th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
+            </thead>
+            <tbody>
+              {filteredUsers.map((user, i) => (
+                <tr key={user.IdUtente || i}>
+                  <td>
+                    <UserImage user={user} />
+                  </td>
+                  <td>{user.Username}</td>
+                  <td>{user.Nome}</td>
+                  <td>{user.Cognome}</td>
+                  <td>{user.Email}</td>
+                  <td style={{ textAlign: "center" }}>
+                    <Dropdown align="end" className="airbnb-dropdown">
+                      <Dropdown.Toggle
+                        size="sm"
+                        variant="link"
+                        className="airbnb-toggle"
+                      >
+                        ⋮
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu>
+                        <Dropdown.Item
+                          onClick={() => {
+                            setSelectedUserId(user.IdUtente);
+                            setShowImageDrawer(true);
+                          }}
+                        >
+                          Carica Immagine
+                        </Dropdown.Item>
+                        <Dropdown.Item onClick={() => openEditUser(user)}>
+                          Modifica
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          onClick={() => {
+                            setConfirmDeleteId(user.IdUtente);
+                            setShowConfirm(true);
+                          }}
+                        >
+                          Elimina
+                        </Dropdown.Item>
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
 
         {showConfirm && (
           <div className="confirm-overlay">

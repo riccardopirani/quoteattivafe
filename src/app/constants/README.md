@@ -5,11 +5,13 @@ Questo file contiene tutte le costanti per le route dell'applicazione, centraliz
 ## Come Usare le Costanti
 
 ### 1. Import delle Costanti
+
 ```javascript
 import { ROUTES, MENU_ROUTES, PROGRAMMATIC_ROUTES } from "../constants/routes";
 ```
 
 ### 2. Uso nelle Route
+
 ```javascript
 // Prima (hardcoded)
 <Route path="/login" component={Login} />
@@ -19,6 +21,7 @@ import { ROUTES, MENU_ROUTES, PROGRAMMATIC_ROUTES } from "../constants/routes";
 ```
 
 ### 3. Uso nella Navigazione
+
 ```javascript
 // Prima (hardcoded)
 this.props.history.push("/dashboard");
@@ -28,6 +31,7 @@ this.props.history.push(ROUTES.DASHBOARD);
 ```
 
 ### 4. Uso nei Link
+
 ```javascript
 // Prima (hardcoded)
 <Link to="/commerciale/commesse">Commesse</Link>
@@ -37,6 +41,7 @@ this.props.history.push(ROUTES.DASHBOARD);
 ```
 
 ### 5. Uso nei Redirect
+
 ```javascript
 // Prima (hardcoded)
 window.location.href = "/commerciale/commesse";
@@ -48,34 +53,44 @@ window.location.href = ROUTES.COMMERCIALE_COMMESSE;
 ## Struttura delle Costanti
 
 ### ROUTES
+
 Contiene tutte le route base dell'applicazione:
+
 - `ROUTES.LOGIN` → `/login`
 - `ROUTES.DASHBOARD` → `/dashboard`
 - `ROUTES.COMMERCIALE_COMMESSE` → `/commerciale/commesse`
 
 ### MENU_ROUTES
+
 Contiene le route organizzate per il menu laterale:
+
 - `MENU_ROUTES.COMMERCIALE.MAIN` → Route principale del menu Commerciale
 - `MENU_ROUTES.COMMERCIALE.SUBMENU.IN_STUDIO` → Route del sottomenu "In studio"
 
 ### PROGRAMMATIC_ROUTES
+
 Contiene le route per la navigazione programmatica:
+
 - `PROGRAMMATIC_ROUTES.AFTER_LOGIN` → Route dopo il login
 - `PROGRAMMATIC_ROUTES.AFTER_CREATE_COMMESSA` → Route dopo la creazione di una commessa
 
 ## Helper Functions
 
 ### buildRoute(baseRoute, params)
+
 Costruisce route dinamiche sostituendo i parametri:
+
 ```javascript
 const userProfileRoute = buildRoute(DYNAMIC_ROUTES.USER_PROFILE, { id: 123 });
 // Risultato: /user/123/profile
 ```
 
 ### addQueryParams(route, queryParams)
+
 Aggiunge query parameters a una route:
+
 ```javascript
-const routeWithParams = addQueryParams(ROUTES.UI_BUTTONS, { menu: 'studio' });
+const routeWithParams = addQueryParams(ROUTES.UI_BUTTONS, { menu: "studio" });
 // Risultato: /ui/buttons?menu=studio
 ```
 
@@ -90,6 +105,7 @@ const routeWithParams = addQueryParams(ROUTES.UI_BUTTONS, { menu: 'studio' });
 ## Esempi di Uso
 
 ### Nel Componente AppRoutes
+
 ```javascript
 import { ROUTES } from "./constants/routes";
 
@@ -98,18 +114,18 @@ import { ROUTES } from "./constants/routes";
 ```
 
 ### Nella Sidebar
+
 ```javascript
 import { MENU_ROUTES } from "../constants/routes";
 
 const menuConfig = {
   route: MENU_ROUTES.COMMERCIALE.MAIN,
-  subMenu: [
-    { to: MENU_ROUTES.COMMERCIALE.SUBMENU.IN_STUDIO }
-  ]
+  subMenu: [{ to: MENU_ROUTES.COMMERCIALE.SUBMENU.IN_STUDIO }],
 };
 ```
 
 ### Nella Navigazione Programmatica
+
 ```javascript
 import { PROGRAMMATIC_ROUTES } from "../constants/routes";
 
