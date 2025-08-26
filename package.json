@@ -1,7 +1,7 @@
 {
   "name": "star-admin-pro-react",
   "version": "1.1.0",
-  "homepage": "https://bootstrapdash.com/demo/star-admin-free/react/template/demo_1/preview",
+  "homepage": ".",
   "private": true,
   "dependencies": {
     "@babel/core": "7.5.5",
@@ -151,10 +151,10 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "set NODE_OPTIONS=--openssl-legacy-provider&& set PORT=4500&& node scripts/start.js",
-    "start-local": "node scripts/start.js",
-    "build": "node scripts/build.js",
-    "test": "node scripts/test.js"
+    "start": "react-scripts start",
+    "start-local": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -172,7 +172,12 @@
     ]
   },
   "devDependencies": {
-    "sass": "^1.89.0"
+    "browserify-zlib": "^0.2.0",
+    "buffer": "^6.0.3",
+    "process": "^0.11.10",
+    "sass": "^1.89.0",
+    "stream-browserify": "^3.0.0",
+    "util": "^0.12.5"
   },
   "jest": {
     "roots": [

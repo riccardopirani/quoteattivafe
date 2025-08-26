@@ -1,17 +1,15 @@
 // FILE COMPLETO: UserManagementDrawer.jsx
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import useDebounce from "../hooks/useDebounce";
 import { PERFORMANCE_CONFIG } from "../config/performance";
-import {
-  Form,
-  Alert,
-  Spinner,
-  Table,
-  Button,
-  Image,
-  Dropdown,
-} from "react-bootstrap";
+import { Form, Alert, Spinner, Table, Button, Dropdown } from "react-bootstrap";
 import { BASE_URL } from "../services/api";
 import "./UserManagementDrawer.css";
 
@@ -56,24 +54,24 @@ const UserImage = React.memo(({ user }) => {
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      // This part of the logic needs to be adjusted if imgCache is not defined here.
-      // For now, it will always set src to the default image if imgCache is not available.
-      // A proper fix would involve passing imgCache or a similar state down.
-      // For now, keeping the original logic as per instructions.
-      // if (imgCache.has(user.IdUtente)) {
-      //   setSrc(imgCache.get(user.IdUtente));
-      // }
+      // Gestione del preload
     };
     img.src = `${BASE_URL}/utente_${user.IdUtente}.jpg`;
   }, [user.IdUtente]);
 
   return (
-    <Image
+    <img
       src={src}
       onError={handleError}
-      roundedCircle
-      style={{ width: 40, height: 40, border: "2px solid green" }}
+      style={{
+        width: 40,
+        height: 40,
+        border: "2px solid green",
+        borderRadius: "50%",
+        objectFit: "cover",
+      }}
       loading="lazy"
+      alt={`Foto profilo ${user.Nome || user.Username}`}
     />
   );
 });
@@ -93,6 +91,10 @@ const UserManagementDrawer = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+
+  // Ref per evitare chiamate multiple durante il cleanup
+  const isMountedRef = useRef(true);
+  const fetchInProgressRef = useRef(false);
 
   const defaultForm = {
     Tipo: "Utente",
@@ -127,7 +129,10 @@ const UserManagementDrawer = () => {
   const [isEditMode, setIsEditMode] = useState(false);
 
   // Debounced filter per migliorare le performance
-  const debouncedFilter = useDebounce(filter, PERFORMANCE_CONFIG.DEBOUNCE.FILTER);
+  const debouncedFilter = useDebounce(
+    filter,
+    PERFORMANCE_CONFIG.DEBOUNCE.FILTER,
+  );
 
   const handleFilterChange = useCallback((e) => setFilter(e.target.value), []);
 
@@ -149,21 +154,47 @@ const UserManagementDrawer = () => {
   const handleImageChange = useCallback((e) => setImage(e.target.files[0]), []);
 
   // Memoized fetchUsers per evitare chiamate multiple
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (showLoading = true) => {
+    // Previene chiamate multiple simultanee
+    if (fetchInProgressRef.current) {
+      console.log("🔄 Fetch già in corso, skip...");
+      return;
+    }
+
     try {
-      setIsLoadingUsers(true);
+      fetchInProgressRef.current = true;
+
+      if (showLoading) {
+        setIsLoadingUsers(true);
+      }
+
       const res = await fetch(`${BASE_URL}/RisorseUmane/CaricaRisorse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
-      setUsers(data);
+
+      // Aggiorna solo se il componente è ancora montato
+      if (isMountedRef.current) {
+        setUsers(data);
+        console.log(`✅ ${data.length} utenti caricati con successo`);
+      }
     } catch (err) {
-      setError("Errore caricamento utenti.");
-      console.error("Errore fetch utenti:", err);
+      console.error("❌ Errore fetch utenti:", err);
+      if (isMountedRef.current) {
+        setError("Errore caricamento utenti.");
+      }
     } finally {
-      setIsLoadingUsers(false);
+      if (isMountedRef.current) {
+        setIsLoadingUsers(false);
+      }
+      fetchInProgressRef.current = false;
     }
   }, []);
 
@@ -183,12 +214,15 @@ const UserManagementDrawer = () => {
               ImmagineProfilo: base64Data,
             }),
           });
+
           setShowImageDrawer(false);
-          // Refresh solo dopo un delay per evitare chiamate multiple
-          setTimeout(() => fetchUsers(), 500);
+          setImage(null);
+
+          // Refresh silenzioso senza loading
+          setTimeout(() => fetchUsers(false), 300);
         } catch (err) {
+          console.error("❌ Errore upload immagine:", err);
           setError("Errore server durante upload foto profilo.");
-          console.error("Errore upload immagine:", err);
         }
       };
       reader.readAsDataURL(image);
@@ -222,13 +256,18 @@ const UserManagementDrawer = () => {
       }
 
       setLoading(true);
+      setError(null);
+      setSuccess(null);
 
       try {
         const endpoint1 = `${BASE_URL}/utente/modificautente`;
         const endpoint2 = `${BASE_URL}/utente/aggiornapermessi`;
 
         if (isEditMode) {
-          if (image) await uploadProfileImage(form.IdUtente);
+          // Modifica utente esistente
+          if (image) {
+            await uploadProfileImage(form.IdUtente);
+          }
 
           await fetch(endpoint1, {
             method: "POST",
@@ -242,13 +281,18 @@ const UserManagementDrawer = () => {
             body: JSON.stringify(form),
           });
 
-          setSuccess("Utente aggiornato");
+          setSuccess("Utente aggiornato con successo!");
+
+          // Refresh silenzioso
+          setTimeout(() => fetchUsers(false), 300);
         } else {
+          // Nuovo utente
           const response = await fetch(`${BASE_URL}/utente/nuovoutente`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(form),
           });
+
           const result = await response.json();
 
           if (result.return && result.return !== 0) {
@@ -269,19 +313,21 @@ const UserManagementDrawer = () => {
               body: JSON.stringify(formWithId),
             });
 
-            // 4. Success & refresh
             setSuccess("Utente creato con successo!");
-            await fetchUsers();
+
+            // Refresh silenzioso
+            setTimeout(() => fetchUsers(false), 300);
           }
         }
 
+        // Reset form e chiudi drawer
         setForm(defaultForm);
         setImage(null);
         setShowDrawer(false);
         setIsEditMode(false);
       } catch (err) {
+        console.error("❌ Errore gestione utente:", err);
         setError("Errore nella gestione utente: " + err.message);
-        console.error("Errore gestione utente:", err);
       } finally {
         setLoading(false);
       }
@@ -296,26 +342,39 @@ const UserManagementDrawer = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ IdUtente: confirmDeleteId }),
       });
+
       const result = await response.json();
 
       if (result.return === "true" || result.return === true) {
-        await fetchUsers();
+        setSuccess("Utente eliminato con successo!");
+
+        // Refresh silenzioso
+        setTimeout(() => fetchUsers(false), 300);
       } else {
         setError("Errore durante l'eliminazione dell'utente.");
       }
     } catch (err) {
+      console.error("❌ Errore eliminazione utente:", err);
       setError("Errore server durante l'eliminazione.");
-      console.error("Errore eliminazione utente:", err);
     } finally {
       setShowConfirm(false);
       setConfirmDeleteId(null);
     }
   }, [confirmDeleteId, fetchUsers]);
 
-  // Carica utenti solo al mount del componente
+  // Cleanup al mount/unmount
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    isMountedRef.current = true;
+    fetchInProgressRef.current = false;
+
+    // Carica utenti solo al mount del componente
+    fetchUsers(true);
+
+    return () => {
+      isMountedRef.current = false;
+      fetchInProgressRef.current = false;
+    };
+  }, []); // Rimuovo fetchUsers dalle dipendenze
 
   // Memoized filtered users per evitare ricalcoli
   const filteredUsers = useMemo(() => {
@@ -477,7 +536,7 @@ const UserManagementDrawer = () => {
       </div>
 
       <div className="user-list">
-        <h4>Utenti Attivi</h4>
+        <h4>Utenti Attivi ({users.length})</h4>
         <input
           type="text"
           className="form-control mb-3"

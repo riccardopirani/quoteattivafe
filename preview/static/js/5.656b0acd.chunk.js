@@ -17930,7 +17930,12 @@
                           t.params.container.show(),
                           t.updateSize(),
                           1 === n.history.length && n.backButton.hide(),
-                          t.setFocus({ scale: 1, x: 0.5, y: 0.5, animate: !0 });
+                          t.setFocus({
+                            scale: 1,
+                            x: 0.5,
+                            y: 0.5,
+                            animate: !0,
+                          });
                       },
                     );
                   },
