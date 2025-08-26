@@ -2,19 +2,20 @@ import React, { Component } from "react";
 import { Link, withRouter } from "react-router-dom";
 import { Collapse, Spinner } from "react-bootstrap";
 import { BASE_URL } from "../services/api";
+import { MENU_ROUTES } from "../constants/routes";
 import "./Sidebar.css";
 
 const permessiPersonalizzati = [
   {
     label: "Commerciale",
     key: "AccessoMagazzino",
-    route: "/gare/upcoming",
+    route: MENU_ROUTES.COMMERCIALE.MAIN,
     subMenu: [
-      { label: "Riepilogo", to: "/gare/upcoming" },
-      { label: "In studio", to: "/basic-ui/buttons?menu=studio" },
-      { label: "Consegnate", to: "/basic-ui/buttons?menu=consegnate" },
-      { label: "Aggiudicate", to: "/basic-ui/buttons?menu=aggiudicate" },
-      { label: "Perse", to: "/basic-ui/buttons?menu=perse" },
+      { label: "Riepilogo", to: MENU_ROUTES.COMMERCIALE.SUBMENU.RIEPILOGO },
+      { label: "In studio", to: MENU_ROUTES.COMMERCIALE.SUBMENU.IN_STUDIO },
+      { label: "Consegnate", to: MENU_ROUTES.COMMERCIALE.SUBMENU.CONSEGNATE },
+      { label: "Aggiudicate", to: MENU_ROUTES.COMMERCIALE.SUBMENU.AGGIUDICATE },
+      { label: "Perse", to: MENU_ROUTES.COMMERCIALE.SUBMENU.PERSE },
     ],
     menuKey: "commercialeMenuOpen",
     icon: "mdi mdi-crosshairs-gps",
@@ -22,46 +23,55 @@ const permessiPersonalizzati = [
   {
     label: "Tecnico",
     key: "AccessoCantieri",
-    route: "/tecnico/dashboard",
+    route: MENU_ROUTES.TECNICO.MAIN,
     subMenu: [
-      { label: "Dashboard", to: "/tecnico/dashboard" },
-      { label: "Controllo Gestione Commessa", to: "/gestione/commesse" },
+      { label: "Dashboard", to: MENU_ROUTES.TECNICO.SUBMENU.DASHBOARD },
+      {
+        label: "Controllo Gestione Commessa",
+        to: MENU_ROUTES.TECNICO.SUBMENU.CONTROLLO_GESTIONE_COMMESSA,
+      },
     ],
     menuKey: "tecnicoMenuOpen",
     icon: "mdi mdi-format-list-bulleted",
   },
   {
     label: "Produzione",
-    key: "AccessoArticoli",
-    route: "/produzione/dashboard",
+    key: "AccessoProduzione",
+    route: MENU_ROUTES.PRODUZIONE.MAIN,
     subMenu: [
-      { label: "Cordinamento", to: "/produzione/cordinamento" },
-      { label: "Dashboard", to: "/produzione/dashboard" },
-      { label: "Gestione Commessa", to: "/produzione/gestionecommessa" },
+      {
+        label: "Cordinamento",
+        to: MENU_ROUTES.PRODUZIONE.SUBMENU.CORDINAMENTO,
+      },
+      { label: "Dashboard", to: MENU_ROUTES.PRODUZIONE.SUBMENU.DASHBOARD },
+      {
+        label: "Gestione Commessa",
+        to: MENU_ROUTES.PRODUZIONE.SUBMENU.GESTIONE_COMMESSA,
+      },
     ],
-    menuKey: "ProduzioneMenuOpen",
+    menuKey: "produzioneMenuOpen",
     icon: "mdi mdi-format-list-bulleted",
   },
   {
     label: "Sicurezza",
     key: "AccessoPreventivi",
-    route: "/form-elements",
+    route: MENU_ROUTES.SICUREZZA.MAIN,
     subMenu: [],
     menuKey: "sicurezzaMenuOpen",
     icon: "mdi mdi-table-large",
   },
   {
     label: "Gestione",
-    key: "AccessoArticoli",
-    route: "/basic-ui/newsuer",
-    subMenu: [{ label: "Utenti", to: "/basic-ui/newsuer" }],
+    key: "AccessoGestione",
+    route: MENU_ROUTES.GESTIONE.MAIN,
+    subMenu: [{ label: "Utenti", to: MENU_ROUTES.GESTIONE.SUBMENU.UTENTI }],
     menuKey: "gestioneMenuOpen",
     icon: "mdi mdi-account-box-outline",
   },
   {
     label: "Amministrazione",
     key: "AccessoUtenti",
-    route: "/charts",
+    route: MENU_ROUTES.AMMINISTRAZIONE.MAIN,
     subMenu: [],
     menuKey: "amministrazioneMenuOpen",
     icon: "mdi mdi-chart-line",
@@ -78,14 +88,17 @@ class Sidebar extends Component {
 
   toggleMenuState = (menuKey) => {
     this.setState((prevState) => {
+      // Assicurati che tutti i menu siano chiusi tranne quello cliccato
       const newMenuStates = {
-        ...Object.keys(prevState.menuStates).reduce((acc, key) => {
-          acc[key] = false;
-          return acc;
-        }, {}),
+        commercialeMenuOpen: false,
+        tecnicoMenuOpen: false,
+        produzioneMenuOpen: false,
+        sicurezzaMenuOpen: false,
+        gestioneMenuOpen: false,
+        amministrazioneMenuOpen: false,
         [menuKey]: !prevState.menuStates[menuKey],
       };
-      localStorage.setItem("menuStates", JSON.stringify(newMenuStates));
+
       return { menuStates: newMenuStates };
     });
   };
@@ -96,12 +109,69 @@ class Sidebar extends Component {
     }));
   };
 
-  async componentDidMount() {
-    // Ripristina stato dei menu da localStorage
-    const storedMenuStates = localStorage.getItem("menuStates");
-    if (storedMenuStates) {
-      this.setState({ menuStates: JSON.parse(storedMenuStates) });
+  initializeMenuStates = () => {
+    // Inizializza tutti i menu come chiusi
+    const initialMenuStates = {
+      commercialeMenuOpen: false,
+      tecnicoMenuOpen: false,
+      produzioneMenuOpen: false,
+      sicurezzaMenuOpen: false,
+      gestioneMenuOpen: false,
+      amministrazioneMenuOpen: false,
+    };
+
+    this.setState({ menuStates: initialMenuStates });
+  };
+
+  openMenuForCurrentRoute = () => {
+    const currentPath = this.props.location.pathname;
+    console.log("🔄 Cambio route rilevato:", currentPath);
+
+    // Determina quale menu aprire in base alla route corrente
+    let menuToOpen = null;
+
+    if (
+      currentPath.startsWith("/gare") ||
+      currentPath.startsWith("/commerciale")
+    ) {
+      menuToOpen = "commercialeMenuOpen";
+    } else if (currentPath.startsWith("/tecnico")) {
+      menuToOpen = "tecnicoMenuOpen";
+    } else if (currentPath.startsWith("/produzione")) {
+      menuToOpen = "produzioneMenuOpen";
+    } else if (currentPath.startsWith("/ui")) {
+      menuToOpen = "sicurezzaMenuOpen";
+    } else if (currentPath.startsWith("/tables")) {
+      menuToOpen = "gestioneMenuOpen";
+    } else if (currentPath.startsWith("/charts")) {
+      menuToOpen = "amministrazioneMenuOpen";
+    } else if (currentPath === "/" || currentPath === "/dashboard") {
+      // Per la dashboard, non aprire nessun menu specifico
+      console.log("📍 Dashboard - nessun menu specifico da aprire");
+      return;
     }
+
+    if (menuToOpen) {
+      console.log(`🎯 Apro menu: ${menuToOpen} per route: ${currentPath}`);
+      this.setState((prevState) => ({
+        menuStates: {
+          ...prevState.menuStates,
+          [menuToOpen]: true,
+        },
+      }));
+    } else {
+      console.log("❌ Nessun menu trovato per la route:", currentPath);
+    }
+  };
+
+  async componentDidMount() {
+    // Inizializza lo stato dei menu
+    this.initializeMenuStates();
+
+    // Aggiungi listener per i cambiamenti di route
+    this.unlisten = this.props.history.listen(() => {
+      this.openMenuForCurrentRoute();
+    });
 
     const userIdStr = localStorage.getItem("userId");
     const userId = userIdStr ? parseInt(userIdStr) : null;
@@ -123,6 +193,11 @@ class Sidebar extends Component {
           user: currentUser || null,
           loading: false,
         });
+
+        // Apri il menu appropriato in base alla route corrente
+        setTimeout(() => {
+          this.openMenuForCurrentRoute();
+        }, 100); // Piccolo delay per assicurarsi che lo stato sia aggiornato
       } catch (err) {
         console.error("Errore fetch utente:", err);
         this.setState({ loading: false });
@@ -143,6 +218,13 @@ class Sidebar extends Component {
     this.props.history.push("/login");
   };
 
+  componentWillUnmount() {
+    // Rimuovi il listener della history
+    if (this.unlisten) {
+      this.unlisten();
+    }
+  }
+
   render() {
     const { user, menuStates, loading, sidebarOpen } = this.state;
 
@@ -155,6 +237,18 @@ class Sidebar extends Component {
     }
 
     const permessi = user || {};
+
+    // Debug: mostra i permessi dell'utente
+    console.log("Permessi utente:", permessi);
+    console.log("User completo:", user);
+
+    // Se l'utente è Amministratore, mostra un messaggio speciale
+    if (user?.Tipo === "Amministratore") {
+      console.log(
+        "🚀 UTENTE AMMINISTRATORE RILEVATO - Tutti i menu sono abilitati!",
+      );
+    }
+
     const imageUrl = user
       ? `${BASE_URL}/utente_${user.IdUtente}.jpg`
       : "https://www.attivacostruzioni.it/wp-content/uploads/2020/07/logo-attiva-costruzioni-menu.jpg";
@@ -219,8 +313,16 @@ class Sidebar extends Component {
           </div>
 
           {permessiPersonalizzati.map(
-            ({ label, key, route, subMenu, menuKey, icon }) =>
-              permessi[key] ? (
+            ({ label, key, route, subMenu, menuKey, icon }) => {
+              // Se l'utente è Amministratore, abilita tutti i menu
+              const isAdmin = user?.Tipo === "Amministratore";
+              const hasPermission = isAdmin || permessi[key];
+
+              console.log(
+                `Menu ${label}: key=${key}, permesso=${permessi[key]}, isAdmin=${isAdmin}, hasPermission=${hasPermission}`,
+              );
+
+              return hasPermission ? (
                 <li
                   key={key}
                   className={
@@ -273,7 +375,8 @@ class Sidebar extends Component {
                     </Collapse>
                   )}
                 </li>
-              ) : null,
+              ) : null;
+            },
           )}
 
           <li className="nav-item mt-4">

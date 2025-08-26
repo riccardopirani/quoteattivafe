@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ROUTES } from "../constants/routes";
 import { Drawer, Button } from "antd";
 import { Select, Input } from "antd";
 import CantiereService from "../services/cantiere";
@@ -644,8 +645,7 @@ function DashboardTabsPanoramica() {
     if (value === "nuova") {
       setIsDrawerOpen(false);
 
-      window.location.href =
-        "/demo/star-admin-free/react/template/demo_1/preview/gestione/commesse";
+      window.location.href = ROUTES.COMMERCIALE_COMMESSE;
     }
   };
   const creaClienteECantiereECommessa = async () => {
@@ -707,8 +707,7 @@ function DashboardTabsPanoramica() {
       console.log("Commessa creata:", commessaRes);
 
       if (idCantiere) {
-        window.location.href =
-          "/demo/star-admin-free/react/template/demo_1/preview/gestione/commesse";
+        window.location.href = ROUTES.COMMERCIALE_COMMESSE;
       } else {
         console.warn("ID cantiere non presente nella risposta:", commessaRes);
         setIsDrawerOpen(false); // fallback

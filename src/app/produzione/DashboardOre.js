@@ -264,7 +264,7 @@ const DashboardOre = () => {
               AttivA: 0,
               Manodopera: 0,
               Aziende: 0,
-            }
+            },
         );
         setDatiOreSettimana(weekData);
 
@@ -311,7 +311,7 @@ const DashboardOre = () => {
     return entry
       ? Object.values(entry).reduce(
           (a, b) => a + (typeof b === "number" ? b : 0),
-          0
+          0,
         )
       : 0;
   };
@@ -370,8 +370,8 @@ const DashboardOre = () => {
                     riga.Azienda === "Attiva Costruzioni S.r.l."
                       ? "#4CAF50" // verde
                       : riga.Azienda === "Manodopera"
-                      ? "#FFC107" // giallo
-                      : "#FF8A80", // rosso
+                        ? "#FFC107" // giallo
+                        : "#FF8A80", // rosso
                   color: "#000",
                 }}
               >
@@ -392,7 +392,7 @@ const DashboardOre = () => {
             {giorni.map((g, idx) => {
               const totale = datiOreCommessa.reduce(
                 (sum, r) => sum + (r[g] || 0),
-                0
+                0,
               );
               return (
                 <td key={idx} style={{ ...cellStyle, fontWeight: "bold" }}>

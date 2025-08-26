@@ -1,5 +1,6 @@
 import React, { Component, Suspense, lazy } from "react";
 import { Switch, Route, Redirect } from "react-router-dom";
+import { ROUTES } from "./constants/routes";
 
 import Spinner from "../app/shared/Spinner";
 import UserManagementDrawer from "./tables/NewUser";
@@ -20,6 +21,7 @@ const Login = lazy(() => import("./user-pages/Login"));
 const GestioneCommessaUI = lazy(
   () => import("./produzione/GestioneCommessaUI"),
 );
+
 class AppRoutes extends Component {
   render() {
     const isLoggedIn = localStorage.getItem("isLogin");
@@ -27,29 +29,65 @@ class AppRoutes extends Component {
     return (
       <Suspense fallback={<Spinner />}>
         <Switch>
-          <Route path="/user-pages/login-1" component={Login} />
-          {!isLoggedIn && <Redirect to="/user-pages/login-1" />}
-          <Route exact path="/dashboard" component={Dashboard} />
-          <Route path="/basic-ui/buttons" component={Buttons} />
-          <Route path="/basic-ui/dropdowns" component={Dropdowns} />
-          <Route path="/gare/upcoming" component={GareUpcoming} />
-          <Route path="/gestione/commesse" component={GestioneCommesse} />
-          <Route path="/gestione/dashboard" component={DashboardOre} />
-          <Route path="/tecnico/dashboard" component={DashboardPanoramica} />
-          <Route path="/produzione/cordinamento" component={Cordinamento} />
-          <Route path="/produzione/dashboard" component={PanoramicaDashboard} />
+          {/* Authentication Routes */}
+          <Route path={ROUTES.LOGIN} component={Login} />
+          {!isLoggedIn && <Redirect to={ROUTES.LOGIN} />}
+
+          {/* Dashboard Routes */}
+          <Route exact path={ROUTES.HOME} component={Dashboard} />
+          <Route exact path={ROUTES.DASHBOARD} component={Dashboard} />
+
+          {/* Basic UI Routes */}
+          <Route path={ROUTES.UI_BUTTONS} component={Buttons} />
+          <Route path={ROUTES.UI_DROPDOWNS} component={Dropdowns} />
+
+          {/* Gare Routes */}
+          <Route path={ROUTES.GARE_UPCOMING} component={GareUpcoming} />
+
+          {/* Commerciale Routes */}
           <Route
-            path="/produzione/gestionecommessa"
+            path={ROUTES.COMMERCIALE_COMMESSE}
+            component={GestioneCommesse}
+          />
+          <Route
+            path={ROUTES.COMMERCIALE_CORDINAMENTO}
+            component={Cordinamento}
+          />
+
+          {/* Produzione Routes */}
+          <Route
+            path={ROUTES.PRODUZIONE_DASHBOARD}
+            component={PanoramicaDashboard}
+          />
+          <Route
+            path={ROUTES.PRODUZIONE_DASHBOARD_GLOBAL}
+            component={DashboardOre}
+          />
+          <Route
+            path={ROUTES.PRODUZIONE_GESTIONE_COMMESSA}
             component={GestioneCommessaUI}
           />
 
-          <Route path="/tables/basic-table" component={BasicTable} />
-          <Route path="/icons/mdi" component={BasicTable} />
-          <Route path="/charts/chart-js" component={BasicTable} />
-          <Route path="/error-pages/error-404" component={Error404} />
-          <Route path="/error-pages/error-500" component={Error500} />
-          <Route path="/basic-ui/newsuer" component={UserManagementDrawer} />
-          <Redirect to="/user-pages/login-1" />
+          {/* Tecnico Routes */}
+          <Route
+            path={ROUTES.TECNICO_DASHBOARD}
+            component={DashboardPanoramica}
+          />
+
+          {/* Table Routes */}
+          <Route path={ROUTES.TABLES_BASIC} component={BasicTable} />
+          <Route path={ROUTES.TABLES_USERS} component={UserManagementDrawer} />
+
+          {/* Other Routes */}
+          <Route path={ROUTES.ICONS} component={BasicTable} />
+          <Route path={ROUTES.CHARTS} component={BasicTable} />
+
+          {/* Error Routes */}
+          <Route path={ROUTES.ERROR_404} component={Error404} />
+          <Route path={ROUTES.ERROR_500} component={Error500} />
+
+          {/* Default redirect */}
+          <Redirect to={ROUTES.LOGIN} />
         </Switch>
       </Suspense>
     );
